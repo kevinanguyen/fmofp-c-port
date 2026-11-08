@@ -13,6 +13,8 @@ The binaries are named by environment variables (CI sets them):
     FMOFP_MISSION   partitions/fmofp_mission
     FMOFP_MISSION_TOOL partitions/fmofp_mission_tool
     FMOFP_COMMS     partitions/fmofp_comms
+    FMOFP_DEFENSIVE partitions/fmofp_defensive
+    FMOFP_DEFENSIVE_TOOL partitions/fmofp_defensive_tool
 """
 
 import os

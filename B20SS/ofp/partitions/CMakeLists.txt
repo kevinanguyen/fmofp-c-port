@@ -115,3 +115,20 @@ target_link_libraries(ofp_comms PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
 
 add_executable(fmofp_comms comms/src/main.cpp)
 target_link_libraries(fmofp_comms PRIVATE ofp::comms ofp::rt_process ofp::bc ofp::warnings)
+
+# Defensive systems, RT 22: the radar warning receiver's contact table over the
+# fused air tracks and the plant's ESM intercepts, the chaff and flare
+# dispensers with the automatic salvo and its cooldown, and the ECM mode
+# (DefensiveService). fmofp_defensive_tool exposes the logic on stdin/stdout
+# for the oracle tests.
+add_library(ofp_defensive STATIC defensive/src/defensive_systems.cpp)
+add_library(ofp::defensive ALIAS ofp_defensive)
+add_dependencies(ofp_defensive ofp_icd_generate)
+target_include_directories(ofp_defensive PUBLIC defensive/include)
+target_link_libraries(ofp_defensive PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_defensive defensive/src/main.cpp)
+target_link_libraries(fmofp_defensive PRIVATE ofp::defensive ofp::rt_process ofp::bc ofp::warnings)
+
+add_executable(fmofp_defensive_tool defensive/tools/defensive_tool.cpp)
+target_link_libraries(fmofp_defensive_tool PRIVATE ofp::defensive ofp::warnings)

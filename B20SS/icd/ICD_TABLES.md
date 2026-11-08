@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.16 (DRAFT, 2026-11-02). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.17 (DRAFT, 2026-11-07). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -20,17 +20,17 @@
 | 11 | `pfd` | Primary flight display | changed | Interfaces/userInterface/displays/pfd.py | Was the single 'Display System' terminal; one process per display means each display needs its own address. On the bus from v1.5 (fmofp_display pfd): it hears the FMS's flight data, status and attitude status by broadcast (RT 31 SA 25-27, v1.7; copies of its own on SA 1-3 until then) |
 | 12 | `flightmanagementsystem` | Flight management system | existing | Systems/flightManagementSys: flightManagementSystem.py and fmsControl.py | Ported in v1.2. Its attitude comes from the FCS over the bus, as the Python copied it from its own flight control object |
 | 13 | `mfd` | Multi-function display | new | Interfaces/userInterface/displays/mfd.py | On the bus from v1.6 (fmofp_display mfd): its radar page mirrors the radars' pictures from the broadcasts the radar display hears too (RT 31 SA 1-4, 6-9), its systems page reads the FCS's GCAS alerts and exceedances (31/5, 31/10), its mission page the FMS flight data (31/25) and, from v1.8, its systems and engine pages the engine computer's engine and fuel status (31/18, 31/19); v1.6 gave it copies of its own on SA 1-11, v1.7 the broadcasts. Its radar commands moved to the radar display terminal in v1.5; it commands nothing. From v1.11 its targeting page draws the targeting radar's tracks (31/24, 31/20-21). From v1.15 the targeting, AEWC and SAR pictures, which only it draws, come by relay into its own receive subaddresses 20-21, 22-23 and 26-27 instead of broadcasts (one consumer, one transfer either way; README section 8) |
-| 14 | `eicas` | Engine indicating and crew alerting display | new | Interfaces/userInterface/displays/eicas.py | On the bus from v1.9 (fmofp_display eicas): it hears the engine computer's engine and fuel status (31/18-19), the flight computer's GCAS alerts and exceedances (31/5, 31/10), the FMS's flight data and status (31/25-26) and the weather radar's scan summary (31/2) by broadcast, and commands nothing. Its hydraulic, electrical and environmental rows read unknown until those terminals exist |
+| 14 | `eicas` | Engine indicating and crew alerting display | new | Interfaces/userInterface/displays/eicas.py | On the bus from v1.9 (fmofp_display eicas): it hears the engine computer's engine and fuel status (31/18-19), the flight computer's GCAS alerts and exceedances (31/5, 31/10), the FMS's flight data and status (31/25-26) and the weather radar's scan summary (31/2) by broadcast, and commands nothing. Its hydraulic, electrical and environmental rows read unknown until those terminals exist. From v1.17 it hears the defensive systems status by relay into its own SA 1 (EICAS_DEF_STATUS) and the radar warning contacts by broadcast (31/16-17) |
 | 15 | `radar_display` | Radar display - the radars' pictures and their control panel | new | Interfaces/userInterface/displays/radar | On the bus from v1.5 (fmofp_display radar): it hears the weather and terrain-following radars' status, scan summary and guidance by broadcast (RT 31 SA 1-4) and their products as broadcast blocks (31 SA 6-9; copies of its own on the same numbers until v1.7), and commands the radars (SA 20-24); from v1.11 it hears the targeting radar's status too (31/24) and commands that radar |
-| 16 | `tsd` | Tactical situation display | new | Interfaces/userInterface/displays/tsd.py | On the bus from v1.11 (fmofp_display tsd): it hears the fused air tracks (31/22-23) and the FMS's flight data, status and attitude status (31/25-27) by broadcast, the energy maneuverability by relay into its own SA 1 (TSD_FMS_ENERGY; broadcast at 31/28 until v1.15), and commands nothing. Its waypoints, order of battle and radar warning contacts wait for the mission and defensive terminals |
+| 16 | `tsd` | Tactical situation display | new | Interfaces/userInterface/displays/tsd.py | On the bus from v1.11 (fmofp_display tsd): it hears the fused air tracks (31/22-23) and the FMS's flight data, status and attitude status (31/25-27) by broadcast, the energy maneuverability by relay into its own SA 1 (TSD_FMS_ENERGY; broadcast at 31/28 until v1.15), and commands nothing. Its waypoints and order of battle came with the mission computer (v1.16, 31/28, 31/13-14) and its radar warning contacts with the defensive systems terminal (v1.17, 31/16-17) |
 | 17 | `sms` | Stores management display | new | Interfaces/userInterface/displays/sms.py | On the bus from v1.14 (fmofp_display sms): it hears the FMS status by broadcast (31/26) for the flight mode and the tactical systems its master arm, ECM cell and signature strip follow, and commands nothing. Its weapon stations are the display's own table, as in the Python, which modelled no armament system (README section 2); a stores management computer is backlog (section 12) |
 | 18 | `hud` | Head-up display | new | Interfaces/userInterface (HUDContainer) |  |
 | 19 | `hydraulics` | Hydraulics | new | Systems/hydraulics |  |
 | 20 | `airframe` | Airframe systems | new | Systems/airframeSystemManagement |  |
 | 21 | `flightsurfaces` | Flight surfaces | new | Systems/flightSurfaces |  |
-| 22 | `defensive` | Defensive systems - RWR, chaff, flare, ECM | new | Systems/defensiveSys |  |
+| 22 | `defensive` | Defensive systems - RWR, chaff, flare, ECM | new | Systems/defensiveSys/defensiveService.py | Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17) |
 | 23 | `flightdatamonitoring` | Flight data monitoring | new | Systems/flightDataMonitoring |  |
-| 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move |
+| 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 25 frames |
 | 31 | `broadcast` | Broadcast address - every terminal that accepts a subaddress hears it | reserved |  | Not a terminal: MIL-STD-1553B address 31. A message or block here is the far end of a relay, stored by the terminals its listeners attribute names, each of which accepts that subaddress for broadcast (README section 8); nothing else stores it and nobody answers it. Added in v1.7 |
 
 RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
@@ -102,6 +102,7 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`DSP_MFD_MODE_CMD`](#dsp_mfd_mode_cmd) | 13 | 12 | R | 1 | aperiodic | Multi-function display mode command | DRAFT |
 | [`DSP_MFD_STATUS`](#dsp_mfd_status) | 13 | 12 | T | 2 | 1 | Multi-function display status | DRAFT |
 | [`MFD_COM_LINK_STATUS`](#mfd_com_link_status) | 13 | 17 | R | 11 | 1 | Radio, satcom and data link status, for the MFD | DRAFT |
+| [`EICAS_DEF_STATUS`](#eicas_def_status) | 14 | 1 | R | 6 | 5 | Defensive systems status, for the EICAS | DRAFT |
 | [`DSP_EICAS_MODE_CMD`](#dsp_eicas_mode_cmd) | 14 | 13 | R | 1 | aperiodic | EICAS mode command | DRAFT |
 | [`DSP_EICAS_STATUS`](#dsp_eicas_status) | 14 | 13 | T | 2 | 1 | EICAS status | DRAFT |
 | [`DSP_RADAR_MODE_CMD`](#dsp_radar_mode_cmd) | 15 | 14 | R | 1 | aperiodic | Weather radar display mode command | DRAFT |
@@ -118,12 +119,17 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`DSP_SMS_STATUS`](#dsp_sms_status) | 17 | 16 | T | 2 | 1 | Stores management display status | DRAFT |
 | [`DSP_HUD_MODE_CMD`](#dsp_hud_mode_cmd) | 18 | 17 | R | 1 | aperiodic | Head-up display mode command | DRAFT |
 | [`DSP_HUD_STATUS`](#dsp_hud_status) | 18 | 17 | T | 2 | 1 | Head-up display status | DRAFT |
+| [`DEF_MODE_CMD`](#def_mode_cmd) | 22 | 10 | R | 1 | aperiodic | Defensive systems mode command | DRAFT |
+| [`DEF_STATUS`](#def_status) | 22 | 10 | T | 6 | 5 | Defensive systems status | DRAFT |
+| [`DEF_ESM`](#def_esm) | 22 | 11 | R | 26 | 5 | ESM signal intercepts, from the plant | DRAFT |
+| [`DEF_CMD`](#def_cmd) | 22 | 12 | R | 5 | aperiodic | Defensive systems command | DRAFT |
 | [`PLANT_SENSORS`](#plant_sensors) | 27 | 1 | T | 11 | 50 | Sensed flight state from the plant | DRAFT |
 | [`PLANT_GPS`](#plant_gps) | 27 | 2 | T | 25 | 1 | GPS pseudoranges from the plant | DRAFT |
 | [`PLANT_WEATHER`](#plant_weather) | 27 | 3 | T | 32 | 1 | Weather truth from the plant | DRAFT |
 | [`PLANT_ENGINE`](#plant_engine) | 27 | 6 | T | 19 | 10 | Engine measurements from the plant | DRAFT |
 | [`PLANT_THRUST_CMD`](#plant_thrust_cmd) | 27 | 7 | R | 3 | 10 | Thrust command as received by the plant | DRAFT |
 | [`PLANT_RF`](#plant_rf) | 27 | 12 | T | 7 | 1 | RF environment: the radio field, the satellite, the link, from the plant | DRAFT |
+| [`PLANT_ESM`](#plant_esm) | 27 | 13 | T | 26 | 5 | ESM signal intercepts, from the plant | DRAFT |
 | [`BCAST_RDR_WX_STATUS`](#bcast_rdr_wx_status) | 31 | 1 | R | 2 | 5 | Weather radar status, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_WX_SCAN`](#bcast_rdr_wx_scan) | 31 | 2 | R | 10 | 5 | Weather radar scan summary, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_TFR_STATUS`](#bcast_rdr_tfr_status) | 31 | 3 | R | 2 | 5 | Terrain-following radar status, broadcast to the displays | DRAFT |
@@ -168,6 +174,8 @@ The descriptor and segment framing is in README.md section 8. A block's payload 
 | `BCAST_RDR_FUSED_TRACKS` | 31 | R | 22 | 23 | 25 | Fused air tracks, broadcast to the displays | as [`RDR_FUSED_TRACKS`](#rdr_fused_tracks) (relayed copy) |
 | `MSN_PLAN` | 6 | T | 12 | 13 | 10 | Mission plan: the route, the targets, the order of battle | [header 3 words + 3 sections, at most 382 words](#msn_plan) |
 | `BCAST_MSN_PLAN` | 31 | R | 13 | 14 | 10 | Mission plan, broadcast to the displays | as [`MSN_PLAN`](#msn_plan) (relayed copy) |
+| `DEF_RWR_CONTACTS` | 22 | T | 13 | 14 | 25 | Radar warning receiver contacts | [header 2 words + 1 sections, at most 259 words](#def_rwr_contacts) |
+| `BCAST_DEF_RWR_CONTACTS` | 31 | R | 16 | 17 | 25 | Radar warning receiver contacts, broadcast to the displays | as [`DEF_RWR_CONTACTS`](#def_rwr_contacts) (relayed copy) |
 
 ## Relays (RT-to-RT transfers)
 
@@ -211,7 +219,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`PLANT_TRAFFIC`](#plant_traffic) | `RDR_TRAFFIC` | block: 4 + 32 per frame | 25 |
 | [`RDR_TGT_STATUS`](#rdr_tgt_status) | [`BCAST_RDR_TGT_STATUS`](#bcast_rdr_tgt_status) (broadcast, heard by RT 13, 15) | 4 | 5 |
 | [`RDR_TGT_TRACKS`](#rdr_tgt_tracks) | `MFD_RDR_TGT_TRACKS` | block: 4 + 32 per frame | 25 |
-| [`RDR_FUSED_TRACKS`](#rdr_fused_tracks) | `BCAST_RDR_FUSED_TRACKS` (broadcast, heard by RT 14, 16) | block: 4 + 32 per frame | 25 |
+| [`RDR_FUSED_TRACKS`](#rdr_fused_tracks) | `BCAST_RDR_FUSED_TRACKS` (broadcast, heard by RT 14, 16, 22) | block: 4 + 32 per frame | 25 |
 | [`FMS_ENERGY`](#fms_energy) | [`TSD_FMS_ENERGY`](#tsd_fms_energy) | 6 | 1 |
 | [`RDR_AEWC_STATUS`](#rdr_aewc_status) | [`BCAST_RDR_AEWC_STATUS`](#bcast_rdr_aewc_status) (broadcast, heard by RT 13, 15) | 3 | 5 |
 | [`RDR_AEWC_TRACKS`](#rdr_aewc_tracks) | `MFD_RDR_AEWC_TRACKS` | block: 4 + 32 per frame | 10 |
@@ -222,6 +230,9 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`COM_LINK_STATUS`](#com_link_status) | [`MFD_COM_LINK_STATUS`](#mfd_com_link_status) | 11 | 1 |
 | [`MSN_STATUS`](#msn_status) | [`BCAST_MSN_STATUS`](#bcast_msn_status) (broadcast, heard by RT 13, 16) | 6 | 5 |
 | [`MSN_PLAN`](#msn_plan) | `BCAST_MSN_PLAN` (broadcast, heard by RT 13, 16) | block: 4 + 32 per frame | 10 |
+| [`PLANT_ESM`](#plant_esm) | [`DEF_ESM`](#def_esm) | 26 | 5 |
+| [`DEF_STATUS`](#def_status) | [`EICAS_DEF_STATUS`](#eicas_def_status) | 6 | 5 |
+| [`DEF_RWR_CONTACTS`](#def_rwr_contacts) | `BCAST_DEF_RWR_CONTACTS` (broadcast, heard by RT 14, 16) | block: 4 + 32 per frame | 25 |
 
 ## Mode codes
 
@@ -855,6 +866,63 @@ What COM_CMD asks of the communications terminal: CommsService's manual controls
 | 8 | SET_DATALINK_MODE |  |  |
 | 9 | SET_DATALINK_CHANNEL |  |  |
 | 10 | DATALINK_SEND |  | send_datalink: one packet sent; FAILED unless the link is active |
+
+### `rwr_band` (3 bits)
+
+Radar warning receiver frequency band (defensiveService.BAND_NAMES, _classify_freq): L 0.5-2 GHz, S 2-4, C 4-8, X 8-12, Ku 12-18, K 18-27, Ka 27-40 (the lower bound in, the upper out). UNKNOWN is the Python's '?': a frequency outside every band, or the THREAT_DB's UNKNOWN entry
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | UNKNOWN |  |  |
+| 1 | L |  |  |
+| 2 | S |  |  |
+| 3 | C |  |  |
+| 4 | X |  |  |
+| 5 | KU |  |  |
+| 6 | K |  |  |
+| 7 | KA |  |  |
+
+### `threat_type` (2 bits)
+
+Radar warning contact type (defensiveService.THREAT_DB's 'type'): SAM, AIR or UNK
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | UNK |  |  |
+| 1 | SAM |  |  |
+| 2 | AIR |  |  |
+
+### `rwr_source` (2 bits)
+
+Where a radar warning contact came from: the track fusion (the Python's FUS- ids), the ESM receiver (ESM- ids) or a scenario injection (SCEN- ids)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | FUSION |  |  |
+| 1 | ESM |  |  |
+| 2 | SCENARIO |  |  |
+
+### `ecm_mode` (2 bits)
+
+DefensiveService.set_ecm_mode: STANDBY, ACTIVE (jamming) or PASSIVE
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | STANDBY |  |  |
+| 1 | ACTIVE |  |  |
+| 2 | PASSIVE |  |  |
+
+### `defensive_command` (4 bits)
+
+What DEF_CMD asks of the defensive systems terminal: DefensiveService's manual controls (dispense_chaff, dispense_flares, set_ecm_mode) and the scenario engine's threat injection (scenarioEngine._inject_threat, which wrote into the service's contact table)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | DISPENSE_CHAFF |  |  |
+| 2 | DISPENSE_FLARES |  |  |
+| 3 | SET_ECM_MODE |  |  |
+| 4 | INJECT_THREAT |  |  |
 
 ## Messages
 
@@ -2451,6 +2519,113 @@ What CommsService._simulate drew once a second, as the world the communications 
 | 6 | 15-8 | `packets_in` | uint | raw counts | Packets the network offers this second |
 | 6 | 7-0 | `packets_out` | uint | raw counts | Packets the aircraft's background traffic sends this second |
 
+### DEF_STATUS
+
+**Defensive systems status** — RT 22 · SA 10 · transmit (terminal to bus) · 6 words · 5 Hz
+
+The terminal's state and command handling as the other subsystems report them, plus what DefensiveService.get_data() returned: the chaff and flares remaining (CHAFF_MAX 60, FLARE_MAX 30), the ECM mode and whether jamming is active, the contact count (threat_count), and the outcome of the last DEF_CMD; with the counts of hostile priority-1 contacts (what _auto_dispense fires on), automatic salvos, chaff and flares released, and the frames left on the flare cooldown (COOLDOWN_S 3 s = 150 frames). The contacts themselves are the DEF_RWR_CONTACTS block. The EICAS reads it by relay (EICAS_DEF_STATUS); the TSD draws only the contacts.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last DEF_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last DEF_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13-12 | `ecm_mode` | enum | enum `ecm_mode` |  |
+| 1 | 11 | `jamming_active` | bool |  | 1 = ECM mode ACTIVE (set_ecm_mode: jamming_active = mode == ACTIVE) |
+| 1 | 10-7 | `defensive_cmd_status` | enum | enum `cmd_status` | Outcome of the last DEF_CMD |
+| 1 | 6 | `fused_valid` | bool |  | 1 = a fused tracks block (BCAST_RDR_FUSED_TRACKS) arrived whole within the last 75 frames |
+| 1 | 5 | `esm_valid` | bool |  | 1 = the ESM intercepts (DEF_ESM) arrived within the last 30 frames |
+| 1 | 4-1 | `spare_1` | spare |  |  |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0) |
+| 2 | 15-8 | `chaff_remaining` | uint | raw counts | 0-60 |
+| 2 | 7-0 | `flares_remaining` | uint | raw counts | 0-30 |
+| 3 | 15-8 | `contact_count` | uint | raw counts | get_data()'s threat_count: radar warning contacts in the table (at most 64) |
+| 3 | 7-0 | `high_priority_count` | uint | raw counts | Hostile contacts of priority 1 |
+| 4 | 15-8 | `auto_salvos` | uint | raw counts | Automatic flare salvos released, mod 256 |
+| 4 | 7-0 | `cooldown_frames` | uint | raw counts | Frames until a flare release is allowed again; 0 = ready |
+| 5 | 15-8 | `chaff_released` | uint | raw counts | Chaff cartridges released in all, mod 256 |
+| 5 | 7-0 | `flares_released` | uint | raw counts | Flares released in all, manual and automatic, mod 256 |
+
+### DEF_MODE_CMD
+
+**Defensive systems mode command** — RT 22 · SA 10 · receive (bus to terminal) · 1 words · aperiodic
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### DEF_ESM
+
+**ESM signal intercepts, from the plant** — RT 22 · SA 11 · receive (bus to terminal) · 26 words · 5 Hz
+
+PLANT_ESM relayed to the defensive systems terminal: what its electronic support measures receiver intercepts.
+
+Same layout as [`PLANT_ESM`](#plant_esm).
+
+### DEF_CMD
+
+**Defensive systems command** — RT 22 · SA 12 · receive (bus to terminal) · 5 words · aperiodic
+
+DefensiveService's manual controls and the scenario engine's threat injection on the bus. DISPENSE_CHAFF releases count cartridges (as many as remain: ACCEPTED when any left the dispenser, FAILED when none did); DISPENSE_FLARES the same, unless the 3 s cooldown since the last flare release is running (FAILED, nothing released); either way the request restarts the cooldown, as dispense_flares did even when the dispenser was empty. SET_ECM_MODE takes the mode (REJECTED_INVALID for an undefined one). INJECT_THREAT adds a contact SCEN-threat_id with the bearing, range, band, type and priority given (hostile, as _inject_threat made every one; REJECTED_INVALID for a priority outside 1-4, FAILED when the table is full); it expires 10 s later like any contact. The fields a command does not use are ignored. The outcome is DEF_STATUS.defensive_cmd_status.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `defensive_command` |  |
+| 0 | 11-10 | `ecm_mode` | enum | enum `ecm_mode` | SET_ECM_MODE |
+| 0 | 9-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+| 1 | 15-8 | `count` | uint | raw counts | DISPENSE_CHAFF, DISPENSE_FLARES: cartridges asked for; 0 reads as 1, the Python's default |
+| 1 | 7-5 | `priority` | uint | raw counts | INJECT_THREAT: 1 (highest) to 4; the scenario engine's default was 1 |
+| 1 | 4-2 | `band` | enum | enum `rwr_band` | INJECT_THREAT; the scenario engine's default was X |
+| 1 | 1-0 | `threat_type` | enum | enum `threat_type` | INJECT_THREAT; the scenario engine's default was SAM |
+| 2 | 15-0 | `bearing` | uint | LSB 360/65536 deg, range 0 to 359.9945 | INJECT_THREAT: true bearing from the aircraft |
+| 3 | 15-0 | `range` | uint | LSB 1/10 nm, range 0 to 6553.5 | INJECT_THREAT; the scenario engine's default was 30 |
+| 4 | 15-8 | `threat_id` | uint | raw counts | INJECT_THREAT: the injection's number; the contact is SCEN-n (the scenario engine named it after the event) |
+| 4 | 7-0 | `spare_4` | spare |  |  |
+
+### PLANT_ESM
+
+**ESM signal intercepts, from the plant** — RT 27 · SA 13 · transmit (terminal to bus) · 26 words · 5 Hz
+
+What the passive sensor manager's ESM sensor detected (passiveSensors.ESMSensor.detect, which DefensiveService read every half second), as the world the defensive systems terminal intercepts (v1.17, fmofp_plant.esm): a new set every 25 frames of randint(0, 5) signals, each a frequency uniform in 0.5-40 GHz, a strength uniform in -120 to -20 dBm and a bearing uniform in 0-360 degrees, in the Python's draw order; then, for each signal, the range the receiver would estimate (uniform 5-60 nm), which the Python's service drew itself for a signal it had not seen. The set is republished unchanged until the next one; epoch says when it is new. Fields of a signal beyond count are zero.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-8 | `epoch` | uint | raw counts | Increments (mod 256) with every new detection set |
+| 0 | 7-0 | `count` | uint | raw counts | Signals in this set, 0-5 |
+| 1-2 | 31-0 | `frequency_1` | sint | LSB 1/1000 MHz, range 0 to 100000 | Signal 1: uniform(0.5e9, 40e9) Hz, in kHz steps |
+| 3 | 15-0 | `strength_1` | sint | LSB 1/10 dBm, range -200 to 0 | Signal 1: uniform(-120, -20); nothing in the Python read it |
+| 4 | 15-0 | `bearing_1` | uint | LSB 360/65536 deg, range 0 to 359.9945 | Signal 1: uniform(0, 360) |
+| 5 | 15-0 | `range_1` | uint | LSB 1/10 nm, range 0 to 6553.5 | Signal 1: the range the receiver would estimate, uniform(5, 60), which DefensiveService._update_rwr drew when it first saw a signal |
+| 6-7 | 31-0 | `frequency_2` | sint | LSB 1/1000 MHz, range 0 to 100000 | Signal 2: uniform(0.5e9, 40e9) Hz, in kHz steps |
+| 8 | 15-0 | `strength_2` | sint | LSB 1/10 dBm, range -200 to 0 | Signal 2: uniform(-120, -20); nothing in the Python read it |
+| 9 | 15-0 | `bearing_2` | uint | LSB 360/65536 deg, range 0 to 359.9945 | Signal 2: uniform(0, 360) |
+| 10 | 15-0 | `range_2` | uint | LSB 1/10 nm, range 0 to 6553.5 | Signal 2: the range the receiver would estimate, uniform(5, 60), which DefensiveService._update_rwr drew when it first saw a signal |
+| 11-12 | 31-0 | `frequency_3` | sint | LSB 1/1000 MHz, range 0 to 100000 | Signal 3: uniform(0.5e9, 40e9) Hz, in kHz steps |
+| 13 | 15-0 | `strength_3` | sint | LSB 1/10 dBm, range -200 to 0 | Signal 3: uniform(-120, -20); nothing in the Python read it |
+| 14 | 15-0 | `bearing_3` | uint | LSB 360/65536 deg, range 0 to 359.9945 | Signal 3: uniform(0, 360) |
+| 15 | 15-0 | `range_3` | uint | LSB 1/10 nm, range 0 to 6553.5 | Signal 3: the range the receiver would estimate, uniform(5, 60), which DefensiveService._update_rwr drew when it first saw a signal |
+| 16-17 | 31-0 | `frequency_4` | sint | LSB 1/1000 MHz, range 0 to 100000 | Signal 4: uniform(0.5e9, 40e9) Hz, in kHz steps |
+| 18 | 15-0 | `strength_4` | sint | LSB 1/10 dBm, range -200 to 0 | Signal 4: uniform(-120, -20); nothing in the Python read it |
+| 19 | 15-0 | `bearing_4` | uint | LSB 360/65536 deg, range 0 to 359.9945 | Signal 4: uniform(0, 360) |
+| 20 | 15-0 | `range_4` | uint | LSB 1/10 nm, range 0 to 6553.5 | Signal 4: the range the receiver would estimate, uniform(5, 60), which DefensiveService._update_rwr drew when it first saw a signal |
+| 21-22 | 31-0 | `frequency_5` | sint | LSB 1/1000 MHz, range 0 to 100000 | Signal 5: uniform(0.5e9, 40e9) Hz, in kHz steps |
+| 23 | 15-0 | `strength_5` | sint | LSB 1/10 dBm, range -200 to 0 | Signal 5: uniform(-120, -20); nothing in the Python read it |
+| 24 | 15-0 | `bearing_5` | uint | LSB 360/65536 deg, range 0 to 359.9945 | Signal 5: uniform(0, 360) |
+| 25 | 15-0 | `range_5` | uint | LSB 1/10 nm, range 0 to 6553.5 | Signal 5: the range the receiver would estimate, uniform(5, 60), which DefensiveService._update_rwr drew when it first saw a signal |
+
+### EICAS_DEF_STATUS
+
+**Defensive systems status, for the EICAS** — RT 14 · SA 1 · receive (bus to terminal) · 6 words · 5 Hz
+
+DEF_STATUS relayed to the EICAS, its one consumer (section 8): the countermeasures rows and cells, the ECM cell and the RWR count.
+
+Same layout as [`DEF_STATUS`](#def_status).
+
 ## Block payloads
 
 ### RDR_WX_PRODUCTS
@@ -2923,6 +3098,35 @@ What missionService.get_data(), get_nav_data() and get_oob() handed the MFD's mi
 | 4-5 | 31-0 | `longitude` | sint | LSB 180/2147483648 deg, range -180 to 179.9999999 |  |
 | 6 | 15-0 | `altitude` | uint | LSB 1 ft, range 0 to 65535 |  |
 | 7 | 15-0 | `speed` | uint | LSB 1/10 kt, range 0 to 6553.5 |  |
+
+### DEF_RWR_CONTACTS
+
+**Radar warning receiver contacts** — RT 22 · descriptor SA 13 · segment SA 14 · 25 Hz · payload at most 259 words
+
+DefensiveService's contact table (v1.17), as get_rwr_contacts() returned it: every contact, sorted by priority (the oldest first within a priority, the Python's stable sort over its insertion-ordered table). A contact is a hostile fused track (FUS-n: bearing and range from the track's position, band, type and priority from THREAT_DB by its classification; FIGHTER is X/AIR/2, BOMBER S/AIR/3, every other class the UNKNOWN entry ?/UNK/4), an ESM intercept (ESM-band-n: the band of its frequency, the range the plant drew, type UNK, priority 3, hostile) or a scenario injection (SCEN-n). A contact not seen for 10 s (TRACK_TTL, 500 frames) is dropped. Republished at every RWR update, every 25 frames; the nine segments take 18 frames at 25 Hz. The Python's table was unbounded; this one holds 64 and counts what it had to refuse.
+
+**Header (2 words)**, followed by one count word per section in the order below.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-8 | `update` | uint | raw counts | Increments (mod 256) with every RWR update |
+| 0 | 7-0 | `dropped` | uint | raw counts | Contacts refused since start for lack of room, mod 256 |
+| 1 | 15-8 | `high_priority_count` | uint | raw counts | Hostile contacts of priority 1 |
+| 1 | 7-0 | `spare_1` | spare |  |  |
+
+**Section `contact` — Radar warning contacts**: up to 64 records of 4 words. In get_rwr_contacts() order
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-0 | `bearing` | uint | LSB 360/65536 deg, range 0 to 359.9945 | RWRContact.bearing_deg: true bearing from the aircraft |
+| 1 | 15-0 | `range` | uint | LSB 1/10 nm, range 0 to 6553.5 | RWRContact.range_nm |
+| 2 | 15-13 | `band` | enum | enum `rwr_band` |  |
+| 2 | 12-11 | `threat_type` | enum | enum `threat_type` |  |
+| 2 | 10-8 | `priority` | uint | raw counts | 1 (highest) to 4 |
+| 2 | 7 | `hostile` | bool |  |  |
+| 2 | 6-5 | `source` | enum | enum `rwr_source` |  |
+| 2 | 4-0 | `spare_2` | spare |  |  |
+| 3 | 15-0 | `id` | uint | raw counts | FUSION: the fused track number (FUS-n); ESM: the whole degrees of the bearing when first seen (ESM-band-n); SCENARIO: DEF_CMD's threat_id (SCEN-n) |
 
 ## Where every legacy message type went
 

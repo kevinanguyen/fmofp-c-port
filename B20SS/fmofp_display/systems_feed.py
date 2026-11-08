@@ -32,6 +32,13 @@ get_fused_tracks(), whose tracks it draws from their to_tsd_dict(); the mission
 service's get_nav_data() and the defensive service's get_rwr_contacts() answer
 empty until those terminals exist. The fused tracks are the BCAST_RDR_FUSED_TRACKS
 block's, and the EICAS's hostile count comes from the same block.
+
+From v1.17 the defensive service's getters answer from the defensive systems
+terminal (RT 22): get_data() from DEF_STATUS, relayed to the EICAS as
+EICAS_DEF_STATUS (the countermeasures, the ECM mode, the contact count), and
+get_rwr_contacts() from the BCAST_DEF_RWR_CONTACTS block both the EICAS and
+the TSD hear, each record turned back into RWRContact.to_dict()'s dictionary
+(the Python's contact ids, bands as its letters).
 """
 
 import math
@@ -183,6 +190,25 @@ class FusedTrackView:
 
 AFFILIATION_NAMES = {"FRIENDLY": "Friendly", "ENEMY": "Enemy", "NEUTRAL": "Neutral", "UNKNOWN": "Unknown"}
 AFFILIATION_PREFIX = {"FRIENDLY": "F", "ENEMY": "E", "NEUTRAL": "N", "UNKNOWN": "U"}
+
+
+# rwr_band enum names to defensiveService.BAND_NAMES' strings (and THREAT_DB's '?').
+BAND_LETTERS = {"UNKNOWN": "?", "L": "L", "S": "S", "C": "C", "X": "X", "KU": "Ku", "K": "K", "KA": "Ka"}
+
+
+def rwr_contact_dict(record):
+    """RWRContact.to_dict() from a DEF_RWR_CONTACTS record: the id the Python gave the contact (FUS-<track>,
+    ESM-<band>-<whole bearing>, SCEN-<number>), bearing and range to a tenth, the band's letters."""
+    band = BAND_LETTERS.get(record.band.name, "?")
+    if record.source.name == "ESM":
+        contact_id = f"ESM-{band}-{record.id}"
+    elif record.source.name == "SCENARIO":
+        contact_id = f"SCEN-{record.id}"
+    else:
+        contact_id = f"FUS-{record.id}"
+    return {"contact_id": contact_id, "bearing_deg": round(record.bearing, 1), "range_nm": round(record.range, 1),
+            "band": band, "threat_type": record.threat_type.name, "priority": record.priority,
+            "hostile": record.hostile}
 
 
 def name_of(words):
@@ -376,10 +402,17 @@ class SystemsFeed:
                 "waypoints_remaining": max(0, len(route) - s.active_index)}
 
     def defensive_data(self):
-        """DefensiveService.get_data(): nothing until the defensive systems terminal (RT 22) is on the bus; the
-        EICAS then shows its own defaults (full countermeasures, ECM standby, no contacts), as it did with the service
-        not running."""
-        return {}
+        """DefensiveService.get_data(): the countermeasures, the ECM mode, the contact count and the contacts, from
+        the relayed DEF_STATUS (EICAS_DEF_STATUS) and the broadcast contacts block; nothing until the status arrives,
+        when the EICAS shows its own defaults (full countermeasures, ECM standby, no contacts), as it did with the
+        service not running."""
+        message = self.terminal.fresh(m.EicasDefStatus, self.stale_after_s)
+        if message is None:
+            return {}
+        p = message.payload
+        return {"chaff_remaining": p.chaff_remaining, "flares_remaining": p.flares_remaining,
+                "ecm_mode": p.ecm_mode.name, "jamming_active": p.jamming_active, "rwr_contacts": self.rwr_contacts(),
+                "threat_count": p.contact_count}
 
     def sensor_data(self):
         """SensorService.get_data(): nothing until the sensor management terminal (RT 10) is on the bus; the EICAS
@@ -476,8 +509,12 @@ class SystemsFeed:
         return self.route_data()
 
     def rwr_contacts(self):
-        """DefensiveService.get_rwr_contacts(): none until the defensive systems terminal (RT 22) is on the bus."""
-        return []
+        """DefensiveService.get_rwr_contacts(): the contacts of the last BCAST_DEF_RWR_CONTACTS block delivered whole,
+        in its order (by priority), while it is fresh; none when the terminal is silent."""
+        block, _, age = self.terminal.latest_block(b.BcastDefRwrContacts)
+        if block is None or age is None or age > self.stale_after_s:
+            return []
+        return [rwr_contact_dict(record) for record in block.contact]
 
     def status_text(self):
         parts = []
@@ -491,6 +528,10 @@ class SystemsFeed:
         exceedances = self.get_exceedances()
         if exceedances:
             parts.append("exceed " + ",".join(e["parameter"] for e in exceedances))
+        defensive = self.defensive_data()
+        if defensive:
+            parts.append(f"DEF chaff {defensive['chaff_remaining']} flares {defensive['flares_remaining']} "
+                         f"ECM {defensive['ecm_mode']} rwr {defensive['threat_count']}")
         position = self.mission_data().get("current_position")
         if position is not None:
             parts.append(f"pos {position['lat']:.4f} {position['lon']:.4f}")

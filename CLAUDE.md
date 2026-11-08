@@ -98,42 +98,44 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone commit: `051e57d` (mission computer + comms, ICD v1.16; CI
-  run 41569356013 all ten jobs green). After it: `d82173f` merge of upstream/main `4c25f52`
-  (six commits of 2026-11-02, mechanical; full suite green on the merged tree); `8d67afd`
-  this file and `B20SS/verify.sh` (CI run 41931935765 all ten green); `e325d00` LF rule for
-  shell scripts (CI run 41932029106: nine green, the Windows 3.13 Python leg red on the
-  flaky `test_weather_radar_live` only; both `cpp` jobs green).
-- **ICD** v1.16 (`B20SS/icd/fmofp_icd.xml`): 26 terminals, 102 message definitions
-  (148 after per-terminal expansion), 35 message relays (15 broadcast), 20 block streams
-  (10 layouts, 10 relayed copies), 9 mode codes, 89/89 legacy types mapped.
+  `git log -1`. Last milestone: unit 18 defensive systems, ICD v1.17 (2026-11-07, the commit
+  after the claim `6614a78`; its CI run is recorded next session). Before it: `782078f` (the
+  rename and Alee; CI run 41941685287 all ten green), `e325d00` and `8d67afd` (this file,
+  `B20SS/verify.sh`, the LF rule; CI green but for the flaky Windows Python leg), `d82173f`
+  (merge of upstream/main `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16; CI run
+  41569356013 all ten green).
+- **ICD** v1.17 (`B20SS/icd/fmofp_icd.xml`): 26 terminals, 108 message definitions
+  (154 after per-terminal expansion), 37 message relays (15 broadcast), 22 block streams
+  (11 layouts, 11 relayed copies), 9 mode codes, 89/89 legacy types mapped.
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
-  engine management (RT 3), mission computer (RT 6), communications (RT 2); the bus
-  controller `fmofp_bc`; tools `fmofp_nav_tool`, `fmofp_radar_tool`, `fmofp_engine_tool`,
-  `fmofp_mission_tool` (stdin oracles for the Python tests).
+  engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
+  systems (RT 22); the bus controller `fmofp_bc`; tools `fmofp_nav_tool`, `fmofp_radar_tool`,
+  `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool` (stdin oracles for the
+  Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
   random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
-  ground scene, the RF environment); six display terminals `py -m fmofp_display
+  ground scene, the RF environment, the ESM intercepts); six display terminals `py -m fmofp_display
   radar|pfd|mfd|eicas|tsd|sms` (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display
   class fed from the bus through `fmofp_display/*_feed.py`; the one-command demo
   `py -m fmofp_demo`; the bus library `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: 14 terminals, 77 scheduled messages, worst minor frame 6908 us of the 10000 us
-  budget. Forty seconds of headless demo: 2000 frames, 0 overruns, 14/14 terminals answering.
-- **Tests**: Python 186 OK (`fmofp_bus/tests`, 35 s on Windows); C++ ctest 2/2
+- **Load**: 15 terminals, 82 scheduled messages, worst minor frame 7332 us of the 10000 us
+  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns (a first run had 2, at
+  start-up), 15/15 terminals answering.
+- **Tests**: Python 196 OK (`fmofp_bus/tests`, 38 s on Windows); C++ ctest 2/2
   (hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
   workflows/ci.yml` job `cpp`, linux-gcc + linux-asan, and Alee's eight Python legs).
-- **Meter**: 21 of 29.5 units = **71 %** (section 2). Pace measured over the log: about
-  5 units per full working day, so roughly two more working days to 100 %; the intern-ticket
-  authoring phase comes after and is not in the number.
+- **Meter**: 21.5 of 29.5 units = **73 %** (section 2). Pace measured over the log: about
+  5 units per full working day, so a day and a half to two more working days to 100 %; the
+  intern-ticket authoring phase comes after and is not in the number.
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-04 (this
-  file, the merge, the repository rename; Alee invited as collaborator with write access,
-  so his first session on his machine starts with section 0.1 step 6). Suggested next
-  unit: 18 defensive (RT 22), then 15 sensor management, 16 power, 17 avionics, 19 flight
-  surfaces, 20 utilities, 28, 29 last, 30.
+- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-07 (unit
+  18). Alee has accepted the invitation (write access) and has not pushed yet; his first
+  session on his machine starts with section 0.1 step 6. Suggested next unit: 15 sensor
+  management (RT 10; it reuses `PLANT_ESM`), then 16 power, 17 avionics, 19 flight surfaces,
+  20 utilities, 28, 29 last, 30.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106); the two
   `cpp` jobs are the ones that judge the port.
@@ -165,7 +167,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 15 | Sensor management (RT 10) | 0.75 | open |
 | 16 | Power management (RT 8) | 0.75 | open |
 | 17 | Avionics: LRU health + BIT + fitness + SW configuration (RT 1) | 1 | open |
-| 18 | Defensive systems (RT 22) | 0.5 | IN PROGRESS (Kevin, 2026-11-07) |
+| 18 | Defensive systems (RT 22) | 0.5 | DONE 2026-11-07 |
 | 19 | Flight surfaces (RT 21) | 0.5 | open |
 | 20 | Small utilities: ECS (RT 4), hydraulics (RT 19), airframe (RT 20), flight data monitoring (RT 23) | 1 | open |
 | 21 | Radar display + PFD on the bus | 1.5 | DONE 2026-10-25 |
@@ -179,7 +181,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | open |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | open |
 
-**Done: 21 / 29.5 = 71 %.** Open: 8.5 units.
+**Done: 21.5 / 29.5 = 73 %.** Open: 8 units.
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -206,8 +208,10 @@ monitoring, 27 plant, 31 broadcast. Free: 24-26, 28-30.
   shows UNKNOWN).
 - **Shape of the port**: the random detections are the world, so they move to the plant
   (`fmofp_plant/`: a detection generator in the Python's draw order, published as a plant
-  message or block; the defensive unit wants the same ESM detections, so publish them once
-  and relay to both RT 10 and RT 22, or broadcast if both exist: two listeners qualify). The
+  message or block; unit 18 already publishes the ESM intercepts as `PLANT_ESM`
+  (`fmofp_plant/esm.py`: a set every 25 frames in the Python's draw order, relayed to RT 22
+  as `DEF_ESM`), so add a second relay into an RT 10 receive subaddress rather than a
+  broadcast (a source may feed up to four relays); the infrared detections are new). The
   service's rules (sensor statuses, the health rule, the fusion's merge/expiry, the counts)
   become the RT 10 partition. Messages: `SNS_STATUS` (health, active/passive bits, contact
   counts; 1 or 5 Hz), `SNS_CMD` (activate/deactivate a sensor), a contacts block only if a
@@ -294,38 +298,14 @@ monitoring, 27 plant, 31 broadcast. Free: 24-26, 28-30.
 
 ### 2.18 Defensive systems (RT 22), 0.5
 
-- **Python to read in full**: `Systems/defensiveSys/defensiveService.py` (362; a 2 Hz
-  loop; `THREAT_DB` and `_classify_freq` at the top; `_update_rwr`: one contact per fusion
-  threat track (`FUS-<id>`: bearing and range from the track, band/type/priority from
-  `THREAT_DB` by the track's classification, hostile from the track) and one per ESM signal
-  from its own `PassiveSensorManager` (`ESM-<band>-<bearing>`: a random range 5-60 nm, type
-  UNK, priority 3, hostile); contacts older than `TRACK_TTL` 10 s are dropped;
-  `_auto_dispense`: a priority-1 hostile contact releases `SALVO_SIZE` 2 flares with a
-  `COOLDOWN_S` 3 s; manual `dispense_chaff` (`CHAFF_MAX` 60), `dispense_flares`
-  (`FLARE_MAX` 30, the same cooldown), `set_ecm_mode` STANDBY/ACTIVE/PASSIVE (jamming active
-  only in ACTIVE); `get_rwr_contacts()` sorted by priority; `get_data()`: chaff, flares,
-  ecm_mode, jamming_active, rwr_contacts, threat_count). `dsConfig.xml` is three lines.
-- **Consumers today**: the TSD draws `get_rwr_contacts()` on its threat ring using
-  `bearing_deg` and `band` (`tsd.py` around 554); the EICAS reads `get_data()` for its
-  countermeasures cells (read `eicas.py` for the keys it draws). The SMS's ECM cell comes
-  from the FMS tactical status, not from here (kept that way in unit 26).
-  `SystemsFeed.defensive_data()` returns `{}` and `get_rwr_contacts()` `[]` for now.
-- **Shape of the port**: RT 22 is a listener of the fused-tracks broadcast
-  (`BCAST_RDR_FUSED_TRACKS`, RT 31 SA 22-23, as the TSD and EICAS are; the records carry
-  the class, identity, threat and position the Python read from the track objects); the ESM
-  signals come from the plant (shared with unit 15 if it exists by then, else a small
-  `PLANT_ESM` message now, in the Python's draw order). Outputs: `DEF_STATUS` at 2 Hz
-  (chaff, flares, ECM mode, jamming, contact count, a dispense counter) and the RWR contacts
-  (a fixed message of up to eight contacts x 3 words, or a block), both with two listeners
-  (TSD, EICAS) so broadcast on free SAs; `DEF_CMD` (chaff n, flares n, ECM mode) for the
-  scenario engine and the CLI. Cooldowns and TTLs in frames.
-- **Tests**: oracle = the frozen `DefensiveService` fed a fake fusion object and a fake ESM,
-  with `time` patched; e2e with the plant's traffic making hostile fused tracks (the targeting
-  e2e script shows how); TSD and EICAS feed/render tests; the demo dashboard (a `DEF` line)
-  and an event (a flare salvo when the SAM appears).
-- **Traps**: the ESM branch draws `random` inside the service (the randomness must come from
-  the plant); the `THREAT_DB` keys must match the fused track class names exactly;
-  `_log_event` writes to SQLite (drop); the auto-dispense reads wall clock.
+DONE 2026-11-07 (section 7, ICD v1.17). The plan that stood here became the ICD README's
+v1.17 paragraph and its section 2 rows. Two things changed from the plan: `DEF_STATUS` has one
+consumer (the TSD draws only the contacts), so it is the EICAS's own relay `EICAS_DEF_STATUS`
+(RT 14 SA 1) and only the contacts block is broadcast (`BCAST_DEF_RWR_CONTACTS`, 31/16-17, up
+to 64 contacts); and the Python's fused-track branch turned out to be dead (it called
+properties as methods), so the port computes the contacts the Python meant to make and the
+oracle records the Python's behaviour. The scenario engine's threat injection is `DEF_CMD`
+`INJECT_THREAT`, ready for unit 28.
 
 ### 2.19 Flight surfaces (RT 21), 0.5
 
@@ -506,7 +486,7 @@ spool-up).
   into that listener's own receive subaddress; RT 31 (broadcast) only for two or more
   listeners. A listener's own receive subaddresses must be broadcast numbers it never
   listens to (one receive buffer per SA); `check_broadcasts` refuses the collision. Free
-  broadcast SAs after v1.16: 12 (not for the MFD), 16, 17, 20, 21, 30.
+  broadcast SAs after v1.17: 12 (not for the MFD), 20, 21, 30.
 - Terminals store a broadcast only on subaddresses they `accept_broadcast`; everything else
   on RT 31 is ignored and counted.
 - Blocks: 31 payload words per 32-word segment, descriptor + segments, CRC-16/CCITT-FALSE,
@@ -659,7 +639,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (186 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (196 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -731,6 +711,15 @@ Python tests and displays
   needs `uninstall_system_sources()` in a `finally`.
 - The plant's airspeed is a random walk that ignores thrust (test aircraft, not an engine
   model): the autothrottle winds to full power in the demo by design.
+- An oracle's fake clock must start far from zero (1000.0): a Python service whose "last
+  time" starts at 0.0 (the epoch) compares against it, and a clock near zero invents a
+  cooldown the real program never had (cost one failing oracle run in unit 18).
+- `dict.get(key, random.uniform(...))` draws every time: the default is evaluated before the
+  lookup. A `random` patched for an oracle must answer those draws too (match on arguments).
+- Before porting a branch, check how it calls what it reads: `DefensiveService` called
+  `FusedTrack.bearing_deg()` on a property, so its fusion branch never ran in the Python.
+- An oracle tool answers from the live table when the Python's getter read live state, not
+  from the last published block (`refresh_contacts()` in `fmofp_defensive_tool`).
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -965,6 +954,45 @@ done before this file existed are condensed from the private session notes.
   flaky live test, section 1), both `cpp` jobs green.
 - *Numbers*: meter unchanged, 21 / 29.5 = 71 %.
 
+### 2026-11-07 - unit 18 defensive systems (RT 22) - ICD v1.17 - by Kevin's agent
+- *What*: `ofp/partitions/defensive` (`DefensiveSystems`: the radar warning receiver's
+  64-contact table from the hostile fused tracks heard by broadcast and the plant's ESM
+  intercepts, THREAT_DB by class, 10 s expiry, the automatic two-flare salvo on a hostile
+  priority-1 contact with its 3 s cooldown, manual chaff and flares, the ECM mode, the
+  scenario threat injection; `fmofp_defensive_tool`). The ESM detections moved to the plant
+  (`fmofp_plant/esm.py`, `PLANT_ESM`: a set of 0-5 signals every 25 frames in the Python's
+  draw order, then a range per signal). ICD v1.17: `DEF_STATUS` → `EICAS_DEF_STATUS` (one
+  consumer), `DEF_MODE_CMD`, `DEF_CMD`, `DEF_ESM`, the `DEF_RWR_CONTACTS` block (9 segments
+  at 25 Hz, republished every 25 frames) → `BCAST_DEF_RWR_CONTACTS` 31/16-17 (EICAS, TSD);
+  RT 22 a listener of `BCAST_RDR_FUSED_TRACKS`. EICAS countermeasures panel and alerts, TSD
+  threat ring, demo `DEF` line and three events (a SAM on the receiver at 18 s with the
+  salvos that follow, ECM ACTIVE at 19 s, chaff at 45 s).
+- *How*: oracle `test_defensive_oracle.py` runs the frozen `DefensiveService` (database and
+  sensors blocked, `time` and `random.uniform` patched, fake tracks answering the calls it
+  makes) beside the tool over a 12 s scenario; `test_defensive_e2e.py` (port base 53000)
+  runs plant + radar + defensive + the EICAS's and TSD's bus halves under the real
+  controller; `test_plant_esm.py` checks the plant's draws against `ESMSensor.detect`; the
+  feed, render, display e2e, demo and message-count tests extended; 10 gtests.
+- *Warnings / lessons*: the Python's fusion branch was dead (`track.bearing_deg()` on a
+  property: TypeError swallowed), so the Python's RWR only ever showed ESM intercepts and
+  scenario injections; THREAT_DB's SAM entries match no radar class, so no fused track
+  reaches priority 1 and only an injected threat fires the auto-dispenser (kept; ICD README
+  section 2). A manual flare request with an empty dispenser restarts the cooldown (kept).
+  The Python's table was unbounded (about 50 live intercepts): the block holds 64 and counts
+  refusals. The oracle's clock must start far from 0 and its patched `random.uniform` must
+  answer the `dict.get` default draw (section 6). A 1 Hz TERM_STATUS needs a 50-frame window
+  (again). The demo's worst measured frame is 19-22 ms at start-up (the Python terminals
+  starting); the schedule estimate is 7332 us.
+- *Files*: `ofp/partitions/defensive/{include/fmofp/defensive/defensive_systems.hpp,
+  src/defensive_systems.cpp, src/main.cpp, tools/defensive_tool.cpp}`,
+  `ofp/tests/defensive_systems_test.cpp`, `fmofp_plant/esm.py`, `fmofp_display/
+  systems_feed.py` (`rwr_contact_dict`, `defensive_data`, `rwr_contacts`, the `DEF` status
+  text), `fmofp_display/app.py`, `fmofp_demo/demo.py`, `icd/fmofp_icd.xml` + README +
+  generated files, `verify.sh`, both CI files, `_support.py`, the tests.
+- *Tests and numbers*: Python 196 OK (was 186), ctest 2/2 (249 gtests), cppcheck clean; load
+  82 messages for 15 terminals, worst minor frame 7332 us (was 6908 for 14); headless demo
+  30 s: 1500 frames, 0 overruns (a first run: 2), 15/15 answering; meter 21.5 / 29.5 = 73 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -993,3 +1021,10 @@ done before this file existed are condensed from the private session notes.
   collaborator with write access; the fork is renamed `fmofp-c-port`. Section 0.5 does not
   change: port work is never pushed to `TubAleeLo/fmofp` from this workflow and the frozen
   Python stays frozen; "ours" in section 4.1 now means the two contributors.
+- 2026-11-07, Kevin ("ok go") and his agent: unit 18 as designed in section 2.18 with two
+  changes: `DEF_STATUS` is the EICAS's own relay (one consumer) and only the contacts block
+  is broadcast (31/16-17); the dead fused-track branch of the Python RWR is departed from
+  (the contacts are computed), the rest of the Python's quirks kept (THREAT_DB as written, the
+  empty-dispenser cooldown, the unbounded table capped at 64 with a refusal count). The
+  scenario engine's threat injection rides in `DEF_CMD` (`INJECT_THREAT`) for unit 28. The
+  plant draws the ESM ranges the service drew. Recorded in the ICD README section 2.

@@ -6,7 +6,8 @@
 It starts, in this order: the plant (the simulated aircraft with its weather,
 terrain, engines and RF environment, RT 27), the ported partitions (flight
 control RT 5, navigation RT 7, flight management RT 12, the radar computer RT 9,
-engine management RT 3, the mission computer RT 6, communications RT 2), the six display programs (the radar display RT 15, the PFD
+engine management RT 3, the mission computer RT 6, communications RT 2, defensive systems RT 22), the six
+display programs (the radar display RT 15, the PFD
 RT 11, the MFD RT 13, the EICAS RT 14, the TSD RT 16 and the SMS RT 17, each in its own window), and
 finally the bus
 controller, which drives the bus in real time. Every program writes its own
@@ -15,7 +16,8 @@ crossing the bus, read from the controller's monitor port: altitude, airspeed
 and heading from the FMS flight data, the ground collision avoidance state,
 the engines' N1 and the fuel, the radars' modes, the terrain clearance and the
 targeting tracks, the navigation fix, the mission's phase and route progress, the
-radio and satcom links, and which terminals are answering.
+radio and satcom links, the countermeasures and the radar warning receiver, and which
+terminals are answering.
 
 Unless --no-events is given, a short scripted flight runs: the radars are
 switched on (the targeting and AEWC radars search, the SAR images the strip
@@ -24,7 +26,9 @@ locks on a track), the thrust
 lever moves, the autothrottle holds 500 kt, the flight
 mode changes, one engine is throttled back, fuel is transferred; a route is loaded
 and flown waypoint by waypoint, a target is designated, engaged and assessed, an
-enemy unit appears on the TSD, the radio is tuned and a satellite acquired. Each event is
+enemy unit appears on the TSD, the radio is tuned and a satellite acquired, a SAM paints the radar
+warning receiver (two flares go out by themselves, and again every 3 s while it lasts), the jammer
+goes active and chaff is dispensed. Each event is
 announced as it happens. The radar display window's own buttons keep working
 throughout: it is the radars' control panel.
 
@@ -40,8 +44,9 @@ import time
 from collections import namedtuple
 
 from fmofp_bus.icd import messages as m
-from fmofp_bus.icd.enums import (Affiliation, CommsCommand, MissionCommand, MissionPhase, RadioMode,
-                                 TargetKind, UnitKind, WaypointType, Weapon, AewcMode, EngineCommand, EngineSelect, FmsFlightMode, FuelTank, LockStatus, SarMode,
+from fmofp_bus.icd.enums import (Affiliation, CommsCommand, DefensiveCommand, EcmMode, MissionCommand, MissionPhase,
+                                 RadioMode,
+                                 RwrBand, TargetKind, ThreatType, UnitKind, WaypointType, Weapon, AewcMode, EngineCommand, EngineSelect, FmsFlightMode, FuelTank, LockStatus, SarMode,
                                  Ssm,
                                  TargetingMode, TerminalState, TfrMode, TrackFilter, WeatherMode)
 from fmofp_bus.monitor import Monitor
@@ -57,7 +62,7 @@ PLANT_RT = m.PlantSensors.RT
 # (executable name, RT) of each ported partition.
 PARTITIONS = (("fcs", m.FcsStatus.RT), ("nav", m.NavSolution.RT), ("fms", m.FmsStatus.RT),
               ("radar", m.RdrWxStatus.RT), ("engine", m.EngStatus.RT), ("mission", m.MsnStatus.RT),
-              ("comms", m.ComStatus.RT))
+              ("comms", m.ComStatus.RT), ("defensive", m.DefStatus.RT))
 # (fmofp_display argument, RT) of each display program.
 DISPLAYS = (("radar", m.DspRadarStatus.RT), ("pfd", m.DspPfdStatus.RT), ("mfd", m.DspMfdStatus.RT),
             ("eicas", m.DspEicasStatus.RT), ("tsd", m.DspTsdStatus.RT), ("sms", m.DspSmsStatus.RT))
@@ -65,7 +70,7 @@ NAMES = {PLANT_RT: "plant", m.FcsStatus.RT: "FCS", m.NavSolution.RT: "nav", m.Fm
          m.RdrWxStatus.RT: "radar", m.EngStatus.RT: "engine", m.DspRadarStatus.RT: "radar display",
          m.DspPfdStatus.RT: "PFD", m.DspMfdStatus.RT: "MFD", m.DspEicasStatus.RT: "EICAS",
          m.DspTsdStatus.RT: "TSD", m.DspSmsStatus.RT: "SMS", m.MsnStatus.RT: "mission",
-         m.ComStatus.RT: "comms"}
+         m.ComStatus.RT: "comms", m.DefStatus.RT: "defensive"}
 
 Event = namedtuple("Event", "seconds what message")
 
@@ -126,6 +131,12 @@ def default_events():
         Event(17.0, "mission: a friendly tanker to the north-west",
               m.MsnCmd(cmd_seq=207, command=MissionCommand.ADD_UNIT, unit_kind=UnitKind.TANKER,
                        affiliation=Affiliation.FRIENDLY, latitude=0.25, longitude=-0.05, altitude=25000.0)),
+        Event(18.0, "defensive: an SA-10 paints the radar warning receiver at 030/25 nm (priority 1: two flares go out by "
+              "themselves within half a second, and again every 3 s until it fades after 10 s; the EICAS warns)",
+              m.DefCmd(cmd_seq=201, command=DefensiveCommand.INJECT_THREAT, threat_id=1, bearing=30.0, range=25.0,
+                       band=RwrBand.X, threat_type=ThreatType.SAM, priority=1)),
+        Event(19.0, "defensive: ECM ACTIVE (the jammer is on: the EICAS ECM cell goes cyan)",
+              m.DefCmd(cmd_seq=202, command=DefensiveCommand.SET_ECM_MODE, ecm_mode=EcmMode.ACTIVE)),
         Event(20.0, "autothrottle engaged: hold 500 kt",
               m.EngCmd(cmd_seq=201, command=EngineCommand.AUTOTHROTTLE_ENGAGE, target_airspeed=500.0)),
         Event(30.0, "flight mode COMBAT (the SMS's master arm goes ARMED)",
@@ -138,6 +149,8 @@ def default_events():
         Event(38.0, "autothrottle disengaged", m.EngCmd(cmd_seq=202, command=EngineCommand.AUTOTHROTTLE_DISENGAGE)),
         Event(40.0, "engine 2 alone to 40 %: asymmetric thrust",
               m.EngCmd(cmd_seq=203, command=EngineCommand.SET_THRUST, engine=EngineSelect.ENGINE_2, thrust=40.0)),
+        Event(45.0, "defensive: four chaff cartridges dispensed (the DEF line counts down)",
+              m.DefCmd(cmd_seq=203, command=DefensiveCommand.DISPENSE_CHAFF, count=4)),
         Event(50.0, "1000 kg from the Center tank to Main Left (it takes what fits)",
               m.EngCmd(cmd_seq=204, command=EngineCommand.FUEL_TRANSFER, source=FuelTank.CENTER,
                        destination=FuelTank.MAIN_LEFT, amount=1000.0)),
@@ -417,6 +430,17 @@ class Dashboard:
             if status is not None and status.comms_cmd_status.name not in ("NONE", "ACCEPTED"):
                 text += f" cmd {status.comms_cmd_status.name}"
             parts.append(text)
+        defensive = self.latest.get(m.DefStatus)
+        if defensive is not None:
+            text = (f"DEF chaff {defensive.chaff_remaining} flares {defensive.flares_remaining} "
+                    f"ECM {defensive.ecm_mode.name} rwr {defensive.contact_count}")
+            if defensive.high_priority_count:
+                text += f" ({defensive.high_priority_count} pri-1)"
+            if defensive.auto_salvos:
+                text += f" salvos {defensive.auto_salvos}"
+            if defensive.defensive_cmd_status.name not in ("NONE", "ACCEPTED"):
+                text += f" cmd {defensive.defensive_cmd_status.name}"
+            parts.append(text)
         nav = self.latest.get(m.NavSolution)
         if nav is not None and nav.position_ssm == Ssm.NORMAL:
             parts.append(f"nav {nav.latitude:+.4f} {nav.longitude:+.4f} ({nav.sats_used} sats)")
@@ -445,9 +469,11 @@ def banner(args, terminals, events, log_dir, paths):
               "    rows, COMMS the radio, satcom and data link, MISSION the route (the active waypoint marked),\n"
               "    the targets and the order of battle.\n"
               "  EICAS window: the engine readings, the fuel quantity and balance, the FCS alerts and the crew alert\n"
-              "    list (hydraulics, electrical and ECS read unknown until their terminals exist).\n"
+              "    list, the countermeasures and the radar warning ring (hydraulics, electrical and ECS read unknown\n"
+              "    until their terminals exist).\n"
               "  TSD window: the fused air tracks around the aircraft (bearing and range), the route's waypoints,\n"
-              "    the enemy unit as a hostile contact, the energy metrics and the tactical systems strip.\n"
+              "    the enemy unit as a hostile contact, the radar warning contacts on the ring's edge (red dots with\n"
+              "    their band), the energy metrics and the tactical systems strip.\n"
               "  SMS window: the weapon stations, colour-coded by state, and the signature strip; MASTER ARM follows\n"
               "    the FMS's weapons state (ARMED from the COMBAT event at 30 s).")
     if events:

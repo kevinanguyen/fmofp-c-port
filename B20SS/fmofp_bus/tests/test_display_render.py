@@ -23,7 +23,7 @@ from fmofp_bus.icd.enums import (AewcMode, SarMode, ClearanceLevel, Countermeasu
                                  Ssm, TargetingMode, TargetingState, TerminalState, TfrMode, WeaponsState, WeatherMode)
 from fmofp_bus.tests.test_display_feeds import (FakeTerminal, flight_payload, sample_aewc, sample_elevation, sample_fused, sample_sar_image,
                                                 sample_link, sample_mission_status, sample_plan, sample_products,
-                                                sample_tracks)
+                                                sample_tracks, sample_def_status, sample_rwr_contacts)
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import RadarFeed
 from fmofp_display.systems_feed import SystemsFeed
@@ -368,6 +368,8 @@ class DisplayWindowsTest(unittest.TestCase):
                 vertical_speed_ssm=Ssm.NORMAL, altitude_ssm=Ssm.NORMAL)))
             terminal.put(m.BcastRdrWxScan(payload=m.RdrWxScan(scan_id=4, mode=WeatherMode.WINDSHEAR,
                                                             max_shear=ShearSeverity.SEVERE)))
+            terminal.put(sample_def_status())
+            terminal.put_block(b.BcastDefRwrContacts, sample_rwr_contacts(), 4)
             window.tick()        # the oil and fuel readings go in through set_engine_readings()
             eicas._poll_data()   # the 10 Hz poll reads the getters
             window.tick()
@@ -390,7 +392,16 @@ class DisplayWindowsTest(unittest.TestCase):
             self.assertNotIn("FUEL QTY UNKNOWN", texts)
             self.assertNotIn("ENG  OIL PRESS UNKNOWN", texts)
             self.assertIn("ENG  EGT CAUTION", texts, "graded on the thrust model (350 + 4.5 x 100 C at COMBAT power), which eicas.py computes before its ECU override")
-            self.assertIn("2 warnings 6 cautions", window.status.text())
+            # The defensive systems terminal: the alerts and the panel's cells and ring (v1.17).
+            self.assertIn("RWR  1 HIGH-PRI THREAT(S)", texts)
+            self.assertIn("CMDS  CHAFF LOW (8)", texts)
+            self.assertIn("CMDS  FLARES DEPLETED", texts)
+            self.assertIn("EW   ECM ACTIVE", texts)
+            self.assertEqual((8, 0, "ACTIVE", True, 2), (eicas._defensive["chaff_remaining"], eicas._defensive["flares_remaining"],
+                                                       eicas._defensive["ecm_mode"], eicas._defensive["jamming_active"],
+                                                       eicas._defensive["threat_count"]))
+            self.assertEqual(["X", "X", "Ku"], [c["band"] for c in eicas._defensive["rwr_contacts"]])
+            self.assertIn("4 warnings 7 cautions", window.status.text())
             self.assertIn("ENG N1 82.0%", window.status.text())
         finally:
             window.timer.stop()
@@ -425,6 +436,7 @@ class DisplayWindowsTest(unittest.TestCase):
                 ssm=Ssm.NORMAL, specific_excess_power=42.5, max_sustained_turn_rate=12.3, max_instantaneous_turn_rate=20.1,
                 max_climb_rate=6000.0, energy_advantage=425.0)))
             terminal.put_block(b.BcastRdrFusedTracks, sample_fused(), 5)
+            terminal.put_block(b.BcastDefRwrContacts, sample_rwr_contacts(), 4)
             tsd._poll_data()   # the 10 Hz poll reads the getters
             window.tick()
             self.app.processEvents()
@@ -443,7 +455,10 @@ class DisplayWindowsTest(unittest.TestCase):
             self.assertEqual(["BANK_ANGLE"], tsd._warnings)
             self.assertEqual([("FIGHTER", True), ("UNKNOWN", False)], [(t["type"], t["hostile"]) for t in tsd._threats])
             self.assertAlmostEqual(45.0, tsd._threats[0]["bearing"])
-            self.assertEqual(([], []), (tsd._waypoints, tsd._rwr_contacts), "no mission or defensive terminal yet")
+            self.assertEqual([], tsd._waypoints, "no mission plan in this sample")
+            self.assertEqual(["SCEN-7", "FUS-3", "ESM-Ku-200"], [c["contact_id"] for c in tsd._rwr_contacts],
+                             "the radar warning contacts on the ring's edge (v1.17)")
+            self.assertEqual([30.0, 45.0, 200.2], [c["bearing_deg"] for c in tsd._rwr_contacts])
             self.assertIn("fused 2 (1 hostile), epoch 3", window.status.text())
         finally:
             window.timer.stop()

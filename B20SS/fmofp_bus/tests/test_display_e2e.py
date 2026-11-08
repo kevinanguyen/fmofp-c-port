@@ -12,8 +12,8 @@ computer's engine and fuel status once each to address 31, and each display
 accepts the subaddresses it draws (ICD v1.7, v1.8). The feeds then make of it
 what the Qt windows would draw.
 
-Needs FMOFP_BC, FMOFP_FCS, FMOFP_NAV, FMOFP_FMS, FMOFP_RADAR, FMOFP_ENGINE, FMOFP_MISSION and FMOFP_COMMS (CI sets
-them).
+Needs FMOFP_BC, FMOFP_FCS, FMOFP_NAV, FMOFP_FMS, FMOFP_RADAR, FMOFP_ENGINE, FMOFP_MISSION, FMOFP_COMMS and
+FMOFP_DEFENSIVE (CI sets them).
 """
 
 import math
@@ -43,7 +43,8 @@ from fmofp_plant.plant import PlantModel, PlantTerminal
 PORT_BASE = 61000
 FRAMES = 420  # the SAR's first picture: a fix, 150 frames of integration, 134 frames of segments
 SYNC_MODE_CODE = 17
-BINARIES = ("FMOFP_FCS", "FMOFP_NAV", "FMOFP_FMS", "FMOFP_RADAR", "FMOFP_ENGINE", "FMOFP_MISSION", "FMOFP_COMMS")
+BINARIES = ("FMOFP_FCS", "FMOFP_NAV", "FMOFP_FMS", "FMOFP_RADAR", "FMOFP_ENGINE", "FMOFP_MISSION", "FMOFP_COMMS",
+            "FMOFP_DEFENSIVE")
 
 
 class PlantThread(threading.Thread):
@@ -124,7 +125,7 @@ class DisplaysEndToEndTest(unittest.TestCase):
         terminals = ["27", str(m.FcsStatus.RT), str(m.NavSolution.RT), str(m.FmsStatus.RT), str(m.RdrWxStatus.RT),
                      str(m.EngStatus.RT), str(m.DspPfdStatus.RT), str(m.DspRadarStatus.RT), str(m.DspMfdStatus.RT),
                      str(m.DspEicasStatus.RT), str(m.DspTsdStatus.RT), str(m.DspSmsStatus.RT), str(m.MsnStatus.RT),
-                     str(m.ComStatus.RT)]
+                     str(m.ComStatus.RT), str(m.DefStatus.RT)]
         args = [os.environ["FMOFP_BC"]]
         for rt in terminals:
             args += ["--rt", rt]
@@ -240,10 +241,12 @@ class DisplaysEndToEndTest(unittest.TestCase):
         # copy written into any display.
         broadcast = {r.command.subaddress for _, r in framed
                      if not r.command.transmit and not r.command.is_mode_code and r.command.rt == BROADCAST_RT}
-        self.assertEqual({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 18, 19, 22, 23, 24, 25, 26, 27, 28}, broadcast)
+        self.assertEqual({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 22, 23, 24, 25, 26, 27, 28},
+                         broadcast)
         # A stream with one consumer is that consumer's own relay (v1.15): the MFD's targeting, AEWC and SAR
-        # pictures and the TSD's energy metrics arrive unicast; nothing else is written into a display.
-        own = {m.DspMfdStatus.RT: {17, 20, 21, 22, 23, 26, 27}, m.DspTsdStatus.RT: {1}}
+        # pictures, the TSD's energy metrics and the EICAS's defensive status (v1.17) arrive unicast; nothing else
+        # is written into a display.
+        own = {m.DspMfdStatus.RT: {17, 20, 21, 22, 23, 26, 27}, m.DspTsdStatus.RT: {1}, m.DspEicasStatus.RT: {1}}
         for rt in (m.DspRadarStatus.RT, m.DspPfdStatus.RT, m.DspMfdStatus.RT, m.DspEicasStatus.RT, m.DspTsdStatus.RT,
                    m.DspSmsStatus.RT):
             unicast = {r.command.subaddress for _, r in framed
@@ -322,6 +325,16 @@ class DisplaysEndToEndTest(unittest.TestCase):
         self.assertGreaterEqual(self.eicas.blocks_completed, 1, "the fused tracks block, which it accepts")
         self.assertEqual(len(eicas.threat_tracks()), eicas.fused_summary()[1], "the hostile count the EICAS alarms on")
         self.assertEqual([a["code"] for a in alerts], [a["code"] for a in eicas.get_alerts()])
+        # The defensive systems terminal: its status by the EICAS's own relay, the contacts block by broadcast.
+        defensive = eicas.defensive.get_data()
+        self.assertEqual((60, 30, "STANDBY", False), (defensive["chaff_remaining"], defensive["flares_remaining"],
+                                                      defensive["ecm_mode"], defensive["jamming_active"]),
+                         "nothing commanded the dispensers")
+        self.assertIsNotNone(self.eicas.fresh(m.EicasDefStatus, stale_after_s=60.0), "the EICAS's own relay")
+        self.assertIsNone(self.tsd.fresh(m.EicasDefStatus, stale_after_s=60.0), "one consumer: not written into the TSD")
+        self.assertIsNotNone(self.eicas.latest_block(b.BcastDefRwrContacts)[0], "the contacts block at the EICAS")
+        self.assertEqual(len(defensive["rwr_contacts"]), len(eicas.rwr_contacts()))
+        self.assertIn("DEF chaff 60 flares 30 ECM STANDBY", eicas.status_text())
         eicas_status = self.transmitted(framed, m.DspEicasStatus, 100, FRAMES)
         self.assertEqual(TerminalState.NORMAL, eicas_status[-1][1].state)
         # The targeting radar, commanded from the radar display: its status and tracks reach the MFD's targeting page,
@@ -382,7 +395,12 @@ class DisplaysEndToEndTest(unittest.TestCase):
         self.assertIsNone(self.tsd.fresh(m.BcastRdrWxScan, stale_after_s=60.0), "not among its receives: ignored")
         self.assertEqual([], tsd.mission.get_nav_data()["route"])
         self.assertEqual(0, tsd.mission.get_nav_data()["waypoints_remaining"], "the mission computer's empty plan")
-        self.assertEqual([], tsd.defensive.get_rwr_contacts())
+        self.assertIsNotNone(self.tsd.latest_block(b.BcastDefRwrContacts)[0], "the contacts block at the TSD")
+        for contact in tsd.defensive.get_rwr_contacts():
+            self.assertIn(contact["band"], ("?", "L", "S", "C", "X", "Ku", "K", "Ka"))
+            self.assertTrue(contact["contact_id"].startswith(("FUS-", "ESM-")), contact)
+            self.assertTrue(contact["hostile"], "every fused threat and every intercept is hostile")
+        self.assertEqual({}, tsd.defensive.get_data(), "the TSD reads the contacts only")
         tsd_status = self.transmitted(framed, m.DspTsdStatus, 100, FRAMES)
         self.assertEqual(TerminalState.NORMAL, tsd_status[-1][1].state)
         # The SMS: the FMS status by broadcast and nothing else; its master arm is the weapons state the FMS reports.

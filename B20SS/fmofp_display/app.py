@@ -582,8 +582,9 @@ class MfdWindow(QWidget):
 def eicas_terminal(port_base):
     return TerminalProcess(EICAS_RT, port_base, m.DspEicasStatus, m.DspEicasModeCmd,
                            receives=(m.BcastFmsFlightData, m.BcastFmsStatus, m.BcastFcsGcasAlerts, m.BcastFcsPerfStatus,
-                                     m.BcastEngEngineStatus, m.BcastEngFuelStatus, m.BcastRdrWxScan),
-                           blocks=(b.BcastRdrFusedTracks,))
+                                     m.BcastEngEngineStatus, m.BcastEngFuelStatus, m.BcastRdrWxScan,
+                                     m.EicasDefStatus),
+                           blocks=(b.BcastRdrFusedTracks, b.BcastDefRwrContacts))
 
 
 def make_eicas(systems_feed):
@@ -644,14 +645,14 @@ def tsd_terminal(port_base):
     return TerminalProcess(TSD_RT, port_base, m.DspTsdStatus, m.DspTsdModeCmd,
                            receives=(m.BcastFmsFlightData, m.BcastFmsStatus, m.BcastFmsAttitudeStatus, m.TsdFmsEnergy,
                                      m.BcastMsnStatus),
-                           blocks=(b.BcastRdrFusedTracks, b.BcastMsnPlan))
+                           blocks=(b.BcastRdrFusedTracks, b.BcastMsnPlan, b.BcastDefRwrContacts))
 
 
 def make_tsd(systems_feed):
     """A TacticalSituationDisplay whose sources are the bus feeds: the FMS and the FMS control (flight data, tactical
     systems, envelope warnings, energy metrics), the radar data fusion (the fused tracks), the mission computer (the
-    route and the order of battle, from v1.16) and the defensive service answering as it did with its terminal not
-    yet on the bus (no radar warning contacts). Its own 10 Hz poll reads them."""
+    route and the order of battle, from v1.16) and the defensive systems terminal (the radar warning contacts,
+    from v1.17). Its own 10 Hz poll reads them."""
     bootstrap()
     install_system_sources(systems_feed)
     import FMOFP.Interfaces.userInterface.displays.tsd as tsd_module

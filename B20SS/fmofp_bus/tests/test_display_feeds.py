@@ -11,6 +11,7 @@ from fmofp_bus.icd.enums import (AewcMode, Affiliation, ChangeType, ClearanceLev
                                  SatcomState, ShearSeverity, Ssm, TargetClass, TargetKind, TargetStatus,
                                  TargetingMode, TargetingState, TerminalState, TfrMode, Threat, TurbulenceCategory,
                                  UnitKind, UnitStatus, WaypointType, Weapon, WeaponsState, WeatherMode)
+from fmofp_bus.icd.enums import EcmMode, RwrBand, RwrSource, ThreatType
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import (BROADCAST_SOURCES, SYMBOL_CLASS, RadarFeed, aewc_item, cell_velocity_nm_s,
                                       polar_to_nm, sar_corners_nm, sar_pgm, targeting_item, weather_items)
@@ -174,6 +175,26 @@ def sample_link(connected=True):
         datalink_state=LinkState.ACTIVE if connected else LinkState.INACTIVE, datalink_mode=DatalinkMode.LOS, channel=1,
         satcom_signal=65.0 if connected else 0.0, data_rate=120.0 if connected else 0.0,
         latency=350.0 if connected else 0.0, packets_sent=5, packets_received=9, error_rate=0.3))
+
+
+def sample_def_status(chaff=8, flares=0, ecm=EcmMode.ACTIVE, contacts=2, high=1):
+    """An EICAS_DEF_STATUS: chaff low, flares gone, the jammer on, two contacts of which one is priority 1."""
+    return m.EicasDefStatus(payload=m.DefStatus(state=TerminalState.NORMAL, chaff_remaining=chaff, flares_remaining=flares,
+                                                ecm_mode=ecm, jamming_active=ecm == EcmMode.ACTIVE,
+                                                contact_count=contacts, high_priority_count=high, auto_salvos=1,
+                                                flares_released=2, esm_valid=True, healthy=True))
+
+
+def sample_rwr_contacts(update=4):
+    """A DEF_RWR_CONTACTS block: an injected SA-10 at 030/25 nm, a hostile fighter track, a Ku-band intercept."""
+    c = b.DefRwrContacts(update=update, high_priority_count=1)
+    c.contact = [b.DefRwrContactsContact(bearing=30.0, range=25.0, band=RwrBand.X, threat_type=ThreatType.SAM, priority=1,
+                                         hostile=True, source=RwrSource.SCENARIO, id=7),
+                 b.DefRwrContactsContact(bearing=45.0, range=14.1, band=RwrBand.X, threat_type=ThreatType.AIR, priority=2,
+                                         hostile=True, source=RwrSource.FUSION, id=3),
+                 b.DefRwrContactsContact(bearing=200.25, range=42.0, band=RwrBand.KU, threat_type=ThreatType.UNK,
+                                         priority=3, hostile=True, source=RwrSource.ESM, id=200)]
+    return c
 
 
 class WeatherItemsTest(unittest.TestCase):
@@ -869,6 +890,43 @@ class MissionFeedTest(unittest.TestCase):
         self.terminal.put(sample_mission_status(), age=5.0)
         self.assertEqual({"route": []}, self.feed.nav_data())
         self.assertNotIn("phase", self.feed.mission_data())
+
+
+class DefensiveFeedTest(unittest.TestCase):
+    """What eicas._poll_data() and tsd._poll_data() read from the defensive service: get_data() and get_rwr_contacts(),
+    from the relayed status and the broadcast contacts block (v1.17)."""
+
+    def setUp(self):
+        self.terminal = FakeTerminal()
+        self.feed = SystemsFeed(self.terminal, clock=lambda: 1000.0)
+
+    def test_without_the_terminal_the_displays_get_what_the_service_gave_when_not_running(self):
+        self.assertEqual({}, self.feed.defensive.get_data())
+        self.assertEqual([], self.feed.defensive.get_rwr_contacts())
+        self.assertNotIn("DEF", self.feed.status_text())
+
+    def test_the_status_and_the_block_become_the_services_dictionaries(self):
+        self.terminal.put(sample_def_status())
+        self.terminal.put_block(b.BcastDefRwrContacts, sample_rwr_contacts(), 4)
+        data = self.feed.defensive.get_data()
+        self.assertEqual((8, 0, "ACTIVE", True, 2), (data["chaff_remaining"], data["flares_remaining"], data["ecm_mode"],
+                                                   data["jamming_active"], data["threat_count"]))
+        contacts = self.feed.defensive.get_rwr_contacts()
+        self.assertEqual(data["rwr_contacts"], contacts)
+        self.assertEqual([{"contact_id": "SCEN-7", "bearing_deg": 30.0, "range_nm": 25.0, "band": "X", "threat_type": "SAM",
+                           "priority": 1, "hostile": True},
+                          {"contact_id": "FUS-3", "bearing_deg": 45.0, "range_nm": 14.1, "band": "X", "threat_type": "AIR",
+                           "priority": 2, "hostile": True},
+                          {"contact_id": "ESM-Ku-200", "bearing_deg": 200.2, "range_nm": 42.0, "band": "Ku",
+                           "threat_type": "UNK", "priority": 3, "hostile": True}], contacts,
+                         "RWRContact.to_dict(): the Python's ids and band letters, a tenth of a degree and a mile")
+        self.assertIn("DEF chaff 8 flares 0 ECM ACTIVE rwr 2", self.feed.status_text())
+
+    def test_stale_data_is_left_out(self):
+        self.terminal.put(sample_def_status(), age=5.0)
+        self.terminal.put_block(b.BcastDefRwrContacts, sample_rwr_contacts(), 4, age=5.0)
+        self.assertEqual({}, self.feed.defensive.get_data())
+        self.assertEqual([], self.feed.defensive.get_rwr_contacts())
 
 
 class CommsFeedTest(unittest.TestCase):

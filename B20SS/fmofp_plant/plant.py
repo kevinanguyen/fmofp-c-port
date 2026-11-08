@@ -40,11 +40,12 @@ import sys
 from fmofp_bus.block import BlockPublisher
 from fmofp_bus.icd.blocks import PlantGround, PlantTerrain, PlantTraffic
 from fmofp_bus.icd.enums import GearPosition, Ssm
-from fmofp_bus.icd.messages import PlantGps, PlantRf, PlantSensors, PlantThrustCmd, PlantWeather
+from fmofp_bus.icd.messages import PlantEsm, PlantGps, PlantRf, PlantSensors, PlantThrustCmd, PlantWeather
 from fmofp_bus.rt_process import RtProcess
 from fmofp_bus.status import Status
 from fmofp_plant.engine import ECU_DT, ECU_HZ, EngineWorld
 from fmofp_plant.ground import GroundScene
+from fmofp_plant.esm import EsmWorld
 from fmofp_plant.rf import RfWorld
 from fmofp_plant.terrain import FlatTerrain, HillTerrain, profile_message
 from fmofp_plant.traffic import TrafficWorld, ownship_enu, ownship_velocity
@@ -69,6 +70,7 @@ GROUND_HZ = 1  # PLANT_GROUND: the movers have moved; its four segments take 20 
 SYNCS_PER_GROUND = SYNC_HZ // GROUND_HZ
 RF_HZ = 1  # PLANT_RF: CommsService._simulate ran once a second
 SYNCS_PER_RF = SYNC_HZ // RF_HZ
+ESM_STEP_FRAMES = 25  # PLANT_ESM: a new detection set every half second, as often as DefensiveService read its sensor
 
 HOLDABLE = ("altitude", "speed", "heading", "pitch", "roll", "vertical_speed", "angle_of_attack", "g_force",
             "flaps", "latitude", "longitude")
@@ -148,7 +150,7 @@ class PlantModel:
 
     def __init__(self, seed=None, terrain=None, latitude=HOME_LATITUDE, longitude=HOME_LONGITUDE,
                  gps_noise_m=3.0, gps_clock_bias_us=1.0, gps_outage=False, weather=True, traffic=True,
-                 ground=True, rf=True, satellite_after_s=None):
+                 ground=True, rf=True, satellite_after_s=None, esm=True):
         self.rng = random.Random(seed)
         # The weather draws from its own generator so adding it changed nothing else about a seeded run.
         self.weather = WeatherWorld(random.Random(None if seed is None else seed ^ 0x5745)) if weather else None
@@ -169,6 +171,8 @@ class PlantModel:
         # And the RF environment the communications terminal measures, from its own generator (v1.16).
         self.rf = RfWorld(random.Random(None if seed is None else seed ^ 0x5246),
                           satellite_after_s=satellite_after_s) if rf else None
+        # And the ESM intercepts the defensive systems terminal receives, from its own generator (v1.17).
+        self.esm = EsmWorld(random.Random(None if seed is None else seed ^ 0x45534D)) if esm else None
         self.altitude = 10000.0       # feet
         self.speed = 500.0            # knots
         self.heading = 0.0            # degrees true
@@ -299,6 +303,9 @@ class PlantModel:
         """PLANT_RF: the field, the satellite and the link; a silent world without an RF model."""
         return self.rf.message() if self.rf is not None else PlantRf()
 
+    def esm_message(self):
+        return self.esm.message() if self.esm is not None else PlantEsm()
+
     def thrust_command(self, words):
         """A PLANT_THRUST_CMD received: the engines take the engine computer's command. True when applied."""
         status, cmd = PlantThrustCmd.decode(words)
@@ -354,8 +361,9 @@ class PlantTerminal:
     """RT 27 on the bus: walks the model at 10 Hz, publishes PLANT_SENSORS every frame, PLANT_WEATHER once a
     second, PLANT_GPS with a new epoch once a second and its ranges refreshed at the walk rate, the
     PLANT_TERRAIN block ten times a second, PLANT_ENGINE ten times a second (the engine model steps at 2 Hz) and
-    the PLANT_GROUND block once a second and PLANT_RF once a second (the RF environment, stepped at that
-    rate), and takes the engine computer's thrust command from PLANT_THRUST_CMD."""
+    the PLANT_GROUND block once a second, PLANT_RF once a second (the RF environment, stepped at that
+    rate) and PLANT_ESM every half second (a new set of intercepts), and takes the engine computer's thrust
+    command from PLANT_THRUST_CMD."""
 
     def __init__(self, model, port_base=51000):
         self.model = model
@@ -382,6 +390,7 @@ class PlantTerminal:
             self.publish_ground()
             self.serve_ground()
             self.publish_rf()
+            self.publish_esm()
         return status
 
     def _load(self, message):
@@ -436,6 +445,9 @@ class PlantTerminal:
     def publish_rf(self):
         self._load(self.model.rf_message())
 
+    def publish_esm(self):
+        self._load(self.model.esm_message())
+
     def publish_ground(self):
         status, words = self.model.ground_message().encode()
         if status not in (Status.OK, Status.CLAMPED):
@@ -467,6 +479,7 @@ class PlantTerminal:
                 self.publish_ground()
                 self.serve_ground()
                 self.publish_rf()
+                self.publish_esm()
             return False
         self.syncs += 1
         self.take_thrust_command()
@@ -492,6 +505,10 @@ class PlantTerminal:
             if self.model.rf is not None:
                 self.model.rf.step()
             self.publish_rf()
+        if self.syncs % ESM_STEP_FRAMES == 0:
+            if self.model.esm is not None:
+                self.model.esm.step()
+            self.publish_esm()
         self.serve_terrain()
         self.serve_traffic()
         self.serve_ground()
@@ -528,6 +545,7 @@ def main(argv=None):
     parser.add_argument("--no-traffic", action="store_true", help="an empty sky: PLANT_TRAFFIC carries no aircraft")
     parser.add_argument("--no-ground", action="store_true", help="bare ground: PLANT_GROUND carries no features")
     parser.add_argument("--no-rf", action="store_true", help="a silent sky: PLANT_RF carries no field and no satellite")
+    parser.add_argument("--no-esm", action="store_true", help="no emitters: PLANT_ESM carries no signals")
     parser.add_argument("--satellite-after", type=float, default=None,
                         help="a satellite comes into view after this many seconds instead of by chance")
     parser.add_argument("--hold", type=parse_hold, default={}, help="name=value,... held constant")
@@ -538,7 +556,8 @@ def main(argv=None):
     model = PlantModel(seed=args.seed, terrain=terrain, latitude=args.lat, longitude=args.lon,
                        gps_noise_m=args.gps_noise_m, gps_clock_bias_us=args.gps_clock_bias_us,
                        gps_outage=args.gps_outage, weather=not args.no_weather, traffic=not args.no_traffic,
-                       ground=not args.no_ground, rf=not args.no_rf, satellite_after_s=args.satellite_after)
+                       ground=not args.no_ground, rf=not args.no_rf, satellite_after_s=args.satellite_after,
+                       esm=not args.no_esm)
     model.hold = args.hold
     plant = PlantTerminal(model, args.port_base)
     status = plant.init()
