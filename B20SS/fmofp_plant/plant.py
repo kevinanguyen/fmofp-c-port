@@ -38,7 +38,7 @@ import random
 import sys
 
 from fmofp_bus.block import BlockPublisher
-from fmofp_bus.icd.blocks import PlantGround, PlantTerrain, PlantTraffic
+from fmofp_bus.icd.blocks import PlantGround, PlantSensorScan, PlantTerrain, PlantTraffic
 from fmofp_bus.icd.enums import GearPosition, Ssm
 from fmofp_bus.icd.messages import PlantEsm, PlantGps, PlantRf, PlantSensors, PlantThrustCmd, PlantWeather
 from fmofp_bus.rt_process import RtProcess
@@ -47,6 +47,7 @@ from fmofp_plant.engine import ECU_DT, ECU_HZ, EngineWorld
 from fmofp_plant.ground import GroundScene
 from fmofp_plant.esm import EsmWorld
 from fmofp_plant.rf import RfWorld
+from fmofp_plant.sensors import SensorScanWorld
 from fmofp_plant.terrain import FlatTerrain, HillTerrain, profile_message
 from fmofp_plant.traffic import TrafficWorld, ownship_enu, ownship_velocity
 from fmofp_plant.weather import WeatherWorld
@@ -70,7 +71,9 @@ GROUND_HZ = 1  # PLANT_GROUND: the movers have moved; its four segments take 20 
 SYNCS_PER_GROUND = SYNC_HZ // GROUND_HZ
 RF_HZ = 1  # PLANT_RF: CommsService._simulate ran once a second
 SYNCS_PER_RF = SYNC_HZ // RF_HZ
-ESM_STEP_FRAMES = 25  # PLANT_ESM: a new detection set every half second, as often as DefensiveService read its sensor
+ESM_STEP_FRAMES = 10  # PLANT_ESM: a new detection set every 0.2 s, as often as SensorDataFusion read its ESM sensor (the
+#                       defensive service read its own every half second and takes the latest set; 25 until v1.18)
+SCAN_STEP_FRAMES = 10  # PLANT_SENSOR_SCAN: a new scan set every 0.2 s, SensorDataFusion's poll; three segments, six frames at 25 Hz
 
 HOLDABLE = ("altitude", "speed", "heading", "pitch", "roll", "vertical_speed", "angle_of_attack", "g_force",
             "flaps", "latitude", "longitude")
@@ -150,7 +153,7 @@ class PlantModel:
 
     def __init__(self, seed=None, terrain=None, latitude=HOME_LATITUDE, longitude=HOME_LONGITUDE,
                  gps_noise_m=3.0, gps_clock_bias_us=1.0, gps_outage=False, weather=True, traffic=True,
-                 ground=True, rf=True, satellite_after_s=None, esm=True):
+                 ground=True, rf=True, satellite_after_s=None, esm=True, scan_sensors=True):
         self.rng = random.Random(seed)
         # The weather draws from its own generator so adding it changed nothing else about a seeded run.
         self.weather = WeatherWorld(random.Random(None if seed is None else seed ^ 0x5745)) if weather else None
@@ -173,6 +176,8 @@ class PlantModel:
                           satellite_after_s=satellite_after_s) if rf else None
         # And the ESM intercepts the defensive systems terminal receives, from its own generator (v1.17).
         self.esm = EsmWorld(random.Random(None if seed is None else seed ^ 0x45534D)) if esm else None
+        # And the five scanning sensors the sensor data fusion asked, from their own generator (v1.18).
+        self.scan_world = SensorScanWorld(random.Random(None if seed is None else seed ^ 0x534E53)) if scan_sensors else None
         self.altitude = 10000.0       # feet
         self.speed = 500.0            # knots
         self.heading = 0.0            # degrees true
@@ -306,6 +311,9 @@ class PlantModel:
     def esm_message(self):
         return self.esm.message() if self.esm is not None else PlantEsm()
 
+    def scan_block(self):
+        return self.scan_world.block() if self.scan_world is not None else PlantSensorScan()
+
     def thrust_command(self, words):
         """A PLANT_THRUST_CMD received: the engines take the engine computer's command. True when applied."""
         status, cmd = PlantThrustCmd.decode(words)
@@ -362,8 +370,8 @@ class PlantTerminal:
     second, PLANT_GPS with a new epoch once a second and its ranges refreshed at the walk rate, the
     PLANT_TERRAIN block ten times a second, PLANT_ENGINE ten times a second (the engine model steps at 2 Hz) and
     the PLANT_GROUND block once a second, PLANT_RF once a second (the RF environment, stepped at that
-    rate) and PLANT_ESM every half second (a new set of intercepts), and takes the engine computer's thrust
-    command from PLANT_THRUST_CMD."""
+    rate), PLANT_ESM every 0.2 s (a new set of intercepts) and the PLANT_SENSOR_SCAN block every 0.2 s (a new
+    set of scans), and takes the engine computer's thrust command from PLANT_THRUST_CMD."""
 
     def __init__(self, model, port_base=51000):
         self.model = model
@@ -375,6 +383,7 @@ class PlantTerminal:
         self.terrain_block = BlockPublisher(PlantTerrain.MAX_PAYLOAD_WORDS)
         self.traffic_block = BlockPublisher(PlantTraffic.MAX_PAYLOAD_WORDS)
         self.ground_block = BlockPublisher(PlantGround.MAX_PAYLOAD_WORDS)
+        self.sensor_block = BlockPublisher(PlantSensorScan.MAX_PAYLOAD_WORDS)
 
     def init(self):
         status = self.process.init(PLANT_RT, self.port_base)
@@ -391,6 +400,8 @@ class PlantTerminal:
             self.serve_ground()
             self.publish_rf()
             self.publish_esm()
+            self.publish_sensors()
+            self.serve_sensors()
         return status
 
     def _load(self, message):
@@ -459,6 +470,18 @@ class PlantTerminal:
     def serve_ground(self):
         self.ground_block.serve(self.process.terminal, PlantGround.DESCRIPTOR_SUBADDRESS, PlantGround.SEGMENT_SUBADDRESS)
 
+    def publish_sensors(self):
+        status, words = self.model.scan_block().encode()
+        if status not in (Status.OK, Status.CLAMPED):
+            self.publish_failures += 1
+            return
+        if self.sensor_block.publish(self.process.terminal, PlantSensorScan.SEGMENT_SUBADDRESS, words) != Status.OK:
+            self.publish_failures += 1
+
+    def serve_sensors(self):
+        self.sensor_block.serve(self.process.terminal, PlantSensorScan.DESCRIPTOR_SUBADDRESS,
+                                PlantSensorScan.SEGMENT_SUBADDRESS)
+
     def poll(self, timeout_s=0.1):
         """One iteration of the loop: handle a datagram, step on sync. Returns True on a sync."""
         self.process.poll(timeout_s)
@@ -468,6 +491,7 @@ class PlantTerminal:
                 self.terrain_block = BlockPublisher(PlantTerrain.MAX_PAYLOAD_WORDS)
                 self.traffic_block = BlockPublisher(PlantTraffic.MAX_PAYLOAD_WORDS)
                 self.ground_block = BlockPublisher(PlantGround.MAX_PAYLOAD_WORDS)
+                self.sensor_block = BlockPublisher(PlantSensorScan.MAX_PAYLOAD_WORDS)
                 self.publish()
                 self.publish_gps()
                 self.publish_weather()
@@ -480,6 +504,8 @@ class PlantTerminal:
                 self.serve_ground()
                 self.publish_rf()
                 self.publish_esm()
+                self.publish_sensors()
+                self.serve_sensors()
             return False
         self.syncs += 1
         self.take_thrust_command()
@@ -509,9 +535,14 @@ class PlantTerminal:
             if self.model.esm is not None:
                 self.model.esm.step()
             self.publish_esm()
+        if self.syncs % SCAN_STEP_FRAMES == 0:
+            if self.model.scan_world is not None:
+                self.model.scan_world.step()
+            self.publish_sensors()
         self.serve_terrain()
         self.serve_traffic()
         self.serve_ground()
+        self.serve_sensors()
         self.publish()
         return True
 
@@ -546,6 +577,7 @@ def main(argv=None):
     parser.add_argument("--no-ground", action="store_true", help="bare ground: PLANT_GROUND carries no features")
     parser.add_argument("--no-rf", action="store_true", help="a silent sky: PLANT_RF carries no field and no satellite")
     parser.add_argument("--no-esm", action="store_true", help="no emitters: PLANT_ESM carries no signals")
+    parser.add_argument("--no-sensors", action="store_true", help="blind sensors: PLANT_SENSOR_SCAN carries no detections")
     parser.add_argument("--satellite-after", type=float, default=None,
                         help="a satellite comes into view after this many seconds instead of by chance")
     parser.add_argument("--hold", type=parse_hold, default={}, help="name=value,... held constant")
@@ -557,7 +589,7 @@ def main(argv=None):
                        gps_noise_m=args.gps_noise_m, gps_clock_bias_us=args.gps_clock_bias_us,
                        gps_outage=args.gps_outage, weather=not args.no_weather, traffic=not args.no_traffic,
                        ground=not args.no_ground, rf=not args.no_rf, satellite_after_s=args.satellite_after,
-                       esm=not args.no_esm)
+                       esm=not args.no_esm, scan_sensors=not args.no_sensors)
     model.hold = args.hold
     plant = PlantTerminal(model, args.port_base)
     status = plant.init()

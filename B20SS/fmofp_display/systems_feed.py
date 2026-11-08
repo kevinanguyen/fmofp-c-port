@@ -39,6 +39,12 @@ EICAS_DEF_STATUS (the countermeasures, the ECM mode, the contact count), and
 get_rwr_contacts() from the BCAST_DEF_RWR_CONTACTS block both the EICAS and
 the TSD hear, each record turned back into RWRContact.to_dict()'s dictionary
 (the Python's contact ids, bands as its letters).
+
+From v1.18 the sensor service's get_data() answers from the sensor management
+terminal (RT 10): SNS_STATUS, relayed to the EICAS as EICAS_SNS_STATUS, gives the
+health, the six sensors' states and the contact count; the fused track count is
+the fused tracks block's, which the EICAS already hears (the Python read it from
+the radar data fusion).
 """
 
 import math
@@ -415,9 +421,22 @@ class SystemsFeed:
                 "threat_count": p.contact_count}
 
     def sensor_data(self):
-        """SensorService.get_data(): nothing until the sensor management terminal (RT 10) is on the bus; the EICAS
-        reads the health as UNKNOWN and no fused tracks."""
-        return {}
+        """SensorService.get_data(): the health, the six sensors' states and the contact count from the relayed
+        SNS_STATUS (EICAS_SNS_STATUS), the fused track count from the fused tracks block the EICAS already hears (the
+        Python read it from the radar data fusion; ICD README section 2); nothing until the status arrives, when the
+        EICAS reads the health as UNKNOWN and no fused tracks, as it did with the service not running."""
+        message = self.terminal.fresh(m.EicasSnsStatus, self.stale_after_s)
+        if message is None:
+            return {}
+        p = message.payload
+        active = {"main_radar": p.main_radar_active, "terrain_following_radar": p.tfr_radar_active,
+                  "lidar": p.lidar_active}
+        passive = {"forward_looking_infrared": p.flir_active, "missile_approach_warning": p.maws_active,
+                   "electronic_support_measures": p.esm_active}
+        return {"active_sensors": {name: {"is_active": on} for name, on in active.items()},
+                "passive_sensors": {name: {"is_active": on} for name, on in passive.items()},
+                "fused_track_count": len(self.fused_tracks()), "sensor_contacts": [],
+                "sensor_contact_count": p.contact_count, "health": p.health.name}
 
     def fused_tracks(self):
         """RadarDataFusion.get_fused_tracks(): the tracks of the last fused tracks block the bus delivered whole, while
@@ -532,6 +551,10 @@ class SystemsFeed:
         if defensive:
             parts.append(f"DEF chaff {defensive['chaff_remaining']} flares {defensive['flares_remaining']} "
                          f"ECM {defensive['ecm_mode']} rwr {defensive['threat_count']}")
+        sensors = self.sensor_data()
+        if sensors:
+            parts.append(f"SNS {sensors['health']} {sensors['fused_track_count']} fused "
+                         f"{sensors['sensor_contact_count']} ctc")
         position = self.mission_data().get("current_position")
         if position is not None:
             parts.append(f"pos {position['lat']:.4f} {position['lon']:.4f}")

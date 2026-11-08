@@ -11,7 +11,7 @@ from fmofp_bus.icd.enums import (AewcMode, Affiliation, ChangeType, ClearanceLev
                                  SatcomState, ShearSeverity, Ssm, TargetClass, TargetKind, TargetStatus,
                                  TargetingMode, TargetingState, TerminalState, TfrMode, Threat, TurbulenceCategory,
                                  UnitKind, UnitStatus, WaypointType, Weapon, WeaponsState, WeatherMode)
-from fmofp_bus.icd.enums import EcmMode, RwrBand, RwrSource, ThreatType
+from fmofp_bus.icd.enums import EcmMode, RwrBand, RwrSource, SensorHealth, ThreatType
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import (BROADCAST_SOURCES, SYMBOL_CLASS, RadarFeed, aewc_item, cell_velocity_nm_s,
                                       polar_to_nm, sar_corners_nm, sar_pgm, targeting_item, weather_items)
@@ -195,6 +195,14 @@ def sample_rwr_contacts(update=4):
                  b.DefRwrContactsContact(bearing=200.25, range=42.0, band=RwrBand.KU, threat_type=ThreatType.UNK,
                                          priority=3, hostile=True, source=RwrSource.ESM, id=200)]
     return c
+
+
+def sample_sns_status(health=SensorHealth.NOMINAL, contacts=14, lidar=True):
+    """An EICAS_SNS_STATUS: every sensor on (or the LIDAR off), fourteen fused sensor contacts."""
+    return m.EicasSnsStatus(payload=m.SnsStatus(state=TerminalState.NORMAL, health=health, main_radar_active=True,
+                                                tfr_radar_active=True, lidar_active=lidar, flir_active=True,
+                                                maws_active=True, esm_active=True, contact_count=contacts,
+                                                sequence=250, scan_valid=True, esm_valid=True, healthy=True))
 
 
 class WeatherItemsTest(unittest.TestCase):
@@ -927,6 +935,37 @@ class DefensiveFeedTest(unittest.TestCase):
         self.terminal.put_block(b.BcastDefRwrContacts, sample_rwr_contacts(), 4, age=5.0)
         self.assertEqual({}, self.feed.defensive.get_data())
         self.assertEqual([], self.feed.defensive.get_rwr_contacts())
+
+
+class SensorFeedTest(unittest.TestCase):
+    """What eicas._poll_data() reads from the sensor service: get_data()'s health and fused track count (v1.18)."""
+
+    def setUp(self):
+        self.terminal = FakeTerminal()
+        self.feed = SystemsFeed(self.terminal, clock=lambda: 1000.0)
+
+    def test_without_the_terminal_the_eicas_gets_what_the_service_gave_when_not_running(self):
+        self.assertEqual({}, self.feed.sensors.get_data())
+        self.assertNotIn("SNS", self.feed.status_text())
+
+    def test_the_status_becomes_the_services_dictionary_with_the_fused_count_from_the_block(self):
+        self.terminal.put(sample_sns_status())
+        self.terminal.put_block(b.BcastRdrFusedTracks, sample_fused(), 5)
+        data = self.feed.sensors.get_data()
+        self.assertEqual(("NOMINAL", 2, 14, []), (data["health"], data["fused_track_count"], data["sensor_contact_count"],
+                                              data["sensor_contacts"]))
+        self.assertEqual({"main_radar": {"is_active": True}, "terrain_following_radar": {"is_active": True},
+                          "lidar": {"is_active": True}}, data["active_sensors"])
+        self.assertEqual({"forward_looking_infrared", "missile_approach_warning", "electronic_support_measures"},
+                         set(data["passive_sensors"]))
+        self.assertIn("SNS NOMINAL 2 fused 14 ctc", self.feed.status_text())
+        self.terminal.put(sample_sns_status(health=SensorHealth.DEGRADED, lidar=False))
+        data = self.feed.sensors.get_data()
+        self.assertEqual(("DEGRADED", False), (data["health"], data["active_sensors"]["lidar"]["is_active"]))
+
+    def test_stale_data_is_left_out(self):
+        self.terminal.put(sample_sns_status(), age=5.0)
+        self.assertEqual({}, self.feed.sensors.get_data())
 
 
 class CommsFeedTest(unittest.TestCase):

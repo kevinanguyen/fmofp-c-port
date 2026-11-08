@@ -23,7 +23,8 @@ from fmofp_bus.icd.enums import (AewcMode, SarMode, ClearanceLevel, Countermeasu
                                  Ssm, TargetingMode, TargetingState, TerminalState, TfrMode, WeaponsState, WeatherMode)
 from fmofp_bus.tests.test_display_feeds import (FakeTerminal, flight_payload, sample_aewc, sample_elevation, sample_fused, sample_sar_image,
                                                 sample_link, sample_mission_status, sample_plan, sample_products,
-                                                sample_tracks, sample_def_status, sample_rwr_contacts)
+                                                sample_tracks, sample_def_status, sample_rwr_contacts,
+                                                sample_sns_status)
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import RadarFeed
 from fmofp_display.systems_feed import SystemsFeed
@@ -370,6 +371,8 @@ class DisplayWindowsTest(unittest.TestCase):
                                                             max_shear=ShearSeverity.SEVERE)))
             terminal.put(sample_def_status())
             terminal.put_block(b.BcastDefRwrContacts, sample_rwr_contacts(), 4)
+            terminal.put(sample_sns_status())
+            terminal.put_block(b.BcastRdrFusedTracks, sample_fused(), 5)
             window.tick()        # the oil and fuel readings go in through set_engine_readings()
             eicas._poll_data()   # the 10 Hz poll reads the getters
             window.tick()
@@ -401,7 +404,10 @@ class DisplayWindowsTest(unittest.TestCase):
                                                        eicas._defensive["ecm_mode"], eicas._defensive["jamming_active"],
                                                        eicas._defensive["threat_count"]))
             self.assertEqual(["X", "X", "Ku"], [c["band"] for c in eicas._defensive["rwr_contacts"]])
-            self.assertIn("4 warnings 7 cautions", window.status.text())
+            # The sensor management terminal: the SENSORS rows and the fusion's hostile count (v1.18).
+            self.assertEqual(("NOMINAL", 2), (eicas._sensor_health, eicas._fused_track_count))
+            self.assertIn("FUSION  1 HOSTILE TRACK(S)", texts)
+            self.assertIn("4 warnings 8 cautions", window.status.text())
             self.assertIn("ENG N1 82.0%", window.status.text())
         finally:
             window.timer.stop()

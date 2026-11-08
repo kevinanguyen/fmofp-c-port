@@ -8,7 +8,7 @@
   bits="11-8" means (word >> 8) & 0xF. A field may span two consecutive words
   (word="3-4" bits="31-0", most significant word first) for one 32-bit value.
 -->
-<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="17" status="DRAFT" date="2026-11-07">
+<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="18" status="DRAFT" date="2026-11-08">
   <revision version="1.0-draft" date="2026-10-04" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">First draft, derived from FMOFP/rtAddressConfig.xml and FMOFP/MIL_STD_1553B/message_schemas.py.</revision>
   <revision version="1.0-draft.2" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 1-3: display addresses accepted; BIT merged into avionics (RT 1), FM fitness and SW configuration folded in as well; bus controller confirmed as its own process. RT 24-26 freed.</revision>
   <revision version="1.0-draft.3" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 4-10: UDP transport accepted; legacy WEATHER mode dropped as unnecessary; every TBD value defined from the code that uses it; heading and yaw are true. Command parameters nothing consumed were removed.</revision>
@@ -432,6 +432,25 @@
       <value name="SET_ECM_MODE" value="3"/>
       <value name="INJECT_THREAT" value="4"/>
     </enum>
+    <enum id="sensor_health" bits="2" doc="SensorService._update's overall health: NOMINAL when every active and every passive sensor is on, DEGRADED when only one of the two suites is whole, FAULT otherwise; INITIALISING before the first update">
+      <value name="INITIALISING" value="0"/>
+      <value name="NOMINAL" value="1"/>
+      <value name="DEGRADED" value="2"/>
+      <value name="FAULT" value="3"/>
+    </enum>
+    <enum id="sensor_id" bits="3" doc="The six sensors of ActiveSensorManager (main radar, terrain-following radar, LIDAR) and PassiveSensorManager (forward-looking infrared, missile approach warning, electronic support measures), in their dictionaries' order">
+      <value name="MAIN_RADAR" value="0"/>
+      <value name="TFR_RADAR" value="1"/>
+      <value name="LIDAR" value="2"/>
+      <value name="FLIR" value="3"/>
+      <value name="MAWS" value="4"/>
+      <value name="ESM" value="5"/>
+    </enum>
+    <enum id="sensor_command" bits="4" doc="What SNS_CMD asks of the sensor management terminal: the managers' activate_sensor and deactivate_sensor, which nothing in the Python called (SensorService.start turned every sensor on)">
+      <value name="NONE" value="0"/>
+      <value name="ACTIVATE" value="1"/>
+      <value name="DEACTIVATE" value="2"/>
+    </enum>
   </enums>
 
   <terminals>
@@ -445,11 +464,11 @@
     <terminal rt="7" id="nav" name="Navigation - GPS position solver and GPS/dead-reckoning fusion" status="existing" source="Systems/nav: gps/globalPositionSystem.py (GPSReceiver, the solver) and dataFusion/fuseData.py" note="Ported in v1.2. The INS of Systems/nav/ins was a noise generator whose output nothing used; it is not carried (README section 2)"/>
     <terminal rt="8" id="powermanagement" name="Power management" status="existing" source="Systems/powerManagement"/>
     <terminal rt="9" id="radar" name="Radar computer - weather, TFR, SAR, targeting, AEWC, track fusion" status="existing" source="Systems/radarManagement" note="The five radars stay one terminal; each radar is a subaddress, as before. The weather radar is ported in v1.3 (SA 1, 6-7, 18-19), the terrain-following radar in v1.4 (SA 2, 14-15, 20-23) the targeting radar with the track fusion in v1.10 (SA 4, 8-11, 24-25), the AEWC radar in v1.12 (SA 5, 12-13) and the synthetic aperture radar in v1.13 (SA 3, 16-17, 26-27). The radar computer listens to the FMS flight data broadcast (31/25) for the synthetic aperture radar's imaging geometry"/>
-    <terminal rt="10" id="sensormanagement" name="Sensor management" status="existing" source="Systems/sensorManagement"/>
+    <terminal rt="10" id="sensormanagement" name="Sensor management" status="existing" source="Systems/sensorManagement: sensorService.py, sensorDataFusion.py, activeSensors/activeSensors.py, passiveSensors/passiveSensors.py" note="Ported in v1.18 (fmofp_sensor). SensorService's health rule over the six sensors' on/off states and SensorDataFusion's contact table (the radar, LIDAR and infrared detections normalised, merged within a 5 degree bearing gate, aged out after 8 s) over the scans the plant publishes (PLANT_SENSOR_SCAN relayed as SNS_SCAN, PLANT_ESM relayed as SNS_ESM). SNS_CMD switches a sensor on or off; SNS_STATUS reaches the EICAS by relay (EICAS_SNS_STATUS). The fused track count the EICAS shows beside the health is counted by the EICAS from the fused tracks block it already hears (README section 2)"/>
     <terminal rt="11" id="pfd" name="Primary flight display" status="changed" source="Interfaces/userInterface/displays/pfd.py" note="Was the single 'Display System' terminal; one process per display means each display needs its own address. On the bus from v1.5 (fmofp_display pfd): it hears the FMS's flight data, status and attitude status by broadcast (RT 31 SA 25-27, v1.7; copies of its own on SA 1-3 until then)"/>
     <terminal rt="12" id="flightmanagementsystem" name="Flight management system" status="existing" source="Systems/flightManagementSys: flightManagementSystem.py and fmsControl.py" note="Ported in v1.2. Its attitude comes from the FCS over the bus, as the Python copied it from its own flight control object"/>
     <terminal rt="13" id="mfd" name="Multi-function display" status="new" source="Interfaces/userInterface/displays/mfd.py" note="On the bus from v1.6 (fmofp_display mfd): its radar page mirrors the radars' pictures from the broadcasts the radar display hears too (RT 31 SA 1-4, 6-9), its systems page reads the FCS's GCAS alerts and exceedances (31/5, 31/10), its mission page the FMS flight data (31/25) and, from v1.8, its systems and engine pages the engine computer's engine and fuel status (31/18, 31/19); v1.6 gave it copies of its own on SA 1-11, v1.7 the broadcasts. Its radar commands moved to the radar display terminal in v1.5; it commands nothing. From v1.11 its targeting page draws the targeting radar's tracks (31/24, 31/20-21). From v1.15 the targeting, AEWC and SAR pictures, which only it draws, come by relay into its own receive subaddresses 20-21, 22-23 and 26-27 instead of broadcasts (one consumer, one transfer either way; README section 8)"/>
-    <terminal rt="14" id="eicas" name="Engine indicating and crew alerting display" status="new" source="Interfaces/userInterface/displays/eicas.py" note="On the bus from v1.9 (fmofp_display eicas): it hears the engine computer's engine and fuel status (31/18-19), the flight computer's GCAS alerts and exceedances (31/5, 31/10), the FMS's flight data and status (31/25-26) and the weather radar's scan summary (31/2) by broadcast, and commands nothing. Its hydraulic, electrical and environmental rows read unknown until those terminals exist. From v1.17 it hears the defensive systems status by relay into its own SA 1 (EICAS_DEF_STATUS) and the radar warning contacts by broadcast (31/16-17)"/>
+    <terminal rt="14" id="eicas" name="Engine indicating and crew alerting display" status="new" source="Interfaces/userInterface/displays/eicas.py" note="On the bus from v1.9 (fmofp_display eicas): it hears the engine computer's engine and fuel status (31/18-19), the flight computer's GCAS alerts and exceedances (31/5, 31/10), the FMS's flight data and status (31/25-26) and the weather radar's scan summary (31/2) by broadcast, and commands nothing. Its hydraulic, electrical and environmental rows read unknown until those terminals exist. From v1.17 it hears the defensive systems status by relay into its own SA 1 (EICAS_DEF_STATUS) and the radar warning contacts by broadcast (31/16-17); from v1.18 the sensor management status by relay into its own SA 3 (EICAS_SNS_STATUS)"/>
     <terminal rt="15" id="radar_display" name="Radar display - the radars' pictures and their control panel" status="new" source="Interfaces/userInterface/displays/radar" note="On the bus from v1.5 (fmofp_display radar): it hears the weather and terrain-following radars' status, scan summary and guidance by broadcast (RT 31 SA 1-4) and their products as broadcast blocks (31 SA 6-9; copies of its own on the same numbers until v1.7), and commands the radars (SA 20-24); from v1.11 it hears the targeting radar's status too (31/24) and commands that radar"/>
     <terminal rt="16" id="tsd" name="Tactical situation display" status="new" source="Interfaces/userInterface/displays/tsd.py" note="On the bus from v1.11 (fmofp_display tsd): it hears the fused air tracks (31/22-23) and the FMS's flight data, status and attitude status (31/25-27) by broadcast, the energy maneuverability by relay into its own SA 1 (TSD_FMS_ENERGY; broadcast at 31/28 until v1.15), and commands nothing. Its waypoints and order of battle came with the mission computer (v1.16, 31/28, 31/13-14) and its radar warning contacts with the defensive systems terminal (v1.17, 31/16-17)"/>
     <terminal rt="17" id="sms" name="Stores management display" status="new" source="Interfaces/userInterface/displays/sms.py" note="On the bus from v1.14 (fmofp_display sms): it hears the FMS status by broadcast (31/26) for the flight mode and the tactical systems its master arm, ECM cell and signature strip follow, and commands nothing. Its weapon stations are the display's own table, as in the Python, which modelled no armament system (README section 2); a stores management computer is backlog (section 12)"/>
@@ -459,7 +478,7 @@
     <terminal rt="21" id="flightsurfaces" name="Flight surfaces" status="new" source="Systems/flightSurfaces"/>
     <terminal rt="22" id="defensive" name="Defensive systems - RWR, chaff, flare, ECM" status="new" source="Systems/defensiveSys/defensiveService.py" note="Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17)"/>
     <terminal rt="23" id="flightdatamonitoring" name="Flight data monitoring" status="new" source="Systems/flightDataMonitoring"/>
-    <terminal rt="27" id="plant" name="Plant model - the simulated aircraft and world (test equipment, not aircraft software)" status="new" source="Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process" note="Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 25 frames"/>
+    <terminal rt="27" id="plant" name="Plant model - the simulated aircraft and world (test equipment, not aircraft software)" status="new" source="Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process" note="Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames)"/>
     <terminal rt="31" id="broadcast" name="Broadcast address - every terminal that accepts a subaddress hears it" status="reserved" note="Not a terminal: MIL-STD-1553B address 31. A message or block here is the far end of a relay, stored by the terminals its listeners attribute names, each of which accepts that subaddress for broadcast (README section 8); nothing else stores it and nobody answers it. Added in v1.7"/>
   </terminals>
 
@@ -1499,7 +1518,7 @@
       <field name="spare_4" word="4" bits="7-0" type="spare"/>
     </message>
     <message id="PLANT_ESM" rt="27" sa="13" dir="T" words="26" rate="5" title="ESM signal intercepts, from the plant">
-      <doc>What the passive sensor manager's ESM sensor detected (passiveSensors.ESMSensor.detect, which DefensiveService read every half second), as the world the defensive systems terminal intercepts (v1.17, fmofp_plant.esm): a new set every 25 frames of randint(0, 5) signals, each a frequency uniform in 0.5-40 GHz, a strength uniform in -120 to -20 dBm and a bearing uniform in 0-360 degrees, in the Python's draw order; then, for each signal, the range the receiver would estimate (uniform 5-60 nm), which the Python's service drew itself for a signal it had not seen. The set is republished unchanged until the next one; epoch says when it is new. Fields of a signal beyond count are zero.</doc>
+      <doc>What the passive sensor manager's ESM sensor detected (passiveSensors.ESMSensor.detect, which DefensiveService read every half second), as the world the defensive systems terminal intercepts (v1.17, fmofp_plant.esm): a new set every 10 frames (every 25 until v1.18: the sensor fusion read the sensor five times a second, the defensive service twice, and each reading was a fresh set; the defensive terminal takes the latest set at each of its updates) of randint(0, 5) signals, each a frequency uniform in 0.5-40 GHz, a strength uniform in -120 to -20 dBm and a bearing uniform in 0-360 degrees, in the Python's draw order; then, for each signal, the range the receiver would estimate (uniform 5-60 nm), which the Python's service drew itself for a signal it had not seen. The set is republished unchanged until the next one; epoch says when it is new. Fields of a signal beyond count are zero.</doc>
       <field name="epoch" word="0" bits="15-8" type="uint" doc="Increments (mod 256) with every new detection set"/>
       <field name="count" word="0" bits="7-0" type="uint" doc="Signals in this set, 0-5"/>
       <field name="frequency_1" word="1-2" bits="31-0" type="sint" lsb="1/1000" units="MHz" min="0" max="100000" doc="Signal 1: uniform(0.5e9, 40e9) Hz, in kHz steps"/>
@@ -1525,6 +1544,50 @@
     </message>
     <message id="EICAS_DEF_STATUS" rt="14" sa="1" dir="R" layout_of="DEF_STATUS" rate="5" title="Defensive systems status, for the EICAS">
       <doc>DEF_STATUS relayed to the EICAS, its one consumer (section 8): the countermeasures rows and cells, the ECM cell and the RWR count.</doc>
+    </message>
+
+    <!-- ===== Sensor management (RT 10): the sensors' states, the sensor data fusion (v1.18) ===== -->
+    <message id="SNS_STATUS" rt="10" sa="10" dir="T" words="5" rate="5" title="Sensor management status">
+      <doc>The terminal's state and command handling as the other subsystems report them, plus what SensorService.get_data() returned at its 5 Hz: the health (NOMINAL when every active and every passive sensor is on, DEGRADED when one suite is whole, FAULT otherwise), the six sensors' on/off states (active_sensors and passive_sensors' is_active), the sensor data fusion's contact count (sensor_contact_count) and its contact id counter, and the outcome of the last SNS_CMD. The fused_track_count of get_data() is not here: the EICAS counts the fused tracks block it already hears (README section 2). The contacts themselves (sensor_contacts) are not on the bus: no display drew them.</doc>
+      <field name="state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="last_cmd_seq" word="0" bits="7-0" type="uint" doc="cmd_seq of the last SNS_MODE_CMD processed (see Command sequence rule)"/>
+      <field name="cmd_rejected" word="1" bits="15" type="bool" doc="1 = the last SNS_MODE_CMD was rejected"/>
+      <field name="mode_transition" word="1" bits="14" type="bool" doc="1 = a commanded mode change is still in progress"/>
+      <field name="health" word="1" bits="13-12" type="enum" enum="sensor_health"/>
+      <field name="sensor_cmd_status" word="1" bits="11-8" type="enum" enum="cmd_status" doc="Outcome of the last SNS_CMD"/>
+      <field name="scan_valid" word="1" bits="7" type="bool" doc="1 = a sensor scans block (SNS_SCAN) arrived whole within the last 30 frames"/>
+      <field name="esm_valid" word="1" bits="6" type="bool" doc="1 = the ESM intercepts (SNS_ESM) arrived within the last 30 frames"/>
+      <field name="spare_1" word="1" bits="5-1" type="spare"/>
+      <field name="healthy" word="1" bits="0" type="bool" doc="1 = healthy (legacy health_status, bit 0)"/>
+      <field name="main_radar_active" word="2" bits="15" type="bool" doc="The six sensors' is_active, all on at start (SensorService.start: activate_all)"/>
+      <field name="tfr_radar_active" word="2" bits="14" type="bool"/>
+      <field name="lidar_active" word="2" bits="13" type="bool"/>
+      <field name="flir_active" word="2" bits="12" type="bool"/>
+      <field name="maws_active" word="2" bits="11" type="bool"/>
+      <field name="esm_active" word="2" bits="10" type="bool"/>
+      <field name="spare_2" word="2" bits="9-0" type="spare"/>
+      <field name="contact_count" word="3" bits="15-8" type="uint" doc="SensorDataFusion.get_contact_count(): contacts in the table (at most 192)"/>
+      <field name="dropped" word="3" bits="7-0" type="uint" doc="Contacts refused since start for lack of room, mod 256 (the Python's table was unbounded)"/>
+      <field name="sequence" word="4" bits="15-0" type="uint" doc="SensorDataFusion._seq, the contact id counter, mod 65536: every detection takes a number, merged or not"/>
+    </message>
+    <message id="SNS_MODE_CMD" rt="10" sa="10" dir="R" words="1" rate="aperiodic" title="Sensor management mode command">
+      <field name="requested_state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="cmd_seq" word="0" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+    </message>
+    <message id="SNS_ESM" rt="10" sa="11" dir="R" layout_of="PLANT_ESM" rate="5" title="ESM signal intercepts, from the plant">
+      <doc>PLANT_ESM relayed to the sensor management terminal, its second consumer: what the sensor data fusion's electronic support measures receiver intercepts.</doc>
+    </message>
+    <message id="SNS_CMD" rt="10" sa="12" dir="R" words="1" rate="aperiodic" title="Sensor management command">
+      <doc>The sensor managers' activate_sensor and deactivate_sensor on the bus: ACTIVATE or DEACTIVATE one of the six sensors. A sensor that is off leaves the health rule (DEGRADED while one suite is whole, FAULT when neither) and its detections are no longer fused. The outcome is SNS_STATUS.sensor_cmd_status: ACCEPTED, or REJECTED_INVALID for an undefined command or sensor.</doc>
+      <field name="command" word="0" bits="15-12" type="enum" enum="sensor_command"/>
+      <field name="sensor" word="0" bits="11-9" type="enum" enum="sensor_id"/>
+      <field name="spare_0" word="0" bits="8" type="spare"/>
+      <field name="cmd_seq" word="0" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+    </message>
+    <message id="EICAS_SNS_STATUS" rt="14" sa="3" dir="R" layout_of="SNS_STATUS" rate="5" title="Sensor management status, for the EICAS">
+      <doc>SNS_STATUS relayed to the EICAS, its one consumer (section 8): the SENSORS health row and the sensor alerts.</doc>
     </message>
   </messages>
 
@@ -1584,6 +1647,9 @@
     <relay from="PLANT_ESM" to="DEF_ESM"/>
     <relay from="DEF_STATUS" to="EICAS_DEF_STATUS"/>
     <relay from="DEF_RWR_CONTACTS" to="BCAST_DEF_RWR_CONTACTS"/>
+    <relay from="PLANT_ESM" to="SNS_ESM"/>
+    <relay from="PLANT_SENSOR_SCAN" to="SNS_SCAN"/>
+    <relay from="SNS_STATUS" to="EICAS_SNS_STATUS"/>
   </relays>
 
   <!-- Payloads larger than one message use the block transfer format in README.md.
@@ -1979,6 +2045,35 @@
     </block>
     <block id="BCAST_DEF_RWR_CONTACTS" rt="31" dir="R" desc_sa="16" seg_sa="17" rate="25" title="Radar warning receiver contacts, broadcast to the displays" layout_of="DEF_RWR_CONTACTS" listeners="14 16">
       <doc>The relayed DEF_RWR_CONTACTS for the TSD's threat ring and the EICAS's defensive panel (v1.17). Subaddresses 16-17 carried the SAR image until v1.15.</doc>
+    </block>
+    <block id="PLANT_SENSOR_SCAN" rt="27" desc_sa="14" seg_sa="15" rate="25" title="Sensor scans, from the plant">
+      <doc>What the sensor data fusion's own sensor managers invented on every one of its 5 Hz updates (v1.18, fmofp_plant.sensors), as the world the sensor management terminal receives: the main radar's and the terrain-following radar's scans (Radar.scan: randint(0, 5) detections, each a distance uniform in 0 to the radar's range, an angle uniform in 0-360 degrees and a speed uniform in 0-1000 m/s), the LIDAR's (Lidar.scan: randint(0, 5) points, a distance uniform in 0-1000 m, an azimuth uniform in 0-360 and an elevation uniform in -15 to 15 degrees) and the two infrared sensors' (InfraredSensor.detect: randint(0, 3) objects, a temperature uniform in 0-1000, an angle uniform across the field of view, 60 degrees for the forward-looking infrared and 360 for the missile approach warning, and a distance uniform in 100-10000 m), drawn in the Python's order: main radar, terrain-following radar, LIDAR, FLIR, MAWS (the ESM's set is PLANT_ESM). A new set every 10 frames; the three segments take six frames at 25 Hz. Records beyond a section's count are zero.</doc>
+      <header words="1">
+        <field name="epoch" word="0" bits="15-8" type="uint" doc="Increments (mod 256) with every new scan set"/>
+        <field name="spare_0" word="0" bits="7-0" type="spare"/>
+      </header>
+      <section id="radar" words="5" max="10" title="Radar detections" doc="The main radar's detections, then the terrain-following radar's">
+        <field name="sensor" word="0" bits="15-13" type="enum" enum="sensor_id" doc="MAIN_RADAR or TFR_RADAR"/>
+        <field name="spare_0" word="0" bits="12-0" type="spare"/>
+        <field name="distance" word="1-2" bits="31-0" type="sint" lsb="1/16" units="m" min="0" max="300000" doc="uniform(0, range): 300 km for the main radar, 50 km for the terrain-following radar"/>
+        <field name="angle" word="3" bits="15-0" type="uint" lsb="360/65536" units="deg" min="0" max="359.9945" doc="uniform(0, 360): the detection's bearing"/>
+        <field name="speed" word="4" bits="15-0" type="uint" lsb="1/10" units="m/s" min="0" max="1000" doc="uniform(0, 1000)"/>
+      </section>
+      <section id="lidar" words="3" max="5" title="LIDAR detections" doc="Lidar.scan's points; the fusion reads their distance and elevation and no bearing (the point's key is azimuth, the fusion reads angle)">
+        <field name="distance" word="0" bits="15-0" type="uint" lsb="1/16" units="m" min="0" max="1000" doc="uniform(0, 1000)"/>
+        <field name="azimuth" word="1" bits="15-0" type="uint" lsb="360/65536" units="deg" min="0" max="359.9945" doc="uniform(0, 360)"/>
+        <field name="elevation" word="2" bits="15-0" type="sint" lsb="1/100" units="deg" min="-15" max="15" doc="uniform(-15, 15): AIR above 2 degrees, GROUND otherwise"/>
+      </section>
+      <section id="infrared" words="4" max="6" title="Infrared detections" doc="The forward-looking infrared's detections, then the missile approach warning's">
+        <field name="sensor" word="0" bits="15-13" type="enum" enum="sensor_id" doc="FLIR or MAWS"/>
+        <field name="spare_0" word="0" bits="12-0" type="spare"/>
+        <field name="temperature" word="1" bits="15-0" type="uint" lsb="1/10" units="C" min="0" max="1000" doc="uniform(0, 1000); nothing in the Python read it"/>
+        <field name="angle" word="2" bits="15-0" type="sint" lsb="180/32768" units="deg" min="-180" max="179.9945" doc="uniform(-fov/2, fov/2): the detection's bearing, relative, as the Python kept it"/>
+        <field name="distance" word="3" bits="15-0" type="uint" lsb="1/4" units="m" min="0" max="16383.75" doc="uniform(100, 10000)"/>
+      </section>
+    </block>
+    <block id="SNS_SCAN" rt="10" dir="R" desc_sa="13" seg_sa="14" rate="25" title="Sensor scans as received by the sensor management computer" layout_of="PLANT_SENSOR_SCAN">
+      <doc>PLANT_SENSOR_SCAN relayed to the sensor management terminal: what its five scanning sensors measure.</doc>
     </block>
   </blocks>
 

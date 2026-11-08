@@ -98,47 +98,51 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone: unit 18 defensive systems, ICD v1.17 (2026-11-07, the commit
-  after the claim `6614a78`; its CI run is recorded next session). Before it: `782078f` (the
-  rename and Alee; CI run 41941685287 all ten green), `e325d00` and `8d67afd` (this file,
-  `B20SS/verify.sh`, the LF rule; CI green but for the flaky Windows Python leg), `d82173f`
-  (merge of upstream/main `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16; CI run
-  41569356013 all ten green).
-- **ICD** v1.17 (`B20SS/icd/fmofp_icd.xml`): 26 terminals, 108 message definitions
-  (154 after per-terminal expansion), 37 message relays (15 broadcast), 22 block streams
-  (11 layouts, 11 relayed copies), 9 mode codes, 89/89 legacy types mapped.
+  `git log -1`. Last milestone: unit 15 sensor management, ICD v1.18 (2026-11-08, the commit
+  after the claim `98bb051`; its CI run is recorded next session). Before it: `d718e09` (unit
+  18 defensive systems, ICD v1.17; CI run 42435137866: eight green, `linux-gcc` red on one
+  unanswered poll in the display e2e on the slow runner, the same code green on the next run,
+  the Linux 3.13 Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename
+  and Alee), `8d67afd` (this file and `B20SS/verify.sh`), `d82173f` (merge of upstream/main
+  `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
+- **ICD** v1.18 (`B20SS/icd/fmofp_icd.xml`): 26 terminals, 113 message definitions
+  (159 after per-terminal expansion), 39 message relays (15 broadcast), 24 block streams
+  (12 layouts, 12 relayed copies), 9 mode codes, 89/89 legacy types mapped.
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
-  systems (RT 22); the bus controller `fmofp_bc`; tools `fmofp_nav_tool`, `fmofp_radar_tool`,
-  `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool` (stdin oracles for the
-  Python tests).
+  systems (RT 22), sensor management (RT 10); the bus controller `fmofp_bc`; tools
+  `fmofp_nav_tool`, `fmofp_radar_tool`, `fmofp_engine_tool`, `fmofp_mission_tool`,
+  `fmofp_defensive_tool`, `fmofp_sensor_tool` (stdin oracles for the Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
   random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
-  ground scene, the RF environment, the ESM intercepts); six display terminals `py -m fmofp_display
+  ground scene, the RF environment, the ESM intercepts, the sensor scans); six display terminals `py -m fmofp_display
   radar|pfd|mfd|eicas|tsd|sms` (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display
   class fed from the bus through `fmofp_display/*_feed.py`; the one-command demo
   `py -m fmofp_demo`; the bus library `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: 15 terminals, 82 scheduled messages, worst minor frame 7332 us of the 10000 us
-  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns (a first run had 2, at
-  start-up), 15/15 terminals answering.
-- **Tests**: Python 196 OK (`fmofp_bus/tests`, 38 s on Windows); C++ ctest 2/2
+- **Load**: 16 terminals, 86 scheduled messages, worst minor frame 7884 us of the 10000 us
+  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns, 16/16 terminals
+  answering.
+- **Tests**: Python 205 OK (`fmofp_bus/tests`, about 40 s on Windows); C++ ctest 2/2
   (hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
   workflows/ci.yml` job `cpp`, linux-gcc + linux-asan, and Alee's eight Python legs).
-- **Meter**: 21.5 of 29.5 units = **73 %** (section 2). Pace measured over the log: about
-  5 units per full working day, so a day and a half to two more working days to 100 %; the
-  intern-ticket authoring phase comes after and is not in the number.
+- **Meter**: 22.25 of 29.5 units = **75 %** (section 2). Pace measured over the log: about
+  5 units per full working day, so about a day and a half more to 100 %; the intern-ticket
+  authoring phase comes after and is not in the number.
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-07 (unit
-  18). Alee has accepted the invitation (write access) and has not pushed yet; his first
-  session on his machine starts with section 0.1 step 6. Suggested next unit: 15 sensor
-  management (RT 10; it reuses `PLANT_ESM`), then 16 power, 17 avionics, 19 flight surfaces,
-  20 utilities, 28, 29 last, 30.
+- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-08 (unit
+  15). Alee has accepted the invitation (write access) and has not pushed yet; his first
+  session on his machine starts with section 0.1 step 6. Suggested next unit: 16 power
+  management (RT 8), then 17 avionics, 19 flight surfaces, 20 utilities, 28, 29 last, 30.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
-  Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106); the two
-  `cpp` jobs are the ones that judge the port.
+  Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106 and the
+  Linux 3.13 leg of 42435137866); the two `cpp` jobs are the ones that judge the port.
+- **Known flaky in our own `cpp` job**: the display e2e runs the bus under `--strict` with
+  seven Python terminals; the slow Linux runner answered one poll late in run 42435137866
+  (worst frame 48 ms, exit 1, the next run of the same code green). Its poll timeout is 40 ms
+  since unit 15; if it reds again, rerun the job before suspecting the code.
 
 ---
 
@@ -164,7 +168,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 12 | SAR radar | 1 | DONE 2026-11-01 |
 | 13 | Mission computer (RT 6) | 1 | DONE 2026-11-02 |
 | 14 | Communications (RT 2) | 0.5 | DONE 2026-11-02 |
-| 15 | Sensor management (RT 10) | 0.75 | IN PROGRESS (Kevin, 2026-11-08) |
+| 15 | Sensor management (RT 10) | 0.75 | DONE 2026-11-08 |
 | 16 | Power management (RT 8) | 0.75 | open |
 | 17 | Avionics: LRU health + BIT + fitness + SW configuration (RT 1) | 1 | open |
 | 18 | Defensive systems (RT 22) | 0.5 | DONE 2026-11-07 |
@@ -181,7 +185,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | open |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | open |
 
-**Done: 21.5 / 29.5 = 73 %.** Open: 8 units.
+**Done: 22.25 / 29.5 = 75 %.** Open: 7.25 units.
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -191,40 +195,13 @@ monitoring, 27 plant, 31 broadcast. Free: 24-26, 28-30.
 
 ### 2.15 Sensor management (RT 10), 0.75
 
-- **Python to read in full**: `B20SS/FMOFP/Systems/sensorManagement/sensorService.py`
-  (238 lines; `SensorService` polls at 5 Hz: the statuses of the active sensors (radar,
-  lidar) and passive sensors (infrared, ESM) which `activate_all()` turns on at start, the
-  fused track count from `RadarDataFusion`, `SensorDataFusion.update()` and its contacts;
-  health NOMINAL when all active and all passive sensors are active, DEGRADED when one group
-  is, FAULT otherwise), `sensorDataFusion.py` (349: `SensorContact`; `_ingest_active` /
-  `_ingest_passive` read the managers' `scan()`/`detect()`; `_merge_or_add` merges by source
-  and bearing delta; `_expire_stale` by wall clock; `get_contacts`, `get_summary`),
-  `activeSensors/activeSensors.py` (150) and `passiveSensors/passiveSensors.py` (137): the
-  detections are random numbers (`random.uniform` bearings and frequencies). `smConfig.xml`
-  is a one-line placeholder.
-- **Consumers today**: the EICAS poll reads `get_sensor_service().get_data()` and uses only
-  `health` and `fused_track_count` (`eicas.py` around line 359). Nothing draws the sensor
-  contacts. `fmofp_display/systems_feed.py` `sensor_data()` returns `{}` for now (the EICAS
-  shows UNKNOWN).
-- **Shape of the port**: the random detections are the world, so they move to the plant
-  (`fmofp_plant/`: a detection generator in the Python's draw order, published as a plant
-  message or block; unit 18 already publishes the ESM intercepts as `PLANT_ESM`
-  (`fmofp_plant/esm.py`: a set every 25 frames in the Python's draw order, relayed to RT 22
-  as `DEF_ESM`), so add a second relay into an RT 10 receive subaddress rather than a
-  broadcast (a source may feed up to four relays); the infrared detections are new). The
-  service's rules (sensor statuses, the health rule, the fusion's merge/expiry, the counts)
-  become the RT 10 partition. Messages: `SNS_STATUS` (health, active/passive bits, contact
-  counts; 1 or 5 Hz), `SNS_CMD` (activate/deactivate a sensor), a contacts block only if a
-  display will draw it (today none would). The EICAS is the only consumer of the status, so
-  it comes by relay into an EICAS receive SA (section 4.2 rule). For the fused track count,
-  prefer letting the EICAS count the fused-tracks block it already receives rather than
-  making RT 10 a listener of it; record the choice in the ICD README section 2.
-- **Tests**: a `fmofp_sensor_tool` oracle against the frozen `SensorDataFusion` with its
-  `time` patched (as `test_targeting_oracle.py` and `test_mission_oracle.py` do), an e2e
-  run with the plant, the EICAS feed and render tests (the health row), the demo dashboard.
-- **Traps**: the `handle_message` XML paths in both managers are dead; the fusion's expiry
-  and ids use wall clock and a counter (frames and a counter in C++); keep the Python's
-  draw order for the detections so the oracle can follow.
+DONE 2026-11-08 (section 7, ICD v1.18). The plan that stood here became the ICD README's
+v1.18 paragraph and its section 2 rows. As planned: the detections are the plant's
+(`PLANT_SENSOR_SCAN`, and `PLANT_ESM` relayed a second time as `SNS_ESM`), the EICAS counts the
+fused tracks from the block it already hears, `SNS_STATUS` is the EICAS's own relay (RT 14
+SA 3), and there is no contacts block (nothing draws the contacts; `fmofp_sensor_tool` reads the
+table for the oracle). One choice beyond the plan: a sensor switched off by `SNS_CMD` leaves
+the fusion too (the Python's fusion had its own always-on managers, a path nothing exercised).
 
 ### 2.16 Power management (RT 8), 0.75
 
@@ -639,7 +616,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (196 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (205 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -720,6 +697,12 @@ Python tests and displays
   `FusedTrack.bearing_deg()` on a property, so its fusion branch never ran in the Python.
 - An oracle tool answers from the live table when the Python's getter read live state, not
   from the last published block (`refresh_contacts()` in `fmofp_defensive_tool`).
+- `to_dict()` can hand out a live list (`corroborated_by`): an oracle snapshot taken from it
+  changes with later merges. Deep-copy snapshots.
+- A Python service reports a switched input at its next poll (`get_data()` is the last
+  update's snapshot): compare after an update, not right after the switch.
+- An attribute named like an existing method (`PlantModel.sensors()`) shadows it silently and
+  the method's callers crash later: `self.scan_world`, not `self.sensors`.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -993,6 +976,44 @@ done before this file existed are condensed from the private session notes.
   82 messages for 15 terminals, worst minor frame 7332 us (was 6908 for 14); headless demo
   30 s: 1500 frames, 0 overruns (a first run: 2), 15/15 answering; meter 21.5 / 29.5 = 73 %.
 
+### 2026-11-08 - unit 15 sensor management (RT 10) - ICD v1.18 - by Kevin's agent
+- *What*: `ofp/partitions/sensor` (`SensorManagement`: the six sensors' on/off states and
+  SensorService's health rule; SensorDataFusion's contact table, 192 entries in insertion
+  order, every radar, LIDAR, infrared and ESM detection merged into the first contact within
+  5 degrees of bearing or appended, corroboration and FUSED, the missing kinematics filled,
+  8 s expiry, the id counter; `fmofp_sensor_tool`). The sensors' scans moved to the plant
+  (`fmofp_plant/sensors.py`, the `PLANT_SENSOR_SCAN` block: the two radars, the LIDAR and the
+  two infrared sensors, a set every 10 frames in the managers' draw order) and `PLANT_ESM`
+  steps every 10 frames (the fusion's 5 Hz; the defensive terminal takes the latest set per
+  update). ICD v1.18: `SNS_STATUS` → `EICAS_SNS_STATUS` (RT 14 SA 3), `SNS_MODE_CMD`, `SNS_CMD`,
+  `SNS_ESM` (a second relay of `PLANT_ESM`), `SNS_SCAN` (a block relay). The EICAS SENSORS rows
+  (health; the fused tracks counted from the block it already hears), demo `SNS` line and two
+  events (LIDAR off at 48 s, on at 58 s). Unit 18's CI result recorded in section 1.
+- *How*: `test_sensor_oracle.py` runs the frozen `SensorService` and `SensorDataFusion` on fake
+  managers beside the tool (`time` patched, `SensorContact` subclassed so new contacts take
+  the fake clock, snapshots deep-copied); `test_sensor_e2e.py` (port base 53500) runs plant +
+  sensor + the EICAS's bus half with sensors switched off and on under the real controller;
+  `test_plant_sensors.py` checks the plant's scans against the managers' sensors draw for
+  draw; feed, render, display e2e, demo and message-count tests extended; 9 gtests.
+- *Warnings / lessons*: the Python's fusion owned its own always-on sensor managers beside the
+  service's (deactivating a sensor, which nothing called, would not have stopped the fusion):
+  one set of states in the port (ICD README section 2). LIDAR points carry `azimuth` and the
+  fusion reads `angle`: no bearing, never merge, about a hundred live LIDAR contacts (kept).
+  `to_dict()` hands out the live `corroborated_by` list (deep-copy oracle snapshots); a service
+  reports a switched sensor at its next poll (compare after an update); an attribute named
+  like a method (`PlantModel.sensors`) shadows it (section 6). The display e2e's poll timeout
+  went from 20 to 40 ms after unit 18's CI red (one unanswered poll on the slow runner).
+- *Files*: `ofp/partitions/sensor/{include/fmofp/sensor/sensor_management.hpp,
+  src/sensor_management.cpp, src/main.cpp, tools/sensor_tool.cpp}`,
+  `ofp/tests/sensor_management_test.cpp`, `fmofp_plant/sensors.py`, `fmofp_plant/plant.py`,
+  `fmofp_display/systems_feed.py` (`sensor_data`, the `SNS` status text), `fmofp_display/app.py`,
+  `fmofp_demo/demo.py`, `icd/fmofp_icd.xml` + README + generated files, `verify.sh`, both CI
+  files, `_support.py`, the tests.
+- *Tests and numbers*: Python 205 OK (was 196), ctest 2/2 (258 gtests), cppcheck clean;
+  load 86 messages for 16 terminals, worst minor frame 7884 us (was 7332 for 15);
+  headless demo 30 s: 1500 frames, 0 overruns, 16/16 answering; meter
+  22.25 / 29.5 = 75 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1028,3 +1049,10 @@ done before this file existed are condensed from the private session notes.
   empty-dispenser cooldown, the unbounded table capped at 64 with a refusal count). The
   scenario engine's threat injection rides in `DEF_CMD` (`INJECT_THREAT`) for unit 28. The
   plant draws the ESM ranges the service drew. Recorded in the ICD README section 2.
+- 2026-11-08, Kevin ("ok go unit 15") and his agent: unit 15 as designed in section 2.15 with
+  these choices: the fused track count stays the EICAS's (counted from the block it hears;
+  RT 10 is no listener of it); one set of sensor states (a sensor switched off by `SNS_CMD`
+  leaves the fusion too, where the Python's fusion had its own always-on managers); no
+  contacts block (no display draws the contacts; the oracle tool reads the table); the table
+  capped at 192 with a refusal count; `PLANT_ESM` steps every 10 frames for both consumers.
+  Recorded in the ICD README section 2.

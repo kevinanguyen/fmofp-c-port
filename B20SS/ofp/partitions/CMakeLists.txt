@@ -132,3 +132,19 @@ target_link_libraries(fmofp_defensive PRIVATE ofp::defensive ofp::rt_process ofp
 
 add_executable(fmofp_defensive_tool defensive/tools/defensive_tool.cpp)
 target_link_libraries(fmofp_defensive_tool PRIVATE ofp::defensive ofp::warnings)
+
+# Sensor management, RT 10: the six sensors' states and the health rule
+# (SensorService) and the sensor data fusion's contact table over the plant's
+# radar, LIDAR, infrared and ESM detections (SensorDataFusion). fmofp_sensor_tool
+# exposes the logic on stdin/stdout for the oracle tests.
+add_library(ofp_sensor STATIC sensor/src/sensor_management.cpp)
+add_library(ofp::sensor ALIAS ofp_sensor)
+add_dependencies(ofp_sensor ofp_icd_generate)
+target_include_directories(ofp_sensor PUBLIC sensor/include)
+target_link_libraries(ofp_sensor PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_sensor sensor/src/main.cpp)
+target_link_libraries(fmofp_sensor PRIVATE ofp::sensor ofp::rt_process ofp::bc ofp::warnings)
+
+add_executable(fmofp_sensor_tool sensor/tools/sensor_tool.cpp)
+target_link_libraries(fmofp_sensor_tool PRIVATE ofp::sensor ofp::warnings)

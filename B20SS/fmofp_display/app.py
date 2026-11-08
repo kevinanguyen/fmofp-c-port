@@ -583,7 +583,7 @@ def eicas_terminal(port_base):
     return TerminalProcess(EICAS_RT, port_base, m.DspEicasStatus, m.DspEicasModeCmd,
                            receives=(m.BcastFmsFlightData, m.BcastFmsStatus, m.BcastFcsGcasAlerts, m.BcastFcsPerfStatus,
                                      m.BcastEngEngineStatus, m.BcastEngFuelStatus, m.BcastRdrWxScan,
-                                     m.EicasDefStatus),
+                                     m.EicasDefStatus, m.EicasSnsStatus),
                            blocks=(b.BcastRdrFusedTracks, b.BcastDefRwrContacts))
 
 

@@ -15,6 +15,8 @@ The binaries are named by environment variables (CI sets them):
     FMOFP_COMMS     partitions/fmofp_comms
     FMOFP_DEFENSIVE partitions/fmofp_defensive
     FMOFP_DEFENSIVE_TOOL partitions/fmofp_defensive_tool
+    FMOFP_SENSOR    partitions/fmofp_sensor
+    FMOFP_SENSOR_TOOL partitions/fmofp_sensor_tool
 """
 
 import os
