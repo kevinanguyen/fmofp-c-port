@@ -165,7 +165,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 15 | Sensor management (RT 10) | 0.75 | open |
 | 16 | Power management (RT 8) | 0.75 | open |
 | 17 | Avionics: LRU health + BIT + fitness + SW configuration (RT 1) | 1 | open |
-| 18 | Defensive systems (RT 22) | 0.5 | open |
+| 18 | Defensive systems (RT 22) | 0.5 | IN PROGRESS (Kevin, 2026-11-07) |
 | 19 | Flight surfaces (RT 21) | 0.5 | open |
 | 20 | Small utilities: ECS (RT 4), hydraulics (RT 19), airframe (RT 20), flight data monitoring (RT 23) | 1 | open |
 | 21 | Radar display + PFD on the bus | 1.5 | DONE 2026-10-25 |
