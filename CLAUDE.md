@@ -98,8 +98,8 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone: unit 15 sensor management, ICD v1.18 (2026-11-08, the commit
-  after the claim `98bb051`; its CI run is recorded next session). Before it: `d718e09` (unit
+  `git log -1`. Last milestone: `c4057ed` (unit 15 sensor management, ICD v1.18, 2026-11-08;
+  CI run 42439181347 all ten jobs green). Before it: `d718e09` (unit
   18 defensive systems, ICD v1.17; CI run 42435137866: eight green, `linux-gcc` red on one
   unanswered poll in the display e2e on the slow runner, the same code green on the next run,
   the Linux 3.13 Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename
@@ -132,9 +132,11 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-08 (unit
-  15). Alee has accepted the invitation (write access) and has not pushed yet; his first
-  session on his machine starts with section 0.1 step 6. Suggested next unit: 16 power
+- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-08 (the
+  protocol check that recorded unit 15's CI; unit 15 itself the session before). Alee is a
+  collaborator with write access (in the collaborator list, no pending invitation, checked
+  2026-11-08) and has not pushed yet; his first session on his machine starts with section
+  0.1 step 6. Suggested next unit: 16 power
   management (RT 8), then 17 avionics, 19 flight surfaces, 20 utilities, 28, 29 last, 30.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106 and the
@@ -1013,6 +1015,16 @@ done before this file existed are condensed from the private session notes.
   load 86 messages for 16 terminals, worst minor frame 7884 us (was 7332 for 15);
   headless demo 30 s: 1500 frames, 0 overruns, 16/16 answering; meter
   22.25 / 29.5 = 75 %.
+
+### 2026-11-08 - protocol check; CI of unit 15 recorded - by Kevin's agent
+- *What*: section 0.1 run on Kevin's machine: tree clean, `origin/port/cpp` = local `c4057ed`,
+  no `wip/` branches, no pull requests, upstream/main still `4c25f52` (nothing to merge). Alee
+  is in the collaborator list with write access (no pending invitation) and has not pushed.
+  No code changed.
+- *CI*: `c4057ed` run 42439181347 all ten jobs green (the claim `98bb051`, run 42436742888,
+  green too), consistent with unit 18's `linux-gcc` red being the display e2e's timing on the
+  slow runner; the 40 ms poll timeout stays.
+- *Numbers*: meter unchanged, 22.25 / 29.5 = 75 %.
 
 ---
 
