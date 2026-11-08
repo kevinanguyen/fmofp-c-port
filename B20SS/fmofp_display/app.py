@@ -583,7 +583,7 @@ def eicas_terminal(port_base):
     return TerminalProcess(EICAS_RT, port_base, m.DspEicasStatus, m.DspEicasModeCmd,
                            receives=(m.BcastFmsFlightData, m.BcastFmsStatus, m.BcastFcsGcasAlerts, m.BcastFcsPerfStatus,
                                      m.BcastEngEngineStatus, m.BcastEngFuelStatus, m.BcastRdrWxScan,
-                                     m.EicasDefStatus, m.EicasSnsStatus),
+                                     m.EicasDefStatus, m.EicasSnsStatus, m.EicasPwrStatus),
                            blocks=(b.BcastRdrFusedTracks, b.BcastDefRwrContacts))
 
 
@@ -625,6 +625,11 @@ class EicasWindow(QWidget):
         readings = self.systems.engine_readings()
         if readings:
             self.eicas.set_engine_readings(**readings)
+        # The electrical rows the same way (v1.19): the power management terminal's status through
+        # set_system_readings(); the hydraulic and ECS rows wait for their terminals.
+        electrical = self.systems.system_readings()
+        if electrical:
+            self.eicas.set_system_readings(**electrical)
         requested = self.terminal.take_mode_request()
         if requested is not None and requested.name in self._display_modes.__members__:
             self.eicas.set_mode(self._display_modes[requested.name])

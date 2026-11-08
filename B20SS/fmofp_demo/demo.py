@@ -6,7 +6,8 @@
 It starts, in this order: the plant (the simulated aircraft with its weather,
 terrain, engines and RF environment, RT 27), the ported partitions (flight
 control RT 5, navigation RT 7, flight management RT 12, the radar computer RT 9,
-engine management RT 3, the mission computer RT 6, communications RT 2, defensive systems RT 22, sensor management RT 10), the
+engine management RT 3, the mission computer RT 6, communications RT 2, defensive systems RT 22, sensor management RT 10,
+power management RT 8), the
 six display programs (the radar display RT 15, the PFD
 RT 11, the MFD RT 13, the EICAS RT 14, the TSD RT 16 and the SMS RT 17, each in its own window), and
 finally the bus
@@ -16,8 +17,8 @@ crossing the bus, read from the controller's monitor port: altitude, airspeed
 and heading from the FMS flight data, the ground collision avoidance state,
 the engines' N1 and the fuel, the radars' modes, the terrain clearance and the
 targeting tracks, the navigation fix, the mission's phase and route progress, the
-radio and satcom links, the countermeasures and the radar warning receiver, the sensors' health, and which
-terminals are answering.
+radio and satcom links, the countermeasures and the radar warning receiver, the sensors' health, the
+electrical system, and which terminals are answering.
 
 Unless --no-events is given, a short scripted flight runs: the radars are
 switched on (the targeting and AEWC radars search, the SAR images the strip
@@ -28,7 +29,9 @@ mode changes, one engine is throttled back, fuel is transferred; a route is load
 and flown waypoint by waypoint, a target is designated, engaged and assessed, an
 enemy unit appears on the TSD, the radio is tuned and a satellite acquired, a SAM paints the radar
 warning receiver (two flares go out by themselves, and again every 3 s while it lasts), the jammer
-goes active and chaff is dispensed, the LIDAR is switched off and on again. Each event is
+goes active and chaff is dispensed, the LIDAR is switched off and on again, the generator is switched off
+and back on (the EICAS shows GEN 1 and GEN 2 FAIL while the main battery discharges) and the emergency
+power comes on. Each event is
 announced as it happens. The radar display window's own buttons keep working
 throughout: it is the radars' control panel.
 
@@ -45,7 +48,7 @@ from collections import namedtuple
 
 from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import (Affiliation, CommsCommand, DefensiveCommand, EcmMode, MissionCommand, MissionPhase,
-                                 RadioMode, SensorCommand, SensorId,
+                                 PowerCommand, RadioMode, SensorCommand, SensorId,
                                  RwrBand, TargetKind, ThreatType, UnitKind, WaypointType, Weapon, AewcMode, EngineCommand, EngineSelect, FmsFlightMode, FuelTank, LockStatus, SarMode,
                                  Ssm,
                                  TargetingMode, TerminalState, TfrMode, TrackFilter, WeatherMode)
@@ -62,7 +65,8 @@ PLANT_RT = m.PlantSensors.RT
 # (executable name, RT) of each ported partition.
 PARTITIONS = (("fcs", m.FcsStatus.RT), ("nav", m.NavSolution.RT), ("fms", m.FmsStatus.RT),
               ("radar", m.RdrWxStatus.RT), ("engine", m.EngStatus.RT), ("mission", m.MsnStatus.RT),
-              ("comms", m.ComStatus.RT), ("defensive", m.DefStatus.RT), ("sensor", m.SnsStatus.RT))
+              ("comms", m.ComStatus.RT), ("defensive", m.DefStatus.RT), ("sensor", m.SnsStatus.RT),
+              ("power", m.PwrStatus.RT))
 # (fmofp_display argument, RT) of each display program.
 DISPLAYS = (("radar", m.DspRadarStatus.RT), ("pfd", m.DspPfdStatus.RT), ("mfd", m.DspMfdStatus.RT),
             ("eicas", m.DspEicasStatus.RT), ("tsd", m.DspTsdStatus.RT), ("sms", m.DspSmsStatus.RT))
@@ -70,7 +74,7 @@ NAMES = {PLANT_RT: "plant", m.FcsStatus.RT: "FCS", m.NavSolution.RT: "nav", m.Fm
          m.RdrWxStatus.RT: "radar", m.EngStatus.RT: "engine", m.DspRadarStatus.RT: "radar display",
          m.DspPfdStatus.RT: "PFD", m.DspMfdStatus.RT: "MFD", m.DspEicasStatus.RT: "EICAS",
          m.DspTsdStatus.RT: "TSD", m.DspSmsStatus.RT: "SMS", m.MsnStatus.RT: "mission",
-         m.ComStatus.RT: "comms", m.DefStatus.RT: "defensive", m.SnsStatus.RT: "sensors"}
+         m.ComStatus.RT: "comms", m.DefStatus.RT: "defensive", m.SnsStatus.RT: "sensors", m.PwrStatus.RT: "power"}
 
 Event = namedtuple("Event", "seconds what message")
 
@@ -156,6 +160,8 @@ def default_events():
         Event(50.0, "1000 kg from the Center tank to Main Left (it takes what fits)",
               m.EngCmd(cmd_seq=204, command=EngineCommand.FUEL_TRANSFER, source=FuelTank.CENTER,
                        destination=FuelTank.MAIN_LEFT, amount=1000.0)),
+        Event(52.0, "power: generator off (the EICAS shows GEN 1 and GEN 2 FAIL; the main battery carries the load, see PWR)",
+              m.PwrCmd(cmd_seq=201, command=PowerCommand.SET_GENERATOR_OUTPUT, value=0.0)),
         Event(55.0, "targeting radar to TARGET_TRACK, lock on track 1",
               m.RdrTgtModeCmd(cmd_seq=202, requested_state=TerminalState.NORMAL,
                               requested_mode=TargetingMode.TARGET_TRACK, track_filter=TrackFilter.ALL,
@@ -165,6 +171,8 @@ def default_events():
         Event(60.0, "weather radar to MAPPING",
               m.RdrWxModeCmd(cmd_seq=202, requested_state=TerminalState.NORMAL,
                              requested_mode=WeatherMode.MAPPING, range_km=200.0, tilt=0.0)),
+        Event(61.0, "power: generator back to automatic (the surplus recharges the main battery)",
+              m.PwrCmd(cmd_seq=202, command=PowerCommand.GENERATOR_AUTO)),
         Event(65.0, "SAR to SPOTLIGHT at 0.3 m: the lake abeam, a ship under way (a picture every 3 s)",
               m.RdrSarModeCmd(cmd_seq=202, requested_state=TerminalState.NORMAL, requested_mode=SarMode.SPOTLIGHT,
                               resolution=0.3)),
@@ -173,6 +181,8 @@ def default_events():
         Event(71.0, "mission: phase EGRESS", m.MsnCmd(cmd_seq=212, command=MissionCommand.ADVANCE_PHASE)),
         Event(75.0, "both engines back to 70 %",
               m.EngCmd(cmd_seq=205, command=EngineCommand.SET_THRUST, engine=EngineSelect.ALL, thrust=70.0)),
+        Event(80.0, "power: emergency power on (the emergency battery carries the critical load; EMERG on the PWR line)",
+              m.PwrCmd(cmd_seq=203, command=PowerCommand.EMERGENCY_POWER_ON)),
         Event(85.0, "comms: send a data-link message (ACCEPTED only with a satellite; see the COM line)",
               m.ComCmd(cmd_seq=203, command=CommsCommand.DATALINK_SEND, message_id=1, priority=2)),
         Event(86.0, "comms: a radio transmission (FAILED while the field strength is under 20 %)",
@@ -456,6 +466,19 @@ class Dashboard:
             if sns.sensor_cmd_status.name not in ("NONE", "ACCEPTED"):
                 text += f" cmd {sns.sensor_cmd_status.name}"
             parts.append(text)
+        pwr = self.latest.get(m.PwrStatus)
+        if pwr is not None and pwr.electrical_valid:
+            text = (f"PWR gen {pwr.generator_output:3.0f} kW bal {pwr.power_balance:+3.0f} "
+                    f"main {pwr.main_battery_charge:5.1f}% cool {pwr.coolant_temp:4.1f}C")
+            if not pwr.generator_online:
+                text += " GEN OFF"
+            if pwr.emergency_mode_active:
+                text += " EMERG"
+            if pwr.apu_running:
+                text += " APU"
+            if pwr.power_cmd_status.name not in ("NONE", "ACCEPTED"):
+                text += f" cmd {pwr.power_cmd_status.name}"
+            parts.append(text)
         nav = self.latest.get(m.NavSolution)
         if nav is not None and nav.position_ssm == Ssm.NORMAL:
             parts.append(f"nav {nav.latitude:+.4f} {nav.longitude:+.4f} ({nav.sats_used} sats)")
@@ -484,8 +507,9 @@ def banner(args, terminals, events, log_dir, paths):
               "    rows, COMMS the radio, satcom and data link, MISSION the route (the active waypoint marked),\n"
               "    the targets and the order of battle.\n"
               "  EICAS window: the engine readings, the fuel quantity and balance, the FCS alerts and the crew alert\n"
-              "    list, the countermeasures and the radar warning ring, the sensors' health and fused track count\n"
-              "    (hydraulics, electrical and ECS read unknown until their terminals exist).\n"
+              "    list, the countermeasures and the radar warning ring, the sensors' health and fused track count,\n"
+              "    the electrical rows (main and essential bus, the generators: FAIL during the generator-off event)\n"
+              "    (hydraulics and ECS read unknown until their terminals exist).\n"
               "  TSD window: the fused air tracks around the aircraft (bearing and range), the route's waypoints,\n"
               "    the enemy unit as a hostile contact, the radar warning contacts on the ring's edge (red dots with\n"
               "    their band), the energy metrics and the tactical systems strip.\n"

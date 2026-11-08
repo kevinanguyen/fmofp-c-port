@@ -98,46 +98,48 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone: `c4057ed` (unit 15 sensor management, ICD v1.18, 2026-11-08;
-  CI run 42439181347 all ten jobs green). Before it: `d718e09` (unit
-  18 defensive systems, ICD v1.17; CI run 42435137866: eight green, `linux-gcc` red on one
+  `git log -1`. Last milestone: unit 16 power management, ICD v1.19 (2026-11-08, the commit
+  after the claim `2dc221c`; its CI run is recorded next session). Before it: `c4057ed` (unit
+  15 sensor management, ICD v1.18; CI run 42439181347 all ten jobs green), `d718e09` (unit 18
+  defensive systems, ICD v1.17; CI run 42435137866: eight green, `linux-gcc` red on one
   unanswered poll in the display e2e on the slow runner, the same code green on the next run,
   the Linux 3.13 Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename
   and Alee), `8d67afd` (this file and `B20SS/verify.sh`), `d82173f` (merge of upstream/main
   `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.18 (`B20SS/icd/fmofp_icd.xml`): 26 terminals, 113 message definitions
-  (159 after per-terminal expansion), 39 message relays (15 broadcast), 24 block streams
+- **ICD** v1.19 (`B20SS/icd/fmofp_icd.xml`): 26 terminals, 121 message definitions
+  (167 after per-terminal expansion), 42 message relays (15 broadcast), 24 block streams
   (12 layouts, 12 relayed copies), 9 mode codes, 89/89 legacy types mapped.
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
-  systems (RT 22), sensor management (RT 10); the bus controller `fmofp_bc`; tools
-  `fmofp_nav_tool`, `fmofp_radar_tool`, `fmofp_engine_tool`, `fmofp_mission_tool`,
-  `fmofp_defensive_tool`, `fmofp_sensor_tool` (stdin oracles for the Python tests).
+  systems (RT 22), sensor management (RT 10), power management (RT 8); the bus controller
+  `fmofp_bc`; tools `fmofp_nav_tool`, `fmofp_radar_tool`, `fmofp_engine_tool`,
+  `fmofp_mission_tool`, `fmofp_defensive_tool`, `fmofp_sensor_tool`, `fmofp_power_tool`
+  (stdin oracles for the Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
   random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
-  ground scene, the RF environment, the ESM intercepts, the sensor scans); six display terminals `py -m fmofp_display
-  radar|pfd|mfd|eicas|tsd|sms` (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display
-  class fed from the bus through `fmofp_display/*_feed.py`; the one-command demo
-  `py -m fmofp_demo`; the bus library `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: 16 terminals, 86 scheduled messages, worst minor frame 7884 us of the 10000 us
-  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns, 16/16 terminals
+  ground scene, the RF environment, the ESM intercepts, the sensor scans, the electrical
+  readings); six display terminals `py -m fmofp_display radar|pfd|mfd|eicas|tsd|sms`
+  (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display class fed from the bus through
+  `fmofp_display/*_feed.py`; the one-command demo `py -m fmofp_demo`; the bus library
+  `fmofp_bus` with generated `fmofp_bus/icd/`.
+- **Load**: 17 terminals, 90 scheduled messages, worst minor frame 8128 us of the 10000 us
+  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns, 17/17 terminals
   answering.
-- **Tests**: Python 205 OK (`fmofp_bus/tests`, about 40 s on Windows); C++ ctest 2/2
+- **Tests**: Python 217 OK (`fmofp_bus/tests`, about 42 s on Windows); C++ ctest 2/2
   (hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
   workflows/ci.yml` job `cpp`, linux-gcc + linux-asan, and Alee's eight Python legs).
-- **Meter**: 22.25 of 29.5 units = **75 %** (section 2). Pace measured over the log: about
-  5 units per full working day, so about a day and a half more to 100 %; the intern-ticket
-  authoring phase comes after and is not in the number.
+- **Meter**: 23 of 29.5 units = **78 %** (section 2). Pace measured over the log: about
+  5 units per full working day, so about a day and a half more to 100 % (6.5 units open); the
+  intern-ticket authoring phase comes after and is not in the number.
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-08 (the
-  protocol check that recorded unit 15's CI; unit 15 itself the session before). Alee is a
-  collaborator with write access (in the collaborator list, no pending invitation, checked
-  2026-11-08) and has not pushed yet; his first session on his machine starts with section
-  0.1 step 6. Suggested next unit: 16 power
-  management (RT 8), then 17 avionics, 19 flight surfaces, 20 utilities, 28, 29 last, 30.
+- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-08 (unit
+  16, after the protocol check that recorded unit 15's CI). Alee is a collaborator with write
+  access (in the collaborator list, no pending invitation, checked 2026-11-08) and has not
+  pushed yet; his first session on his machine starts with section 0.1 step 6. Suggested next
+  unit: 17 avionics (RT 1), then 19 flight surfaces, 20 utilities, 28, 29 last, 30.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106 and the
   Linux 3.13 leg of 42435137866); the two `cpp` jobs are the ones that judge the port.
@@ -171,7 +173,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 13 | Mission computer (RT 6) | 1 | DONE 2026-11-02 |
 | 14 | Communications (RT 2) | 0.5 | DONE 2026-11-02 |
 | 15 | Sensor management (RT 10) | 0.75 | DONE 2026-11-08 |
-| 16 | Power management (RT 8) | 0.75 | IN PROGRESS (Kevin, 2026-11-08) |
+| 16 | Power management (RT 8) | 0.75 | DONE 2026-11-08 |
 | 17 | Avionics: LRU health + BIT + fitness + SW configuration (RT 1) | 1 | open |
 | 18 | Defensive systems (RT 22) | 0.5 | DONE 2026-11-07 |
 | 19 | Flight surfaces (RT 21) | 0.5 | open |
@@ -187,7 +189,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | open |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | open |
 
-**Done: 22.25 / 29.5 = 75 %.** Open: 7.25 units.
+**Done: 23 / 29.5 = 78 %.** Open: 6.5 units.
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -207,33 +209,15 @@ the fusion too (the Python's fusion had its own always-on managers, a path nothi
 
 ### 2.16 Power management (RT 8), 0.75
 
-- **Python to read in full**: `Systems/powerManagement/elec/powerManagementSystem.py`
-  (319; 1 Hz loop: `adjust_power_parameters(dt_hours = 1/3600)` draws the generator output
-  200-250 kW and the consumption 180-220 kW at random, the balance charges or discharges the
-  main battery (amps = |balance| x 1000 / nominal volts), charges the APU battery at a
-  quarter, the emergency battery sustains the critical bus, the cooling gets a heat load of
-  6 x consumption, HVAC updates; `monitor()` snapshots the three battery charges, generator
-  output, consumption, balance, bus voltages drawn 110-120 V and 25-28 V, frequency 398-402,
-  power factor 0.95-1, coolant and cabin temperatures; `set_generator_output`;
-  `health_report`), the batteries `batts/mainBatt.py` (109), `emergencyBatt.py` (65),
-  `missionEquipmentBatt.py` (68), thermal `thermalManagement/coolingSystems/cooling.py` (71),
-  `HVAC.py` (70), `thermalDissipation/activeDissipation.py` (86). `epConfig.xml` and
-  `pmConfig.xml` are placeholders.
-- **Consumers today**: the EICAS electrical rows, which read UNKNOWN until this terminal
-  exists; `EicasWindow.tick()` hands readings to `eicas.set_system_readings(...)` (that is
-  how the engine readings reached the panel in unit 24). No other display reads power.
-- **Shape of the port**: the random draws (generator output, consumption, voltages,
-  frequency, power factor) are the world: plant message `PLANT_ELECTRICAL` at 1 Hz in the
-  Python's draw order. The bookkeeping (battery charge and discharge per step, the APU and
-  emergency batteries, the thermal loads) is the RT 8 partition; `PWR_STATUS` carries what
-  `monitor()` snapshots; `PWR_CMD` for `set_generator_output` and any load shedding. One
-  consumer (EICAS): relay.
-- **Tests**: oracle = the frozen battery and cooling classes stepped with the same inputs
-  (they are deterministic once the random draws are inputs); feed and render tests for the
-  EICAS electrical rows.
-- **Traps**: `monitor()` re-draws the voltages on every call, so they are not state;
-  `receive_message()` and `_process_received_message()` are dead; the 1 Hz loop's dt is a
-  constant 1/3600 h, not the measured time.
+DONE 2026-11-08 (section 7, ICD v1.19). The plan that stood here became the ICD README's
+v1.19 paragraph and its section 2 rows. As planned: the six random draws are the plant's
+(`PLANT_ELECTRICAL` at 1 Hz in the Python's order), the bookkeeping is RT 8, `PWR_STATUS`
+carries `monitor()`'s snapshot and is the EICAS's own relay (RT 14 SA 4). Beyond the plan:
+`set_generator_output`, dead in the Python (the next draw overwrote it), holds the plant's
+generator (`PWR_GEN_CMD` → `PLANT_GEN_CMD`) until released; `PWR_CMD` also carries the
+component classes' manual controls nothing called (emergency power, APU, engine start, HVAC,
+dissipation unit); the EICAS's two generator rows show the one generator and its essential bus
+row the 28 V auxiliary bus; the mission equipment batteries stay off the bus.
 
 ### 2.17 Avionics: LRU health, built-in test, FM fitness, software configuration (RT 1), 1
 
@@ -618,7 +602,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (205 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (217 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -705,6 +689,15 @@ Python tests and displays
   update's snapshot): compare after an update, not right after the switch.
 - An attribute named like an existing method (`PlantModel.sensors()`) shadows it silently and
   the method's callers crash later: `self.scan_world`, not `self.sensors`.
+- A Python service's `get_data()` dictionary is the last loop pass's snapshot: a manual control
+  changes the components, not the dictionary, until the next pass (the power oracle compares
+  `pms_data` only right after a `monitor()`).
+- A plant command sent at frame f is applied at the plant's next model step, and a 1 Hz reading
+  is relayed within the second: the power e2e's generator hold at frame 100 shows in
+  `PWR_STATUS` between 150 and 200, and its release at 250 misses the step at 250 (three
+  readings at zero, not two); window the assertions on the trough, not on a count of steps.
+- An `epoch` field that starts at 0 cannot say "no reading": `PLANT_ELECTRICAL`'s cycles 1-255
+  and 0 is the plant without the model, which the terminal ignores.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -1026,6 +1019,45 @@ done before this file existed are condensed from the private session notes.
   slow runner; the 40 ms poll timeout stays.
 - *Numbers*: meter unchanged, 22.25 / 29.5 = 75 %.
 
+### 2026-11-08 - unit 16 power management (RT 8) - ICD v1.19 - by Kevin's agent
+- *What*: `ofp/partitions/power` (`PowerManagement`: PowerManagementSystem's 1 Hz bookkeeping
+  over the plant's reading: the balance as current on the 24 V main battery (charged by a
+  surplus, discharged by a deficit), the APU battery charged at a quarter, the emergency
+  battery's 8 A critical load while the emergency mode is on, 6 W per kW of consumption into
+  the coolant loop with its fan controller, the cabin's HVAC; `Battery` and its four kinds,
+  `ActiveDissipationUnit`, `CoolingSystem`, `HvacSystem`; `fmofp_power_tool`). The six random
+  draws moved to the plant (`fmofp_plant/electrical.py`, `PLANT_ELECTRICAL` at 1 Hz, epoch
+  1-255, the generator held where `PLANT_GEN_CMD` says). ICD v1.19: `PWR_STATUS` →
+  `EICAS_PWR_STATUS` (RT 14 SA 4), `PWR_MODE_CMD`, `PWR_CMD` (fourteen commands),
+  `PWR_GEN_CMD` → `PLANT_GEN_CMD`, `PLANT_ELECTRICAL` → `PWR_ELECTRICAL`; enums
+  `thermal_status`, `power_command`. The EICAS's ELECTRICAL rows fill in (`system_readings()`
+  through `set_system_readings`), a `PWR` status text and demo line, three demo events (the
+  generator off at 52 s, back at 61 s, the emergency power on at 80 s).
+- *How*: `test_power_oracle.py` runs the frozen `PowerManagementSystem` (its `random` answering
+  the staged reading by range, its `DatabaseManager` a mock) beside the tool second for second
+  to nine places (the same arithmetic in the same order), plus the manual controls and a quirk
+  test; `test_power_e2e.py` (port base 54500) runs plant + power + the EICAS's bus half under
+  the real controller with the generator held at zero and released, the emergency power on, a
+  setpoint moved and an empty command rejected; `test_plant_electrical.py` checks the plant's
+  draws against the Python's; feed, render, display e2e, demo and message tests extended;
+  14 gtests.
+- *Warnings / lessons*: `set_generator_output` was dead (the next second's draw overwrote it):
+  departed, it holds the plant's generator (README section 2). The bus voltages are draws
+  independent of the generator, so a generator at zero shows GEN FAIL but never MAIN BUS LO
+  (backlog). The coolant settles near 40 C under the Python's 6 W/kW: WARNING and CRITICAL need
+  the dissipation unit off. The oracle's `pms_data` cross-check must follow a `monitor()`
+  (section 6); the e2e's hold lasts three readings, not two (section 6). The XML's `<revision>`
+  elements stop at 1.8: versions since are in the README's table only.
+- *Files*: `ofp/partitions/power/{include/fmofp/power/power_management.hpp,
+  src/power_management.cpp, src/main.cpp, tools/power_tool.cpp}`,
+  `ofp/tests/power_management_test.cpp`, `fmofp_plant/electrical.py`, `fmofp_plant/plant.py`,
+  `fmofp_display/systems_feed.py` (`power_data`, `system_readings`, the `PWR` text),
+  `fmofp_display/app.py`, `fmofp_demo/demo.py`, `icd/fmofp_icd.xml` + README + generated
+  files, `ofp/README.md`, `verify.sh`, both CI files, `_support.py`, the tests.
+- *Tests and numbers*: Python 217 OK (was 205), ctest 2/2 (272 gtests), cppcheck clean;
+  load 90 messages for 17 terminals, worst minor frame 8128 us (was 7884 for 16); headless
+  demo 30 s: 1500 frames, 0 overruns, 17/17 answering; meter 23 / 29.5 = 78 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1067,4 +1099,12 @@ done before this file existed are condensed from the private session notes.
   leaves the fusion too, where the Python's fusion had its own always-on managers); no
   contacts block (no display draws the contacts; the oracle tool reads the table); the table
   capped at 192 with a refusal count; `PLANT_ESM` steps every 10 frames for both consumers.
+  Recorded in the ICD README section 2.
+- 2026-11-08, Kevin ("ok go unit 16") and his agent: unit 16 as designed in section 2.16 with
+  these choices: the dead `set_generator_output` becomes a hold on the plant's generator
+  (`PWR_GEN_CMD` → `PLANT_GEN_CMD`, released by GENERATOR_AUTO); `PWR_STATUS` is the EICAS's own
+  relay (RT 14 SA 4) at 5 Hz, `PLANT_ELECTRICAL` at the Python's 1 Hz; the EICAS's two generator
+  rows show the one generator (online while its output is above zero) and its essential bus
+  row the 28 V auxiliary bus; the component classes' manual controls nothing in the Python
+  called ride in `PWR_CMD`; one heat source; the mission equipment batteries stay off the bus.
   Recorded in the ICD README section 2.

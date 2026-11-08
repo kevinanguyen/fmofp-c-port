@@ -148,3 +148,20 @@ target_link_libraries(fmofp_sensor PRIVATE ofp::sensor ofp::rt_process ofp::bc o
 
 add_executable(fmofp_sensor_tool sensor/tools/sensor_tool.cpp)
 target_link_libraries(fmofp_sensor_tool PRIVATE ofp::sensor ofp::warnings)
+
+# Power management, RT 8: PowerManagementSystem's bookkeeping over the plant's
+# electrical readings (the main, APU and emergency batteries, the avionics
+# coolant loop with its fan controller, the cabin's HVAC) and the component
+# classes' controls. fmofp_power_tool exposes the logic on stdin/stdout for the
+# oracle tests.
+add_library(ofp_power STATIC power/src/power_management.cpp)
+add_library(ofp::power ALIAS ofp_power)
+add_dependencies(ofp_power ofp_icd_generate)
+target_include_directories(ofp_power PUBLIC power/include)
+target_link_libraries(ofp_power PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_power power/src/main.cpp)
+target_link_libraries(fmofp_power PRIVATE ofp::power ofp::rt_process ofp::bc ofp::warnings)
+
+add_executable(fmofp_power_tool power/tools/power_tool.cpp)
+target_link_libraries(fmofp_power_tool PRIVATE ofp::power ofp::warnings)

@@ -45,6 +45,13 @@ terminal (RT 10): SNS_STATUS, relayed to the EICAS as EICAS_SNS_STATUS, gives th
 health, the six sensors' states and the contact count; the fused track count is
 the fused tracks block's, which the EICAS already hears (the Python read it from
 the radar data fusion).
+
+From v1.19 the EICAS's electrical rows come from the power management terminal
+(RT 8): PWR_STATUS, relayed to the EICAS as EICAS_PWR_STATUS, gives the main bus
+voltage, the auxiliary 28 V bus (shown as the essential bus) and the generator's
+state (both GEN rows), which the window hands to eicas.set_system_readings() each
+tick as it does the engine readings; power_data() is PowerManagementSystem.get_data()'s
+snapshot for whatever reads it (the status line today).
 """
 
 import math
@@ -282,6 +289,7 @@ class SystemsFeed:
         self.bit = SimpleNamespace(self_tests=[])  # BuiltInTestController(): no results until the avionics terminal
         self.defensive = SimpleNamespace(get_data=self.defensive_data, get_rwr_contacts=self.rwr_contacts)
         self.sensors = SimpleNamespace(get_data=self.sensor_data)
+        self.power = SimpleNamespace(get_data=self.power_data)
         self.fusion = SimpleNamespace(get_threat_tracks=self.threat_tracks, get_fused_tracks=self.fused_tracks)
 
     def get_alerts(self):
@@ -438,6 +446,37 @@ class SystemsFeed:
                 "fused_track_count": len(self.fused_tracks()), "sensor_contacts": [],
                 "sensor_contact_count": p.contact_count, "health": p.health.name}
 
+    def power_data(self):
+        """PowerManagementSystem.get_data(): monitor()'s snapshot (the three batteries' charge, the generator output,
+        the consumption and the balance, the bus voltages, frequency and power factor, the coolant and cabin
+        temperatures) from the relayed PWR_STATUS (EICAS_PWR_STATUS), plus the component states the Python kept
+        beside it; empty until the status arrives with a reading, as pms_data was before the first pass."""
+        message = self.terminal.fresh(m.EicasPwrStatus, self.stale_after_s)
+        if message is None or not message.payload.electrical_valid:
+            return {}
+        p = message.payload
+        return {"main_battery_charge": p.main_battery_charge, "emergency_battery_charge": p.emergency_battery_charge,
+                "apu_battery_charge": p.apu_battery_charge, "generator_output": p.generator_output,
+                "total_power_consumption": p.total_power_consumption, "power_balance": p.power_balance,
+                "main_bus_voltage": p.main_bus_voltage, "aux_bus_voltage": p.aux_bus_voltage,
+                "generator_frequency": p.generator_frequency, "power_factor": p.power_factor,
+                "coolant_temp_c": p.coolant_temp, "cabin_temp_c": p.cabin_temp,
+                "generator_online": p.generator_online, "emergency_mode_active": p.emergency_mode_active,
+                "apu_running": p.apu_running, "thermal_status": p.thermal_status.name}
+
+    def system_readings(self):
+        """What eicas.set_system_readings() takes from the power management terminal (v1.19): the main bus voltage
+        (main_bus_v), the auxiliary 28 V bus as the essential bus (ess_bus_v) and the one generator's state as both
+        generator rows (gen1_ok, gen2_ok: online while its output is above zero), from the relayed PWR_STATUS while
+        it is fresh and has a reading (ICD README section 2). The hydraulic and ECS readings wait for their
+        terminals; set_system_readings marks each key valid, so they age out like everything else."""
+        message = self.terminal.fresh(m.EicasPwrStatus, self.stale_after_s)
+        if message is None or not message.payload.electrical_valid:
+            return {}
+        p = message.payload
+        return {"main_bus_v": p.main_bus_voltage, "ess_bus_v": p.aux_bus_voltage, "gen1_ok": p.generator_online,
+                "gen2_ok": p.generator_online}
+
     def fused_tracks(self):
         """RadarDataFusion.get_fused_tracks(): the tracks of the last fused tracks block the bus delivered whole, while
         it is fresh; empty when the fusion is silent, as the Python's table was with the fusion not running."""
@@ -555,6 +594,15 @@ class SystemsFeed:
         if sensors:
             parts.append(f"SNS {sensors['health']} {sensors['fused_track_count']} fused "
                          f"{sensors['sensor_contact_count']} ctc")
+        power = self.power_data()
+        if power:
+            text = (f"PWR gen {power['generator_output']:.0f} kW bal {power['power_balance']:+.0f} "
+                    f"main {power['main_battery_charge']:.1f}% cool {power['coolant_temp_c']:.1f}C")
+            if not power["generator_online"]:
+                text += " GEN OFF"
+            if power["emergency_mode_active"]:
+                text += " EMERG"
+            parts.append(text)
         position = self.mission_data().get("current_position")
         if position is not None:
             parts.append(f"pos {position['lat']:.4f} {position['lon']:.4f}")

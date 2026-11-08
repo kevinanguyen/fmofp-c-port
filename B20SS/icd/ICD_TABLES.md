@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.18 (DRAFT, 2026-11-08). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.19 (DRAFT, 2026-11-08). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -14,13 +14,13 @@
 | 5 | `flightcontrolsys` | Flight control - FCC, GCAS, performance monitor | existing | Systems/flightControlSys | Ported in v1.1 (fmofp_fcs). From v1.8 it hears the engine computer's ENG_ENGINE_STATUS by broadcast (RT 31 SA 18), which gives FCS_PERF_STATUS its fuel efficiency |
 | 6 | `missionplanning` | Mission computer - phase, route, targets, order of battle | existing | Systems/missionPlanning: missionService.py, missionControl.py (MissionControl), routeManagement/handleRoute.py, targeting/targeting.py, orderOfBattle/orderOfBattle.py | Ported in v1.16 (fmofp_mission). It hears the FMS flight data by broadcast (31/25) for the route's progress, takes MSN_CMD (the scenario engine's waypoints and phases, and the targeting and order-of-battle calls nothing in the Python made), and publishes MSN_STATUS and the MSN_PLAN block, broadcast to the MFD and the TSD. The MissionPlanningSystem class of missionControl.py, a second route in flat degrees that the service fed and never read, is not carried |
 | 7 | `nav` | Navigation - GPS position solver and GPS/dead-reckoning fusion | existing | Systems/nav: gps/globalPositionSystem.py (GPSReceiver, the solver) and dataFusion/fuseData.py | Ported in v1.2. The INS of Systems/nav/ins was a noise generator whose output nothing used; it is not carried (README section 2) |
-| 8 | `powermanagement` | Power management | existing | Systems/powerManagement |  |
+| 8 | `powermanagement` | Power management - generator, batteries, cooling, HVAC | existing | Systems/powerManagement: elec/powerManagementSystem.py, batts/mainBatt.py, emergencyBatt.py, apuBatt.py, missionEquipmentBatt.py, thermalManagement/coolingSystems/cooling.py, HVAC.py, thermalDissipation/activeDissipation.py | Ported in v1.19 (fmofp_power). PowerManagementSystem's 1 Hz bookkeeping over the readings the plant publishes (PLANT_ELECTRICAL, relayed as PWR_ELECTRICAL): the main battery charged by the surplus or discharged by the deficit, the APU battery charged at a quarter, the emergency battery under its critical load while the emergency mode is on, the avionics coolant loop with its fan controller, the cabin's HVAC. PWR_CMD carries set_generator_output (a hold on the plant's generator through PWR_GEN_CMD, relayed as PLANT_GEN_CMD) and the component classes' manual controls. PWR_STATUS reaches the EICAS by relay (EICAS_PWR_STATUS): its ELECTRICAL rows (README section 2) |
 | 9 | `radar` | Radar computer - weather, TFR, SAR, targeting, AEWC, track fusion | existing | Systems/radarManagement | The five radars stay one terminal; each radar is a subaddress, as before. The weather radar is ported in v1.3 (SA 1, 6-7, 18-19), the terrain-following radar in v1.4 (SA 2, 14-15, 20-23) the targeting radar with the track fusion in v1.10 (SA 4, 8-11, 24-25), the AEWC radar in v1.12 (SA 5, 12-13) and the synthetic aperture radar in v1.13 (SA 3, 16-17, 26-27). The radar computer listens to the FMS flight data broadcast (31/25) for the synthetic aperture radar's imaging geometry |
 | 10 | `sensormanagement` | Sensor management | existing | Systems/sensorManagement: sensorService.py, sensorDataFusion.py, activeSensors/activeSensors.py, passiveSensors/passiveSensors.py | Ported in v1.18 (fmofp_sensor). SensorService's health rule over the six sensors' on/off states and SensorDataFusion's contact table (the radar, LIDAR and infrared detections normalised, merged within a 5 degree bearing gate, aged out after 8 s) over the scans the plant publishes (PLANT_SENSOR_SCAN relayed as SNS_SCAN, PLANT_ESM relayed as SNS_ESM). SNS_CMD switches a sensor on or off; SNS_STATUS reaches the EICAS by relay (EICAS_SNS_STATUS). The fused track count the EICAS shows beside the health is counted by the EICAS from the fused tracks block it already hears (README section 2) |
 | 11 | `pfd` | Primary flight display | changed | Interfaces/userInterface/displays/pfd.py | Was the single 'Display System' terminal; one process per display means each display needs its own address. On the bus from v1.5 (fmofp_display pfd): it hears the FMS's flight data, status and attitude status by broadcast (RT 31 SA 25-27, v1.7; copies of its own on SA 1-3 until then) |
 | 12 | `flightmanagementsystem` | Flight management system | existing | Systems/flightManagementSys: flightManagementSystem.py and fmsControl.py | Ported in v1.2. Its attitude comes from the FCS over the bus, as the Python copied it from its own flight control object |
 | 13 | `mfd` | Multi-function display | new | Interfaces/userInterface/displays/mfd.py | On the bus from v1.6 (fmofp_display mfd): its radar page mirrors the radars' pictures from the broadcasts the radar display hears too (RT 31 SA 1-4, 6-9), its systems page reads the FCS's GCAS alerts and exceedances (31/5, 31/10), its mission page the FMS flight data (31/25) and, from v1.8, its systems and engine pages the engine computer's engine and fuel status (31/18, 31/19); v1.6 gave it copies of its own on SA 1-11, v1.7 the broadcasts. Its radar commands moved to the radar display terminal in v1.5; it commands nothing. From v1.11 its targeting page draws the targeting radar's tracks (31/24, 31/20-21). From v1.15 the targeting, AEWC and SAR pictures, which only it draws, come by relay into its own receive subaddresses 20-21, 22-23 and 26-27 instead of broadcasts (one consumer, one transfer either way; README section 8) |
-| 14 | `eicas` | Engine indicating and crew alerting display | new | Interfaces/userInterface/displays/eicas.py | On the bus from v1.9 (fmofp_display eicas): it hears the engine computer's engine and fuel status (31/18-19), the flight computer's GCAS alerts and exceedances (31/5, 31/10), the FMS's flight data and status (31/25-26) and the weather radar's scan summary (31/2) by broadcast, and commands nothing. Its hydraulic, electrical and environmental rows read unknown until those terminals exist. From v1.17 it hears the defensive systems status by relay into its own SA 1 (EICAS_DEF_STATUS) and the radar warning contacts by broadcast (31/16-17); from v1.18 the sensor management status by relay into its own SA 3 (EICAS_SNS_STATUS) |
+| 14 | `eicas` | Engine indicating and crew alerting display | new | Interfaces/userInterface/displays/eicas.py | On the bus from v1.9 (fmofp_display eicas): it hears the engine computer's engine and fuel status (31/18-19), the flight computer's GCAS alerts and exceedances (31/5, 31/10), the FMS's flight data and status (31/25-26) and the weather radar's scan summary (31/2) by broadcast, and commands nothing. Its hydraulic, electrical and environmental rows read unknown until those terminals exist. From v1.17 it hears the defensive systems status by relay into its own SA 1 (EICAS_DEF_STATUS) and the radar warning contacts by broadcast (31/16-17); from v1.18 the sensor management status by relay into its own SA 3 (EICAS_SNS_STATUS); from v1.19 the power management status by relay into its own SA 4 (EICAS_PWR_STATUS), which fills its electrical rows |
 | 15 | `radar_display` | Radar display - the radars' pictures and their control panel | new | Interfaces/userInterface/displays/radar | On the bus from v1.5 (fmofp_display radar): it hears the weather and terrain-following radars' status, scan summary and guidance by broadcast (RT 31 SA 1-4) and their products as broadcast blocks (31 SA 6-9; copies of its own on the same numbers until v1.7), and commands the radars (SA 20-24); from v1.11 it hears the targeting radar's status too (31/24) and commands that radar |
 | 16 | `tsd` | Tactical situation display | new | Interfaces/userInterface/displays/tsd.py | On the bus from v1.11 (fmofp_display tsd): it hears the fused air tracks (31/22-23) and the FMS's flight data, status and attitude status (31/25-27) by broadcast, the energy maneuverability by relay into its own SA 1 (TSD_FMS_ENERGY; broadcast at 31/28 until v1.15), and commands nothing. Its waypoints and order of battle came with the mission computer (v1.16, 31/28, 31/13-14) and its radar warning contacts with the defensive systems terminal (v1.17, 31/16-17) |
 | 17 | `sms` | Stores management display | new | Interfaces/userInterface/displays/sms.py | On the bus from v1.14 (fmofp_display sms): it hears the FMS status by broadcast (31/26) for the flight mode and the tactical systems its master arm, ECM cell and signature strip follow, and commands nothing. Its weapon stations are the display's own table, as in the Python, which modelled no armament system (README section 2); a stores management computer is backlog (section 12) |
@@ -30,7 +30,7 @@
 | 21 | `flightsurfaces` | Flight surfaces | new | Systems/flightSurfaces |  |
 | 22 | `defensive` | Defensive systems - RWR, chaff, flare, ECM | new | Systems/defensiveSys/defensiveService.py | Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17) |
 | 23 | `flightdatamonitoring` | Flight data monitoring | new | Systems/flightDataMonitoring |  |
-| 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames) |
+| 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD) |
 | 31 | `broadcast` | Broadcast address - every terminal that accepts a subaddress hears it | reserved |  | Not a terminal: MIL-STD-1553B address 31. A message or block here is the far end of a relay, stored by the terminals its listeners attribute names, each of which accepts that subaddress for broadcast (README section 8); nothing else stores it and nobody answers it. Added in v1.7 |
 
 RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
@@ -67,6 +67,11 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`NAV_SENSORS`](#nav_sensors) | 7 | 13 | R | 11 | 50 | Sensed flight state, for navigation | DRAFT |
 | [`NAV_GPS`](#nav_gps) | 7 | 14 | R | 25 | 1 | GPS pseudoranges, for navigation | DRAFT |
 | [`NAV_SOLUTION`](#nav_solution) | 7 | 15 | T | 8 | 10 | Navigation solution | DRAFT |
+| [`PWR_MODE_CMD`](#pwr_mode_cmd) | 8 | 10 | R | 1 | aperiodic | Power management mode command | DRAFT |
+| [`PWR_STATUS`](#pwr_status) | 8 | 10 | T | 16 | 5 | Power management status | DRAFT |
+| [`PWR_ELECTRICAL`](#pwr_electrical) | 8 | 11 | R | 7 | 1 | Electrical readings, from the plant | DRAFT |
+| [`PWR_GEN_CMD`](#pwr_gen_cmd) | 8 | 12 | T | 2 | 5 | Generator command to the plant | DRAFT |
+| [`PWR_CMD`](#pwr_cmd) | 8 | 13 | R | 2 | aperiodic | Power management command | DRAFT |
 | [`RDR_WX_MODE_CMD`](#rdr_wx_mode_cmd) | 9 | 1 | R | 3 | aperiodic | Weather radar mode command | DRAFT |
 | [`RDR_WX_STATUS`](#rdr_wx_status) | 9 | 1 | T | 2 | 5 | Weather radar status | DRAFT |
 | [`RDR_TFR_MODE_CMD`](#rdr_tfr_mode_cmd) | 9 | 2 | R | 2 | aperiodic | Terrain-following radar mode command | DRAFT |
@@ -108,6 +113,7 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`MFD_COM_LINK_STATUS`](#mfd_com_link_status) | 13 | 17 | R | 11 | 1 | Radio, satcom and data link status, for the MFD | DRAFT |
 | [`EICAS_DEF_STATUS`](#eicas_def_status) | 14 | 1 | R | 6 | 5 | Defensive systems status, for the EICAS | DRAFT |
 | [`EICAS_SNS_STATUS`](#eicas_sns_status) | 14 | 3 | R | 5 | 5 | Sensor management status, for the EICAS | DRAFT |
+| [`EICAS_PWR_STATUS`](#eicas_pwr_status) | 14 | 4 | R | 16 | 5 | Power management status, for the EICAS | DRAFT |
 | [`DSP_EICAS_MODE_CMD`](#dsp_eicas_mode_cmd) | 14 | 13 | R | 1 | aperiodic | EICAS mode command | DRAFT |
 | [`DSP_EICAS_STATUS`](#dsp_eicas_status) | 14 | 13 | T | 2 | 1 | EICAS status | DRAFT |
 | [`DSP_RADAR_MODE_CMD`](#dsp_radar_mode_cmd) | 15 | 14 | R | 1 | aperiodic | Weather radar display mode command | DRAFT |
@@ -135,6 +141,8 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`PLANT_THRUST_CMD`](#plant_thrust_cmd) | 27 | 7 | R | 3 | 10 | Thrust command as received by the plant | DRAFT |
 | [`PLANT_RF`](#plant_rf) | 27 | 12 | T | 7 | 1 | RF environment: the radio field, the satellite, the link, from the plant | DRAFT |
 | [`PLANT_ESM`](#plant_esm) | 27 | 13 | T | 26 | 5 | ESM signal intercepts, from the plant | DRAFT |
+| [`PLANT_ELECTRICAL`](#plant_electrical) | 27 | 16 | T | 7 | 1 | Electrical readings from the plant | DRAFT |
+| [`PLANT_GEN_CMD`](#plant_gen_cmd) | 27 | 17 | R | 2 | 5 | Generator command as received by the plant | DRAFT |
 | [`BCAST_RDR_WX_STATUS`](#bcast_rdr_wx_status) | 31 | 1 | R | 2 | 5 | Weather radar status, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_WX_SCAN`](#bcast_rdr_wx_scan) | 31 | 2 | R | 10 | 5 | Weather radar scan summary, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_TFR_STATUS`](#bcast_rdr_tfr_status) | 31 | 3 | R | 2 | 5 | Terrain-following radar status, broadcast to the displays | DRAFT |
@@ -243,6 +251,9 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`PLANT_ESM`](#plant_esm) | [`SNS_ESM`](#sns_esm) | 26 | 5 |
 | [`PLANT_SENSOR_SCAN`](#plant_sensor_scan) | `SNS_SCAN` | block: 4 + 32 per frame | 25 |
 | [`SNS_STATUS`](#sns_status) | [`EICAS_SNS_STATUS`](#eicas_sns_status) | 5 | 5 |
+| [`PLANT_ELECTRICAL`](#plant_electrical) | [`PWR_ELECTRICAL`](#pwr_electrical) | 7 | 1 |
+| [`PWR_GEN_CMD`](#pwr_gen_cmd) | [`PLANT_GEN_CMD`](#plant_gen_cmd) | 2 | 5 |
+| [`PWR_STATUS`](#pwr_status) | [`EICAS_PWR_STATUS`](#eicas_pwr_status) | 16 | 5 |
 
 ## Mode codes
 
@@ -967,6 +978,37 @@ What SNS_CMD asks of the sensor management terminal: the managers' activate_sens
 | 0 | NONE |  |  |
 | 1 | ACTIVATE |  |  |
 | 2 | DEACTIVATE |  |  |
+
+### `thermal_status` (2 bits)
+
+CoolingSystem.get_status()'s status: OK below 55 C of coolant, WARNING from 55 C, CRITICAL from 70 C (cooling.WARNING_TEMP_C, CRITICAL_TEMP_C)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | OK |  |  |
+| 1 | WARNING |  |  |
+| 2 | CRITICAL |  |  |
+
+### `power_command` (4 bits)
+
+What PWR_CMD asks of the power management terminal: PowerManagementSystem.set_generator_output (whose value the Python's next draw overwrote, README section 2) with its release, and the manual controls of its component classes, which nothing in the Python called: EmergencyBattery.activate_emergency_power and deactivate_emergency_power, APUBattery.start_apu and stop_apu, MainBattery.start_engine, HVACSystem.set_temperature, set_airflow, power_on and power_off, ActiveDissipationUnit.activate and deactivate
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | SET_GENERATOR_OUTPUT |  |  |
+| 2 | GENERATOR_AUTO |  |  |
+| 3 | EMERGENCY_POWER_ON |  |  |
+| 4 | EMERGENCY_POWER_OFF |  |  |
+| 5 | APU_START |  |  |
+| 6 | APU_STOP |  |  |
+| 7 | ENGINE_START |  |  |
+| 8 | HVAC_SETPOINT |  |  |
+| 9 | HVAC_AIRFLOW |  |  |
+| 10 | HVAC_POWER_ON |  |  |
+| 11 | HVAC_POWER_OFF |  |  |
+| 12 | DISSIPATION_ON |  |  |
+| 13 | DISSIPATION_OFF |  |  |
 
 ## Messages
 
@@ -2738,6 +2780,123 @@ The sensor managers' activate_sensor and deactivate_sensor on the bus: ACTIVATE 
 SNS_STATUS relayed to the EICAS, its one consumer (section 8): the SENSORS health row and the sensor alerts.
 
 Same layout as [`SNS_STATUS`](#sns_status).
+
+### PLANT_ELECTRICAL
+
+**Electrical readings from the plant** — RT 27 · SA 16 · transmit (terminal to bus) · 7 words · 1 Hz
+
+What PowerManagementSystem drew once a second, as the world the power management terminal measures (v1.19, fmofp_plant.electrical): adjust_power_parameters' generator output (uniform 200-250 kW) and total consumption (uniform 180-220 kW), then monitor()'s main bus voltage (uniform 110-120 V), auxiliary bus voltage (uniform 25-28 V), generator frequency (uniform 398-402 Hz) and power factor (uniform 0.95-1), in the Python's draw order. epoch says when a reading is new; the terminal runs its bookkeeping once per new reading. While PLANT_GEN_CMD holds the generator (generator_override), generator_output is the commanded value and the draw is made and discarded, so a seeded run keeps its sequence.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-8 | `epoch` | uint | raw counts | 1-255, moving on with every new reading; 0 says there is no reading (a plant without the electrical model), which the terminal ignores |
+| 0 | 7 | `generator_override` | bool |  | 1 = the generator is held at the output the power management terminal commanded (PLANT_GEN_CMD) |
+| 0 | 6-0 | `spare_0` | spare |  |  |
+| 1 | 15-0 | `generator_output` | uint | LSB 1/100 kW, range 0 to 655.35 |  |
+| 2 | 15-0 | `total_power_consumption` | uint | LSB 1/100 kW, range 0 to 655.35 |  |
+| 3 | 15-0 | `main_bus_voltage` | uint | LSB 1/100 V, range 0 to 655.35 | The 115 V AC bus |
+| 4 | 15-0 | `aux_bus_voltage` | uint | LSB 1/100 V, range 0 to 655.35 | The 28 V DC bus |
+| 5 | 15-0 | `generator_frequency` | uint | LSB 1/100 Hz, range 0 to 655.35 |  |
+| 6 | 15-0 | `power_factor` | uint | LSB 1/10000, range 0 to 1 |  |
+
+### PWR_STATUS
+
+**Power management status** — RT 8 · SA 10 · transmit (terminal to bus) · 16 words · 5 Hz
+
+The terminal's state and command handling as the other subsystems report them, plus what PowerManagementSystem.monitor() snapshotted once a second: the three batteries' charge (MainBattery 40 Ah 24 V, EmergencyBattery 12 Ah, APUBattery 15 Ah), the generator output, the total consumption and their balance, the bus voltages, frequency and power factor of the last reading, the avionics coolant temperature (CoolingSystem) and the cabin temperature (HVACSystem); and the states the Python kept in its component classes: the emergency mode, the APU, the HVAC's power and setpoint, the dissipation unit's fan and the cooling status (OK, WARNING from 55 C, CRITICAL from 70 C). The bookkeeping runs once per new PLANT_ELECTRICAL reading with the Python's constant step of one second (dt_hours = 1/3600): a surplus charges the main battery (amps = balance x 1000 / 24 V) and the APU battery at a quarter of that current, a deficit discharges the main battery, the emergency battery carries 8 A while the emergency mode is on, the coolant loop takes 6 W per kW of consumption. electrical_valid is 0 until the first reading and when readings stop (150 frames); every value is then the last known. The mission equipment batteries (radar, comms, mission computer, 6 Ah each, never drawn from in the Python) are not here (README section 2).
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last PWR_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last PWR_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13-12 | `thermal_status` | enum | enum `thermal_status` | CoolingSystem.get_status()['status'] |
+| 1 | 11-8 | `power_cmd_status` | enum | enum `cmd_status` | Outcome of the last PWR_CMD |
+| 1 | 7 | `electrical_valid` | bool |  | 1 = a PLANT_ELECTRICAL reading (PWR_ELECTRICAL) arrived within the last 150 frames |
+| 1 | 6 | `generator_online` | bool |  | 1 = the last reading's generator output is above zero (the EICAS's GEN rows, README section 2) |
+| 1 | 5 | `emergency_mode_active` | bool |  | EmergencyBattery.emergency_mode_active |
+| 1 | 4 | `apu_running` | bool |  | APUBattery.apu_running |
+| 1 | 3 | `hvac_powered` | bool |  | HVACSystem.powered |
+| 1 | 2 | `dissipation_active` | bool |  | ActiveDissipationUnit.active |
+| 1 | 1 | `hvac_at_setpoint` | bool |  | HVACSystem.get_status()['at_setpoint']: the cabin within 0.5 C of the setpoint |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0) |
+| 2 | 15-0 | `main_battery_charge` | uint | LSB 1/100 %, range 0 to 100 | MainBattery.charge_pct |
+| 3 | 15-0 | `emergency_battery_charge` | uint | LSB 1/100 %, range 0 to 100 | EmergencyBattery.charge_pct |
+| 4 | 15-0 | `apu_battery_charge` | uint | LSB 1/100 %, range 0 to 100 | APUBattery.charge_pct |
+| 5 | 15-0 | `generator_output` | uint | LSB 1/100 kW, range 0 to 655.35 | The last reading's |
+| 6 | 15-0 | `total_power_consumption` | uint | LSB 1/100 kW, range 0 to 655.35 | The last reading's |
+| 7 | 15-0 | `power_balance` | sint | LSB 1/100 kW, range -327.68 to 327.67 | generator_output - total_power_consumption |
+| 8 | 15-0 | `main_bus_voltage` | uint | LSB 1/100 V, range 0 to 655.35 |  |
+| 9 | 15-0 | `aux_bus_voltage` | uint | LSB 1/100 V, range 0 to 655.35 |  |
+| 10 | 15-0 | `generator_frequency` | uint | LSB 1/100 Hz, range 0 to 655.35 |  |
+| 11 | 15-0 | `power_factor` | uint | LSB 1/10000, range 0 to 1 |  |
+| 12 | 15-0 | `coolant_temp` | sint | LSB 1/100 C, range -327.68 to 327.67 | CoolingSystem.coolant_temp_c: starts at the 20 C ambient, the target is 25 C, never below ambient |
+| 13 | 15-0 | `cabin_temp` | sint | LSB 1/100 C, range -327.68 to 327.67 | HVACSystem.cabin_temp_c: starts at 22 C, the setpoint |
+| 14 | 15-0 | `fan_pct` | uint | LSB 1/10 %, range 0 to 100 | ActiveDissipationUnit.fan_pct: 10 at or below the target, 100 at 5 C over, 0 when deactivated |
+| 15 | 15-0 | `heat_load` | uint | LSB 1 W, range 0 to 65535 | CoolingSystem.total_heat_load_watts(): 6 W per kW of consumption |
+
+### PWR_MODE_CMD
+
+**Power management mode command** — RT 8 · SA 10 · receive (bus to terminal) · 1 words · aperiodic
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### PWR_ELECTRICAL
+
+**Electrical readings, from the plant** — RT 8 · SA 11 · receive (bus to terminal) · 7 words · 1 Hz
+
+PLANT_ELECTRICAL relayed to the power management terminal: what its generator and bus sensors would measure.
+
+Same layout as [`PLANT_ELECTRICAL`](#plant_electrical).
+
+### PWR_GEN_CMD
+
+**Generator command to the plant** — RT 8 · SA 12 · transmit (terminal to bus) · 2 words · 5 Hz
+
+What the terminal asks of the generator: held at generator_output while override is 1 (PWR_CMD SET_GENERATOR_OUTPUT, the Python's set_generator_output, whose value the next second's draw overwrote, README section 2), free to run as the plant draws it otherwise (GENERATOR_AUTO). Relayed to the plant as PLANT_GEN_CMD.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15 | `override` | bool |  | 1 = hold the generator at generator_output |
+| 0 | 14-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `sequence` | uint | raw counts | cmd_seq of the PWR_CMD that last set or released the hold; 0 while neither has |
+| 1 | 15-0 | `generator_output` | uint | LSB 1/100 kW, range 0 to 655.35 | max(0, output), as set_generator_output clamped it |
+
+### PWR_CMD
+
+**Power management command** — RT 8 · SA 13 · receive (bus to terminal) · 2 words · aperiodic
+
+PowerManagementSystem.set_generator_output and the manual controls of its component classes on the bus, none of which the Python ever called (README section 2). SET_GENERATOR_OUTPUT holds the plant's generator at value kW (a negative value reads as 0, as max(0, output) had it) until GENERATOR_AUTO; EMERGENCY_POWER_ON and EMERGENCY_POWER_OFF are EmergencyBattery.activate_emergency_power and deactivate_emergency_power (the critical load of 8 A is drawn while on); APU_START is APUBattery.start_apu (FAILED under 15 % of charge, ACCEPTED when already running) and APU_STOP stop_apu; ENGINE_START is MainBattery.start_engine for engine 1 or 2 (FAILED under 20 %; REJECTED_INVALID for ALL); HVAC_SETPOINT is HVACSystem.set_temperature with value in C (clamped to 10-30), HVAC_AIRFLOW set_airflow with value in % (clamped to 0-100), HVAC_POWER_ON and HVAC_POWER_OFF power_on and power_off; DISSIPATION_ON and DISSIPATION_OFF are ActiveDissipationUnit.activate and deactivate. The outcome is PWR_STATUS.power_cmd_status.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `power_command` |  |
+| 0 | 11-10 | `engine` | enum | enum `engine_select` | ENGINE_START: ENGINE_1 or ENGINE_2 |
+| 0 | 9-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+| 1 | 15-0 | `value` | sint | LSB 1/100, range -327.68 to 327.67 | SET_GENERATOR_OUTPUT: kW; HVAC_SETPOINT: C; HVAC_AIRFLOW: %; ignored otherwise |
+
+### EICAS_PWR_STATUS
+
+**Power management status, for the EICAS** — RT 14 · SA 4 · receive (bus to terminal) · 16 words · 5 Hz
+
+PWR_STATUS relayed to the EICAS, its one consumer (section 8): the ELECTRICAL rows (main bus, essential bus, the generators) and the electrical alerts.
+
+Same layout as [`PWR_STATUS`](#pwr_status).
+
+### PLANT_GEN_CMD
+
+**Generator command as received by the plant** — RT 27 · SA 17 · receive (bus to terminal) · 2 words · 5 Hz
+
+PWR_GEN_CMD relayed to the plant: the generator held at the commanded output while override is 1.
+
+Same layout as [`PWR_GEN_CMD`](#pwr_gen_cmd).
 
 ## Block payloads
 

@@ -12,8 +12,8 @@ from fmofp_bus.status import Status
 class GeneratedMessagesTest(unittest.TestCase):
     def test_version_and_table(self):
         self.assertEqual(1, m.ICD_MAJOR)
-        self.assertEqual(18, m.ICD_MINOR)
-        self.assertEqual(39, len(m.RELAYS))
+        self.assertEqual(19, m.ICD_MINOR)
+        self.assertEqual(42, len(m.RELAYS))
         self.assertEqual(("PLANT_SENSORS", "FCS_SENSORS", 27, 1, 5, 13, 11, 50, ()), tuple(m.RELAYS[0]))
         broadcast = [r for r in m.RELAYS if r.to_rt == 31]
         self.assertEqual(15, len(broadcast), "minus the energy maneuverability (v1.15), plus the mission status (v1.16)")
@@ -34,6 +34,12 @@ class GeneratedMessagesTest(unittest.TestCase):
                                               for r in m.RELAYS if r.to_id == "EICAS_SNS_STATUS"))
         self.assertEqual({("SNS_SCAN", 13, 14)}, {(r.to_id, r.to_descriptor_subaddress, r.to_segment_subaddress)
                                                    for r in b.BLOCK_RELAYS if r.to_rt == 10})
+        self.assertEqual(("PLANT_ELECTRICAL", "PWR_ELECTRICAL", 27, 16, 8, 11, 7, 1, ()),
+                         tuple(next(r for r in m.RELAYS if r.to_id == "PWR_ELECTRICAL")), "the readings to the power terminal (v1.19)")
+        self.assertEqual((8, 12, 27, 17), next((r.from_rt, r.from_subaddress, r.to_rt, r.to_subaddress)
+                                               for r in m.RELAYS if r.to_id == "PLANT_GEN_CMD"), "the generator hold to the plant")
+        self.assertEqual((8, 10, 14, 4), next((r.from_rt, r.from_subaddress, r.to_rt, r.to_subaddress)
+                                              for r in m.RELAYS if r.to_id == "EICAS_PWR_STATUS"))
         self.assertEqual((2, 13, 13, 17), next((r.from_rt, r.from_subaddress, r.to_rt, r.to_subaddress)
                                                for r in m.RELAYS if r.to_id == "MFD_COM_LINK_STATUS"))
         self.assertEqual(("FMS_ENERGY", "TSD_FMS_ENERGY", 12, 22, 16, 1, 6, 1, ()),
@@ -50,7 +56,7 @@ class GeneratedMessagesTest(unittest.TestCase):
         self.assertEqual({("MFD_RDR_TGT_TRACKS", 20, 21), ("MFD_RDR_AEWC_TRACKS", 22, 23), ("MFD_RDR_SAR_IMAGE", 26, 27)},
                          {(r.to_id, r.to_descriptor_subaddress, r.to_segment_subaddress)
                           for r in b.BLOCK_RELAYS if r.to_rt == 13})
-        self.assertEqual(113, len(m.MESSAGES))
+        self.assertEqual(121, len(m.MESSAGES))
         self.assertIs(m.FcsAttitude, m.MESSAGE_CLASSES["FCS_ATTITUDE"])
         self.assertEqual(m.EVERY_TERMINAL, m.TermStatus.RT)
 

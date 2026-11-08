@@ -11,7 +11,7 @@ from fmofp_bus.icd.enums import (AewcMode, Affiliation, ChangeType, ClearanceLev
                                  SatcomState, ShearSeverity, Ssm, TargetClass, TargetKind, TargetStatus,
                                  TargetingMode, TargetingState, TerminalState, TfrMode, Threat, TurbulenceCategory,
                                  UnitKind, UnitStatus, WaypointType, Weapon, WeaponsState, WeatherMode)
-from fmofp_bus.icd.enums import EcmMode, RwrBand, RwrSource, SensorHealth, ThreatType
+from fmofp_bus.icd.enums import EcmMode, RwrBand, RwrSource, SensorHealth, ThermalStatus, ThreatType
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import (BROADCAST_SOURCES, SYMBOL_CLASS, RadarFeed, aewc_item, cell_velocity_nm_s,
                                       polar_to_nm, sar_corners_nm, sar_pgm, targeting_item, weather_items)
@@ -203,6 +203,20 @@ def sample_sns_status(health=SensorHealth.NOMINAL, contacts=14, lidar=True):
                                                 tfr_radar_active=True, lidar_active=lidar, flir_active=True,
                                                 maws_active=True, esm_active=True, contact_count=contacts,
                                                 sequence=250, scan_valid=True, esm_valid=True, healthy=True))
+
+
+def sample_pwr_status(generator_kw=231.4, online=True, main_bus_v=115.3, aux_bus_v=27.4, main_charge=99.42,
+                      emergency=False):
+    """An EICAS_PWR_STATUS: the generator at 231 kW against 205 kW of load, the buses nominal, the main battery
+    just under full, the coolant warming."""
+    return m.EicasPwrStatus(payload=m.PwrStatus(
+        state=TerminalState.NORMAL, electrical_valid=True, generator_online=online, emergency_mode_active=emergency,
+        hvac_powered=True, dissipation_active=True, hvac_at_setpoint=True, healthy=True,
+        thermal_status=ThermalStatus.OK, main_battery_charge=main_charge, emergency_battery_charge=100.0,
+        apu_battery_charge=100.0, generator_output=generator_kw, total_power_consumption=205.0,
+        power_balance=generator_kw - 205.0, main_bus_voltage=main_bus_v, aux_bus_voltage=aux_bus_v,
+        generator_frequency=400.2, power_factor=0.97, coolant_temp=20.3, cabin_temp=22.0, fan_pct=10.0,
+        heat_load=1230.0))
 
 
 class WeatherItemsTest(unittest.TestCase):
@@ -966,6 +980,45 @@ class SensorFeedTest(unittest.TestCase):
     def test_stale_data_is_left_out(self):
         self.terminal.put(sample_sns_status(), age=5.0)
         self.assertEqual({}, self.feed.sensors.get_data())
+
+
+class PowerFeedTest(unittest.TestCase):
+    """What the EICAS window hands eicas.set_system_readings() from the power management terminal, and
+    PowerManagementSystem.get_data()'s snapshot (v1.19)."""
+
+    def setUp(self):
+        self.terminal = FakeTerminal()
+        self.feed = SystemsFeed(self.terminal, clock=lambda: 1000.0)
+
+    def test_without_the_terminal_the_electrical_rows_stay_unknown(self):
+        self.assertEqual({}, self.feed.system_readings())
+        self.assertEqual({}, self.feed.power.get_data())
+        self.assertNotIn("PWR", self.feed.status_text())
+
+    def test_the_status_becomes_the_readings_and_the_snapshot(self):
+        self.terminal.put(sample_pwr_status())
+        self.assertEqual({"main_bus_v": 115.3, "ess_bus_v": 27.4, "gen1_ok": True, "gen2_ok": True},
+                         self.feed.system_readings())
+        data = self.feed.power.get_data()
+        self.assertEqual((99.42, 100.0, 100.0, 231.4, 205.0, 20.3, 22.0, "OK", False),
+                         (data["main_battery_charge"], data["emergency_battery_charge"], data["apu_battery_charge"],
+                          data["generator_output"], data["total_power_consumption"], data["coolant_temp_c"],
+                          data["cabin_temp_c"], data["thermal_status"], data["emergency_mode_active"]))
+        self.assertAlmostEqual(26.4, data["power_balance"])
+        self.assertIn("PWR gen 231 kW bal +26 main 99.4% cool 20.3C", self.feed.status_text())
+        # The generator off: both generator rows FAIL, the Python's one generator being the EICAS's two.
+        self.terminal.put(sample_pwr_status(generator_kw=0.0, online=False, main_charge=61.5, emergency=True))
+        readings = self.feed.system_readings()
+        self.assertEqual((False, False, 115.3), (readings["gen1_ok"], readings["gen2_ok"], readings["main_bus_v"]))
+        self.assertIn("PWR gen 0 kW bal -205 main 61.5% cool 20.3C GEN OFF EMERG", self.feed.status_text())
+
+    def test_stale_or_readingless_data_is_left_out(self):
+        self.terminal.put(sample_pwr_status(), age=5.0)
+        self.assertEqual({}, self.feed.system_readings())
+        waiting = sample_pwr_status()
+        waiting.payload.electrical_valid = False
+        self.terminal.put(waiting)
+        self.assertEqual(({}, {}), (self.feed.system_readings(), self.feed.power.get_data()))
 
 
 class CommsFeedTest(unittest.TestCase):

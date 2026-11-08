@@ -24,7 +24,7 @@ from fmofp_bus.icd.enums import (AewcMode, SarMode, ClearanceLevel, Countermeasu
 from fmofp_bus.tests.test_display_feeds import (FakeTerminal, flight_payload, sample_aewc, sample_elevation, sample_fused, sample_sar_image,
                                                 sample_link, sample_mission_status, sample_plan, sample_products,
                                                 sample_tracks, sample_def_status, sample_rwr_contacts,
-                                                sample_sns_status)
+                                                sample_sns_status, sample_pwr_status)
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import RadarFeed
 from fmofp_display.systems_feed import SystemsFeed
@@ -373,6 +373,7 @@ class DisplayWindowsTest(unittest.TestCase):
             terminal.put_block(b.BcastDefRwrContacts, sample_rwr_contacts(), 4)
             terminal.put(sample_sns_status())
             terminal.put_block(b.BcastRdrFusedTracks, sample_fused(), 5)
+            terminal.put(sample_pwr_status())
             window.tick()        # the oil and fuel readings go in through set_engine_readings()
             eicas._poll_data()   # the 10 Hz poll reads the getters
             window.tick()
@@ -407,7 +408,15 @@ class DisplayWindowsTest(unittest.TestCase):
             # The sensor management terminal: the SENSORS rows and the fusion's hostile count (v1.18).
             self.assertEqual(("NOMINAL", 2), (eicas._sensor_health, eicas._fused_track_count))
             self.assertIn("FUSION  1 HOSTILE TRACK(S)", texts)
-            self.assertIn("4 warnings 8 cautions", window.status.text())
+            # The power management terminal: the ELECTRICAL rows through set_system_readings (v1.19); the three
+            # "unknown" cautions of the electrical rows are gone.
+            self.assertTrue(eicas.has_valid("main_bus_v") and eicas.has_valid("ess_bus_v") and eicas.has_valid("gen1_ok"))
+            self.assertEqual((115.3, 27.4, True, True), (eicas._electrical["main_bus_v"], eicas._electrical["ess_bus_v"],
+                                                       eicas._electrical["gen1_ok"], eicas._electrical["gen2_ok"]))
+            self.assertNotIn("ELEC  GEN 1 UNKNOWN", texts)
+            self.assertNotIn("ELEC  BUS VOLTS UNKNOWN", texts)
+            self.assertIn("HYD C  PRESSURE UNKNOWN", texts, "hydraulics still wait for their terminal")
+            self.assertIn("4 warnings 5 cautions", window.status.text())
             self.assertIn("ENG N1 82.0%", window.status.text())
         finally:
             window.timer.stop()

@@ -3,7 +3,7 @@
     py -m fmofp_plant [--port-base 51000] [--syncs 0] [--seed N] [--terrain-ft ELEVATION]
                       [--lat 0.0] [--lon 0.0]
                       [--gps-noise-m 3.0] [--gps-clock-bias-us 1.0] [--gps-outage]
-                      [--no-weather] [--no-traffic] [--no-ground]
+                      [--no-weather] [--no-traffic] [--no-ground] [--no-electrical]
                       [--hold altitude=1500,vertical_speed=-4500,...] [--quiet]
 
 PlantModel is Systems/flightControlSys/flightControlComputer.FlightControlComputer's
@@ -26,7 +26,11 @@ AEWC radars generated, published as the PLANT_TRAFFIC block five times a second
 as the radars' antennas would measure them. And it holds the ground scene
 (fmofp_plant.ground): the training range the synthetic aperture radar images,
 laid out along the northbound track from home, published as the PLANT_GROUND
-block once a second with its vehicles and ship moving.
+block once a second with its vehicles and ship moving. And it reads the electrical
+system (fmofp_plant.electrical): the generator output, the consumption, the bus
+voltages, the frequency and the power factor PowerManagementSystem drew, published
+as PLANT_ELECTRICAL once a second, the generator held where the power management
+terminal commands it (PLANT_GEN_CMD).
 
 --hold freezes named quantities at fixed values, which is how the tests put the
 aircraft into a known situation.
@@ -40,9 +44,11 @@ import sys
 from fmofp_bus.block import BlockPublisher
 from fmofp_bus.icd.blocks import PlantGround, PlantSensorScan, PlantTerrain, PlantTraffic
 from fmofp_bus.icd.enums import GearPosition, Ssm
-from fmofp_bus.icd.messages import PlantEsm, PlantGps, PlantRf, PlantSensors, PlantThrustCmd, PlantWeather
+from fmofp_bus.icd.messages import (PlantElectrical, PlantEsm, PlantGenCmd, PlantGps, PlantRf, PlantSensors,
+                                    PlantThrustCmd, PlantWeather)
 from fmofp_bus.rt_process import RtProcess
 from fmofp_bus.status import Status
+from fmofp_plant.electrical import ElectricalWorld
 from fmofp_plant.engine import ECU_DT, ECU_HZ, EngineWorld
 from fmofp_plant.ground import GroundScene
 from fmofp_plant.esm import EsmWorld
@@ -74,6 +80,8 @@ SYNCS_PER_RF = SYNC_HZ // RF_HZ
 ESM_STEP_FRAMES = 10  # PLANT_ESM: a new detection set every 0.2 s, as often as SensorDataFusion read its ESM sensor (the
 #                       defensive service read its own every half second and takes the latest set; 25 until v1.18)
 SCAN_STEP_FRAMES = 10  # PLANT_SENSOR_SCAN: a new scan set every 0.2 s, SensorDataFusion's poll; three segments, six frames at 25 Hz
+ELECTRICAL_HZ = 1  # PLANT_ELECTRICAL: PowerManagementSystem's loop read its generator and buses once a second
+SYNCS_PER_ELECTRICAL = SYNC_HZ // ELECTRICAL_HZ
 
 HOLDABLE = ("altitude", "speed", "heading", "pitch", "roll", "vertical_speed", "angle_of_attack", "g_force",
             "flaps", "latitude", "longitude")
@@ -153,7 +161,7 @@ class PlantModel:
 
     def __init__(self, seed=None, terrain=None, latitude=HOME_LATITUDE, longitude=HOME_LONGITUDE,
                  gps_noise_m=3.0, gps_clock_bias_us=1.0, gps_outage=False, weather=True, traffic=True,
-                 ground=True, rf=True, satellite_after_s=None, esm=True, scan_sensors=True):
+                 ground=True, rf=True, satellite_after_s=None, esm=True, scan_sensors=True, electrical=True):
         self.rng = random.Random(seed)
         # The weather draws from its own generator so adding it changed nothing else about a seeded run.
         self.weather = WeatherWorld(random.Random(None if seed is None else seed ^ 0x5745)) if weather else None
@@ -178,6 +186,8 @@ class PlantModel:
         self.esm = EsmWorld(random.Random(None if seed is None else seed ^ 0x45534D)) if esm else None
         # And the five scanning sensors the sensor data fusion asked, from their own generator (v1.18).
         self.scan_world = SensorScanWorld(random.Random(None if seed is None else seed ^ 0x534E53)) if scan_sensors else None
+        # And the electrical system the power management terminal measures, from its own generator (v1.19).
+        self.electrical = ElectricalWorld(random.Random(None if seed is None else seed ^ 0x454C45)) if electrical else None
         self.altitude = 10000.0       # feet
         self.speed = 500.0            # knots
         self.heading = 0.0            # degrees true
@@ -314,6 +324,18 @@ class PlantModel:
     def scan_block(self):
         return self.scan_world.block() if self.scan_world is not None else PlantSensorScan()
 
+    def electrical_message(self):
+        """PLANT_ELECTRICAL: the last reading; epoch 0 (no reading) without an electrical model."""
+        return self.electrical.message() if self.electrical is not None else PlantElectrical()
+
+    def generator_command(self, words):
+        """A PLANT_GEN_CMD received: the generator held where the power management terminal asks. True when the
+        hold changed."""
+        status, cmd = PlantGenCmd.decode(words)
+        if status != Status.OK or self.electrical is None:
+            return False
+        return self.electrical.command(cmd.payload)
+
     def thrust_command(self, words):
         """A PLANT_THRUST_CMD received: the engines take the engine computer's command. True when applied."""
         status, cmd = PlantThrustCmd.decode(words)
@@ -370,8 +392,9 @@ class PlantTerminal:
     second, PLANT_GPS with a new epoch once a second and its ranges refreshed at the walk rate, the
     PLANT_TERRAIN block ten times a second, PLANT_ENGINE ten times a second (the engine model steps at 2 Hz) and
     the PLANT_GROUND block once a second, PLANT_RF once a second (the RF environment, stepped at that
-    rate), PLANT_ESM every 0.2 s (a new set of intercepts) and the PLANT_SENSOR_SCAN block every 0.2 s (a new
-    set of scans), and takes the engine computer's thrust command from PLANT_THRUST_CMD."""
+    rate), PLANT_ESM every 0.2 s (a new set of intercepts), the PLANT_SENSOR_SCAN block every 0.2 s (a new
+    set of scans) and PLANT_ELECTRICAL once a second (a new reading), and takes the engine computer's thrust
+    command from PLANT_THRUST_CMD and the power management terminal's generator hold from PLANT_GEN_CMD."""
 
     def __init__(self, model, port_base=51000):
         self.model = model
@@ -380,6 +403,7 @@ class PlantTerminal:
         self.syncs = 0
         self.publish_failures = 0
         self.thrust_commands = 0
+        self.generator_commands = 0
         self.terrain_block = BlockPublisher(PlantTerrain.MAX_PAYLOAD_WORDS)
         self.traffic_block = BlockPublisher(PlantTraffic.MAX_PAYLOAD_WORDS)
         self.ground_block = BlockPublisher(PlantGround.MAX_PAYLOAD_WORDS)
@@ -402,6 +426,7 @@ class PlantTerminal:
             self.publish_esm()
             self.publish_sensors()
             self.serve_sensors()
+            self.publish_electrical()
         return status
 
     def _load(self, message):
@@ -459,6 +484,15 @@ class PlantTerminal:
     def publish_esm(self):
         self._load(self.model.esm_message())
 
+    def publish_electrical(self):
+        self._load(self.model.electrical_message())
+
+    def take_generator_command(self):
+        """Applies a PLANT_GEN_CMD that arrived since the last frame."""
+        status, words, fresh = self.process.terminal.get_received(PlantGenCmd.SUBADDRESS)
+        if status == Status.OK and fresh and self.model.generator_command(words):
+            self.generator_commands += 1
+
     def publish_ground(self):
         status, words = self.model.ground_message().encode()
         if status not in (Status.OK, Status.CLAMPED):
@@ -506,9 +540,11 @@ class PlantTerminal:
                 self.publish_esm()
                 self.publish_sensors()
                 self.serve_sensors()
+                self.publish_electrical()
             return False
         self.syncs += 1
         self.take_thrust_command()
+        self.take_generator_command()
         if self.syncs % SYNCS_PER_ECU_STEP == 0:
             self.model.engines.step(ECU_DT)
         if self.syncs % SYNCS_PER_ENGINE == 0:
@@ -539,6 +575,10 @@ class PlantTerminal:
             if self.model.scan_world is not None:
                 self.model.scan_world.step()
             self.publish_sensors()
+        if self.syncs % SYNCS_PER_ELECTRICAL == 0:
+            if self.model.electrical is not None:
+                self.model.electrical.step()
+            self.publish_electrical()
         self.serve_terrain()
         self.serve_traffic()
         self.serve_ground()
@@ -578,6 +618,8 @@ def main(argv=None):
     parser.add_argument("--no-rf", action="store_true", help="a silent sky: PLANT_RF carries no field and no satellite")
     parser.add_argument("--no-esm", action="store_true", help="no emitters: PLANT_ESM carries no signals")
     parser.add_argument("--no-sensors", action="store_true", help="blind sensors: PLANT_SENSOR_SCAN carries no detections")
+    parser.add_argument("--no-electrical", action="store_true",
+                        help="no electrical readings: PLANT_ELECTRICAL carries epoch 0 (the power terminal waits)")
     parser.add_argument("--satellite-after", type=float, default=None,
                         help="a satellite comes into view after this many seconds instead of by chance")
     parser.add_argument("--hold", type=parse_hold, default={}, help="name=value,... held constant")
@@ -589,7 +631,7 @@ def main(argv=None):
                        gps_noise_m=args.gps_noise_m, gps_clock_bias_us=args.gps_clock_bias_us,
                        gps_outage=args.gps_outage, weather=not args.no_weather, traffic=not args.no_traffic,
                        ground=not args.no_ground, rf=not args.no_rf, satellite_after_s=args.satellite_after,
-                       esm=not args.no_esm, scan_sensors=not args.no_sensors)
+                       esm=not args.no_esm, scan_sensors=not args.no_sensors, electrical=not args.no_electrical)
     model.hold = args.hold
     plant = PlantTerminal(model, args.port_base)
     status = plant.init()
@@ -611,7 +653,8 @@ def main(argv=None):
         plant.shutdown()
     c = plant.process.terminal.counters
     print(f"plant: syncs={plant.syncs} transmits={c.transmits} message_errors={c.message_errors} "
-          f"publish_failures={plant.publish_failures} thrust_commands={plant.thrust_commands}")
+          f"publish_failures={plant.publish_failures} thrust_commands={plant.thrust_commands} "
+          f"generator_commands={plant.generator_commands}")
     return 0
 
 

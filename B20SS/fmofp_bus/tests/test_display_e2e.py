@@ -13,7 +13,7 @@ accepts the subaddresses it draws (ICD v1.7, v1.8). The feeds then make of it
 what the Qt windows would draw.
 
 Needs FMOFP_BC, FMOFP_FCS, FMOFP_NAV, FMOFP_FMS, FMOFP_RADAR, FMOFP_ENGINE, FMOFP_MISSION, FMOFP_COMMS,
-FMOFP_DEFENSIVE and FMOFP_SENSOR (CI sets them).
+FMOFP_DEFENSIVE, FMOFP_SENSOR and FMOFP_POWER (CI sets them).
 """
 
 import math
@@ -44,7 +44,7 @@ PORT_BASE = 61000
 FRAMES = 420  # the SAR's first picture: a fix, 150 frames of integration, 134 frames of segments
 SYNC_MODE_CODE = 17
 BINARIES = ("FMOFP_FCS", "FMOFP_NAV", "FMOFP_FMS", "FMOFP_RADAR", "FMOFP_ENGINE", "FMOFP_MISSION", "FMOFP_COMMS",
-            "FMOFP_DEFENSIVE", "FMOFP_SENSOR")
+            "FMOFP_DEFENSIVE", "FMOFP_SENSOR", "FMOFP_POWER")
 
 
 class PlantThread(threading.Thread):
@@ -125,7 +125,7 @@ class DisplaysEndToEndTest(unittest.TestCase):
         terminals = ["27", str(m.FcsStatus.RT), str(m.NavSolution.RT), str(m.FmsStatus.RT), str(m.RdrWxStatus.RT),
                      str(m.EngStatus.RT), str(m.DspPfdStatus.RT), str(m.DspRadarStatus.RT), str(m.DspMfdStatus.RT),
                      str(m.DspEicasStatus.RT), str(m.DspTsdStatus.RT), str(m.DspSmsStatus.RT), str(m.MsnStatus.RT),
-                     str(m.ComStatus.RT), str(m.DefStatus.RT), str(m.SnsStatus.RT)]
+                     str(m.ComStatus.RT), str(m.DefStatus.RT), str(m.SnsStatus.RT), str(m.PwrStatus.RT)]
         args = [os.environ["FMOFP_BC"]]
         for rt in terminals:
             args += ["--rt", rt]
@@ -244,9 +244,9 @@ class DisplaysEndToEndTest(unittest.TestCase):
         self.assertEqual({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 22, 23, 24, 25, 26, 27, 28},
                          broadcast)
         # A stream with one consumer is that consumer's own relay (v1.15): the MFD's targeting, AEWC and SAR
-        # pictures, the TSD's energy metrics and the EICAS's defensive status (v1.17) and sensor status (v1.18)
-        # arrive unicast; nothing else is written into a display.
-        own = {m.DspMfdStatus.RT: {17, 20, 21, 22, 23, 26, 27}, m.DspTsdStatus.RT: {1}, m.DspEicasStatus.RT: {1, 3}}
+        # pictures, the TSD's energy metrics and the EICAS's defensive (v1.17), sensor (v1.18) and power (v1.19)
+        # statuses arrive unicast; nothing else is written into a display.
+        own = {m.DspMfdStatus.RT: {17, 20, 21, 22, 23, 26, 27}, m.DspTsdStatus.RT: {1}, m.DspEicasStatus.RT: {1, 3, 4}}
         for rt in (m.DspRadarStatus.RT, m.DspPfdStatus.RT, m.DspMfdStatus.RT, m.DspEicasStatus.RT, m.DspTsdStatus.RT,
                    m.DspSmsStatus.RT):
             unicast = {r.command.subaddress for _, r in framed
@@ -344,6 +344,20 @@ class DisplaysEndToEndTest(unittest.TestCase):
         self.assertIsNotNone(self.eicas.fresh(m.EicasSnsStatus, stale_after_s=60.0), "the EICAS's own relay")
         self.assertIsNone(self.tsd.fresh(m.EicasSnsStatus, stale_after_s=60.0), "one consumer: not written into the TSD")
         self.assertIn("SNS NOMINAL", eicas.status_text())
+        # The power management terminal: its status by the EICAS's own relay; the electrical rows through
+        # set_system_readings (v1.19): the buses, and both generator rows from the one generator.
+        electrical = eicas.system_readings()
+        self.assertEqual({"main_bus_v", "ess_bus_v", "gen1_ok", "gen2_ok"}, set(electrical))
+        self.assertTrue(110.0 <= electrical["main_bus_v"] <= 120.0, electrical)
+        self.assertTrue(25.0 <= electrical["ess_bus_v"] <= 28.0, electrical)
+        self.assertTrue(electrical["gen1_ok"] and electrical["gen2_ok"], "the generator runs at 200-250 kW")
+        power = eicas.power.get_data()
+        self.assertTrue(200.0 <= power["generator_output"] <= 250.0, power)
+        self.assertGreaterEqual(power["main_battery_charge"], 90.0)
+        self.assertEqual("OK", power["thermal_status"])
+        self.assertIsNotNone(self.eicas.fresh(m.EicasPwrStatus, stale_after_s=60.0), "the EICAS's own relay")
+        self.assertIsNone(self.tsd.fresh(m.EicasPwrStatus, stale_after_s=60.0), "one consumer: not written into the TSD")
+        self.assertIn("PWR gen ", eicas.status_text())
         eicas_status = self.transmitted(framed, m.DspEicasStatus, 100, FRAMES)
         self.assertEqual(TerminalState.NORMAL, eicas_status[-1][1].state)
         # The targeting radar, commanded from the radar display: its status and tracks reach the MFD's targeting page,
