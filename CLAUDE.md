@@ -171,7 +171,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 13 | Mission computer (RT 6) | 1 | DONE 2026-11-02 |
 | 14 | Communications (RT 2) | 0.5 | DONE 2026-11-02 |
 | 15 | Sensor management (RT 10) | 0.75 | DONE 2026-11-08 |
-| 16 | Power management (RT 8) | 0.75 | open |
+| 16 | Power management (RT 8) | 0.75 | IN PROGRESS (Kevin, 2026-11-08) |
 | 17 | Avionics: LRU health + BIT + fitness + SW configuration (RT 1) | 1 | open |
 | 18 | Defensive systems (RT 22) | 0.5 | DONE 2026-11-07 |
 | 19 | Flight surfaces (RT 21) | 0.5 | open |
