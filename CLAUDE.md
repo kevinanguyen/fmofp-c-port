@@ -135,14 +135,20 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: unit 17 avionics is `IN PROGRESS (Alee, 2026-11-09)`; no `wip/` branches.
-  Last session: Kevin's, 2026-11-09 (the protocol check that recorded Alee's runs and widened the
-  demo test; before it Alee's first session on his machine, 2026-11-09: setup of section 5 done,
-  `verify.sh` green, unit 16's CI recorded, unit 17 claimed). Both contributors have a working
-  machine. Kevin's next unit: 19 flight surfaces or 20 utilities (not 17), then 28, 29 last, 30.
+- **Open work / claims**: unit 17 avionics is `IN PROGRESS (Alee, 2026-11-09)`, on branch
+  `wip/unit17-avionics` (`95f6fca`, Alee, 2026-11-09, on top of `d5aa844`; its commit message is
+  its record, condensed in section 7 under 2026-11-10; it merges onto `port/cpp` without conflict
+  as of 2026-11-10). Green there: ICD v1.20, the bus controller's bus-health message, the C++
+  partition and tool, the oracle and e2e tests. Not done: the display tests, the full Python
+  suite and the headless demo since the wiring, the ICD and ofp READMEs, this file. Next step for
+  whoever continues it: rebase on `port/cpp`, finish those, `verify.sh` green, one commit on
+  `port/cpp`, delete the branch. Last session: Kevin's, 2026-11-10 (this record). Kevin's next
+  unit: 19 flight surfaces or 20 utilities (not 17), then 28, 29 last, 30; a unit landing on
+  `port/cpp` while unit 17 is open takes ICD v1.21 (v1.20 is unit 17's; section 8).
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
-  Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106 and the
-  Linux 3.13 leg of 42435137866); the two `cpp` jobs are the ones that judge the port.
+  Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
+  leg of 42435137866 and the Windows 3.13 leg of 42729856922); the two `cpp` jobs are the ones
+  that judge the port.
 - **Known flaky in our own `cpp` job**: the display e2e runs the bus under `--strict` with
   seven Python terminals; the slow Linux runner answered one poll late in run 42435137866
   (worst frame 48 ms, exit 1, the next run of the same code green). Its poll timeout is 40 ms
@@ -1104,6 +1110,29 @@ done before this file existed are condensed from the private session notes.
   reds above. Unit 16's `a63556e` run 42507980864 all ten green (recorded by Alee).
 - *Numbers*: meter unchanged, 23 / 29.5 = 78 %.
 
+### 2026-11-10 - protocol check; CI of 65eacdc recorded; Alee's wip branch for unit 17 - by Kevin's agent
+- *What*: section 0.1 on Kevin's machine: tree clean, `port/cpp` unchanged at `65eacdc` (local = origin),
+  upstream/main still `4c25f52`, no pull requests. New on origin: `wip/unit17-avionics` (`95f6fca`, Alee,
+  2026-11-09, on top of `d5aa844`, 34 files, +4192 lines) with no change to this file, so the branch's state
+  is in its commit message; recorded here and in section 1. No code changed.
+- *Alee's branch, in his words*: done and passing on his machine: ICD v1.20 (`AVN_STATUS` →
+  `EICAS_AVN_STATUS` 14/6, `AVN_MODE_CMD`, `AVN_CMD`, `AVN_BUS_HEALTH` written by the bus controller once a
+  second; five enums; 126 messages, 43 relays); the bus controller's `BusHealthReporter` and
+  `set_receive_data`; `ofp/partitions/avionics` (LRU monitor with forced faults, built-in tests, FM fitness,
+  software configuration) with `fmofp_avionics_tool`; C++ build clean, ctest 2/2, cppcheck clean; load 93
+  messages for 18 terminals, worst frame 7944 us; `test_avionics_oracle.py` (15 tests) and
+  `test_avionics_e2e.py` (2 tests; port base 55500, free) pass; feed, app, demo, `verify.sh`, both CI files
+  and `_support.py` wired. Not done: `test_display_feeds/render/e2e` not extended for the avionics terminal
+  (the display e2e still lists 17 terminals), the full Python suite and the headless demo not run since the
+  wiring, the ICD README, `ofp/README.md` and this file's sections 1, 2, 6, 7, 8 not written.
+- *Checked here*: `git merge-tree --write-tree port/cpp origin/wip/unit17-avionics` reports no conflict (his
+  `test_demo.py` hunks and the ten-second change of `65eacdc` do not overlap). CI does not run on `wip/**`
+  (the workflow triggers on `main` and `port/**`), so the branch has no run; its first run comes when it
+  lands on `port/cpp`.
+- *CI*: `65eacdc` run 42729856922 nine green, the Windows 3.13 Python leg red on Alee's flaky
+  `test_weather_radar_live` only; both `cpp` jobs green, so the ten-second demo test held on the runner.
+- *Numbers*: meter unchanged, 23 / 29.5 = 78 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1154,3 +1183,10 @@ done before this file existed are condensed from the private session notes.
   row the 28 V auxiliary bus; the component classes' manual controls nothing in the Python
   called ride in `PWR_CMD`; one heat source; the mission equipment batteries stay off the bus.
   Recorded in the ICD README section 2.
+- 2026-11-10, Kevin's agent (a coordination rule under section 4.1; either human may overrule):
+  while a unit is open on a `wip/` branch with its ICD version already chosen, the next unit that
+  lands on `port/cpp` takes the version after it, not the same number, so neither side renumbers
+  when the second lands. Unit 17 holds v1.20 on `wip/unit17-avionics`; Kevin's next unit is v1.21
+  even if it lands first (the README's section 1 paragraph and revision row for v1.20 are then
+  inserted in order when unit 17 lands). The message, relay and block counts are still whoever
+  pushes second's to fix.
