@@ -98,8 +98,8 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone: unit 16 power management, ICD v1.19 (2026-11-08, the commit
-  after the claim `2dc221c`; its CI run is recorded next session). Before it: `c4057ed` (unit
+  `git log -1`. Last milestone: `a63556e` unit 16 power management, ICD v1.19 (2026-11-08;
+  CI run 42507980864 all ten jobs green). Before it: `c4057ed` (unit
   15 sensor management, ICD v1.18; CI run 42439181347 all ten jobs green), `d718e09` (unit 18
   defensive systems, ICD v1.17; CI run 42435137866: eight green, `linux-gcc` red on one
   unanswered poll in the display e2e on the slow runner, the same code green on the next run,
@@ -135,10 +135,9 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-08 (unit
-  16, after the protocol check that recorded unit 15's CI). Alee is a collaborator with write
-  access (in the collaborator list, no pending invitation, checked 2026-11-08) and has not
-  pushed yet; his first session on his machine starts with section 0.1 step 6. Suggested next
+- **Open work / claims**: none. No `wip/` branches. Last session: Alee's, 2026-11-09 (first
+  session on Alee's Windows machine: setup of section 5 done, `verify.sh` green, unit 16's CI
+  recorded; no code changed). Both contributors now have a working machine. Suggested next
   unit: 17 avionics (RT 1), then 19 flight surfaces, 20 utilities, 28, 29 last, 30.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106 and the
@@ -705,6 +704,17 @@ Working on this machine (Kevin's)
 - MSYS2's `bin` holds its own `python.exe` (3.14, no PyQt6): never put it above the
   python.org install on PATH; `py` is unaffected.
 
+Working on Alee's machine
+- `py` defaults to the free-threaded `python3.14t` there, which PyQt6 6.8.1 cannot load: the
+  requirements are installed into the regular 3.14, so run the gate as
+  `PY_PYTHON=3.14 bash B20SS/verify.sh` (and `py -3.14 ...` by hand).
+- The clone is a worktree of a repository whose remotes were renamed: `origin` is the fork,
+  `bitbucket` is Alee's private Bitbucket copy, `upstream` is push-disabled. Push only to
+  `origin`.
+- `verify.sh icd` reports the four `fmofp_bus/icd` files and `ICD_TABLES.md` as changed on a
+  CRLF checkout: the generator writes LF and `git diff` is empty. Not a change: `git restore`
+  them, do not commit them.
+
 ---
 
 ## 7. Unit log (append-only; newest at the bottom)
@@ -1057,6 +1067,24 @@ done before this file existed are condensed from the private session notes.
 - *Tests and numbers*: Python 217 OK (was 205), ctest 2/2 (272 gtests), cppcheck clean;
   load 90 messages for 17 terminals, worst minor frame 8128 us (was 7884 for 16); headless
   demo 30 s: 1500 frames, 0 overruns, 17/17 answering; meter 23 / 29.5 = 78 %.
+
+### 2026-11-09 - first session on Alee's machine; CI of unit 16 recorded - by Alee's agent
+- *What*: section 0.1 step 6 on Alee's Windows 10 machine. Setup of section 5: the
+  requirements into python.org 3.14 (PyQt6 6.8.1, numpy 2.5, scipy 1.18, qasync, click),
+  MSYS2 by winget with g++ 16.2, cmake 4.4.5, ninja 1.13.2, cppcheck 2.21, gtest and gcovr in
+  UCRT64; remotes as section 5.1 (`upstream` push-disabled). No code changed.
+- *How*: `PY_PYTHON=3.14 bash B20SS/verify.sh` from a clean `port/cpp` at `a63556e`.
+- *Warnings / lessons*: the default `py` there is free-threaded 3.14t (PyQt6 cannot load);
+  the first MSYS2 login shell exits after the core update (run pacman again); the regenerated
+  ICD files differ only in line endings on a CRLF checkout (section 6). `gh` is not installed:
+  CI read from the public Actions API.
+- *CI*: `a63556e` (unit 16) run 42507980864 all ten jobs green; the claim `2dc221c` run
+  42503903851 green; the working-file commit `76df0c3` run 42501800996 nine green, `linux-gcc`
+  red (a documents-only commit, so the known display e2e timing on the slow runner; the next
+  two runs green).
+- *Tests and numbers*: verify OK (icd cpp py load): ctest 2/2, cppcheck clean, Python 217 OK
+  in 51 s, load 90 messages for 17 terminals, worst minor frame 8128 us, the same numbers as
+  Kevin's machine. Meter unchanged, 23 / 29.5 = 78 %.
 
 ---
 
