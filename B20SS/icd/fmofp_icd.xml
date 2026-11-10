@@ -8,7 +8,7 @@
   bits="11-8" means (word >> 8) & 0xF. A field may span two consecutive words
   (word="3-4" bits="31-0", most significant word first) for one 32-bit value.
 -->
-<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="19" status="DRAFT" date="2026-11-08">
+<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="21" status="DRAFT" date="2026-11-10">
   <revision version="1.0-draft" date="2026-10-04" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">First draft, derived from FMOFP/rtAddressConfig.xml and FMOFP/MIL_STD_1553B/message_schemas.py.</revision>
   <revision version="1.0-draft.2" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 1-3: display addresses accepted; BIT merged into avionics (RT 1), FM fitness and SW configuration folded in as well; bus controller confirmed as its own process. RT 24-26 freed.</revision>
   <revision version="1.0-draft.3" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 4-10: UDP transport accepted; legacy WEATHER mode dropped as unnecessary; every TBD value defined from the code that uses it; heading and yaw are true. Command parameters nothing consumed were removed.</revision>
@@ -472,6 +472,18 @@
       <value name="DISSIPATION_ON" value="12"/>
       <value name="DISSIPATION_OFF" value="13"/>
     </enum>
+    <enum id="surface_command" bits="4" doc="What FSF_CMD asks of the flight surfaces terminal: FlightSurfaceService.set_flaps, set_speedbrake, set_rudder and set_trim, the manual controls nothing in the Python called">
+      <value name="NONE" value="0"/>
+      <value name="SET_FLAPS" value="1"/>
+      <value name="SET_SPEEDBRAKE" value="2"/>
+      <value name="SET_RUDDER" value="3"/>
+      <value name="SET_TRIM" value="4"/>
+    </enum>
+    <enum id="trim_axis" bits="2" doc="FlightSurfaceService.set_trim's axis: the keys of its trim dictionary">
+      <value name="PITCH" value="0"/>
+      <value name="ROLL" value="1"/>
+      <value name="YAW" value="2"/>
+    </enum>
   </enums>
 
   <terminals>
@@ -496,7 +508,7 @@
     <terminal rt="18" id="hud" name="Head-up display" status="new" source="Interfaces/userInterface (HUDContainer)"/>
     <terminal rt="19" id="hydraulics" name="Hydraulics" status="new" source="Systems/hydraulics"/>
     <terminal rt="20" id="airframe" name="Airframe systems" status="new" source="Systems/airframeSystemManagement"/>
-    <terminal rt="21" id="flightsurfaces" name="Flight surfaces" status="new" source="Systems/flightSurfaces"/>
+    <terminal rt="21" id="flightsurfaces" name="Flight surfaces - the ten control surfaces and their motion" status="existing" source="Systems/flightSurfaces/flightSurfaceService.py" note="Ported in v1.21 (fmofp_surfaces). FlightSurfaceService's ten surfaces (two ailerons, two elevators, the rudder, two flaps, two slats, the speedbrake), each moved toward its command at its slew rate within its limits every minor frame (the Python's 50 Hz loop), under the service's own commands: the ailerons and elevators follow the sensed roll and pitch and the slats the angle of attack (_sync_from_fcc, which read the flight control computer's data dictionary, the sensed flight state the plant publishes: PLANT_SENSORS relayed as FSF_SENSORS), and the flaps, speedbrake, rudder and trim follow FSF_CMD (set_flaps, set_speedbrake, set_rudder, set_trim). FSF_POSITIONS carries the measured positions, FSF_STATUS the flap detent, the trim and the health. It does not follow the flight control computer's FCS_SURFACE_CMD, which the Python's service never read either (README section 2)"/>
     <terminal rt="22" id="defensive" name="Defensive systems - RWR, chaff, flare, ECM" status="new" source="Systems/defensiveSys/defensiveService.py" note="Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17)"/>
     <terminal rt="23" id="flightdatamonitoring" name="Flight data monitoring" status="new" source="Systems/flightDataMonitoring"/>
     <terminal rt="27" id="plant" name="Plant model - the simulated aircraft and world (test equipment, not aircraft software)" status="new" source="Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process" note="Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD)"/>
@@ -1683,12 +1695,72 @@
     <message id="PLANT_GEN_CMD" rt="27" sa="17" dir="R" layout_of="PWR_GEN_CMD" rate="5" title="Generator command as received by the plant">
       <doc>PWR_GEN_CMD relayed to the plant: the generator held at the commanded output while override is 1.</doc>
     </message>
+
+    <!-- ===== RT 21 flight surfaces (v1.21): FlightSurfaceService on the bus ===== -->
+    <message id="FSF_STATUS" rt="21" sa="10" dir="T" words="6" rate="5" title="Flight surfaces status">
+      <doc>The terminal's state and command handling as the other subsystems report them, plus what FlightSurfaceService.get_data() returned beside the positions: the commanded flap detent (set_flaps's nearest of 0, 5, 15 and 30 degrees), the three trim values (set_trim, clamped to +-10 degrees; no surface follows them: the Python kept them in a dictionary nothing read) and healthy (every surface healthy, a flag the Python never cleared). sensors_valid is 1 while the sensed flight state (FSF_SENSORS) arrives: 0 before the first and when it stops (3 frames), when the surfaces keep moving toward their last commands, as the Python's loop kept stepping on the flight control computer's last data. The positions are FSF_POSITIONS.</doc>
+      <field name="state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="last_cmd_seq" word="0" bits="7-0" type="uint" doc="cmd_seq of the last FSF_MODE_CMD processed (see Command sequence rule)"/>
+      <field name="cmd_rejected" word="1" bits="15" type="bool" doc="1 = the last FSF_MODE_CMD was rejected"/>
+      <field name="mode_transition" word="1" bits="14" type="bool" doc="1 = a commanded mode change is still in progress"/>
+      <field name="spare_1" word="1" bits="13-12" type="spare"/>
+      <field name="surface_cmd_status" word="1" bits="11-8" type="enum" enum="cmd_status" doc="Outcome of the last FSF_CMD"/>
+      <field name="sensors_valid" word="1" bits="7" type="bool" doc="1 = FSF_SENSORS with its roll, pitch and angle of attack NORMAL arrived within the last 3 frames"/>
+      <field name="slats_extended" word="1" bits="6" type="bool" doc="1 = the slats are commanded out: the sensed angle of attack was above 8 degrees at the last sync"/>
+      <field name="spare_2" word="1" bits="5-1" type="spare"/>
+      <field name="healthy" word="1" bits="0" type="bool" doc="1 = healthy (legacy health_status, bit 0): every surface healthy and the self test passed"/>
+      <field name="flap_cmd" word="2" bits="15-0" type="uint" lsb="1" units="deg" min="0" max="30" doc="FlightSurfaceService._flap_cmd: the detent set_flaps chose, 0 / 5 / 15 / 30"/>
+      <field name="trim_pitch" word="3" bits="15-0" type="sint" lsb="1/100" units="deg" min="-10" max="10" doc="set_trim('pitch', deg), clamped to +-10"/>
+      <field name="trim_roll" word="4" bits="15-0" type="sint" lsb="1/100" units="deg" min="-10" max="10" doc="set_trim('roll', deg)"/>
+      <field name="trim_yaw" word="5" bits="15-0" type="sint" lsb="1/100" units="deg" min="-10" max="10" doc="set_trim('yaw', deg)"/>
+    </message>
+    <message id="FSF_MODE_CMD" rt="21" sa="10" dir="R" words="1" rate="aperiodic" title="Flight surfaces mode command">
+      <field name="requested_state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="cmd_seq" word="0" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+    </message>
+    <message id="FSF_SENSORS" rt="21" sa="11" dir="R" layout_of="PLANT_SENSORS" rate="50" title="Sensed flight state, for the flight surfaces">
+      <doc>PLANT_SENSORS relayed to the flight surfaces terminal: the roll, pitch and angle of attack FlightSurfaceService._sync_from_fcc read from the flight control computer's data dictionary (the sensed flight state, which the plant publishes since v1.1). Each frame with a fresh copy whose roll, pitch and angle of attack are NORMAL: aileron command = clamp(-0.5 x roll, +-25), the left aileron commanded to its negative and the right to it; elevator command = clamp(-0.8 x pitch, +-30) for both; the slats to 20 degrees while the angle of attack is above 8, else to 0. The rudder, flaps and speedbrake take their commands from FSF_CMD alone.</doc>
+    </message>
+    <message id="FSF_CMD" rt="21" sa="12" dir="R" words="2" rate="aperiodic" title="Flight surfaces command">
+      <doc>FlightSurfaceService's manual controls, which nothing in the Python called (README section 2). SET_FLAPS: set_flaps(value degrees), the nearest detent of 0, 5, 15 and 30 (a tie goes to the lower, as min() over the tuple had it); SET_SPEEDBRAKE: set_speedbrake(value percent), the speedbrake commanded to clamp(0.6 x value, 0, 60) degrees; SET_RUDDER: set_rudder(value degrees), clamped to +-30; SET_TRIM: set_trim(axis, value degrees), clamped to +-10. The outcome is FSF_STATUS.surface_cmd_status (REJECTED_INVALID for NONE); the surfaces then move at their slew rates (ailerons 60, elevators 50, rudder 40, speedbrake 30, flaps and slats 5 degrees a second).</doc>
+      <field name="command" word="0" bits="15-12" type="enum" enum="surface_command"/>
+      <field name="axis" word="0" bits="11-10" type="enum" enum="trim_axis" doc="SET_TRIM: which trim"/>
+      <field name="spare_0" word="0" bits="9-8" type="spare"/>
+      <field name="cmd_seq" word="0" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+      <field name="value" word="1" bits="15-0" type="sint" lsb="1/100" min="-327.68" max="327.67" doc="SET_FLAPS: degrees; SET_SPEEDBRAKE: percent; SET_RUDDER and SET_TRIM: degrees; ignored otherwise"/>
+    </message>
+    <message id="FSF_POSITIONS" rt="21" sa="13" dir="T" words="12" rate="10" title="Control surface positions, measured">
+      <doc>FlightSurfaceService.get_data()['surfaces']: where each of the ten surfaces is, in degrees (positive = trailing edge down, or right for the rudder; the Python rounded them to two decimals, the lsb here). Every minor frame each surface moves toward its command by at most its slew rate x 0.02 s and stays within its limits (ailerons +-25, elevators and rudder +-30, flaps 0-30, slats 0-20, speedbrake 0-60). The SSMs are NORMAL from the terminal's start: the surfaces start at neutral and are known, as the Python's were.</doc>
+      <field name="aileron_l_ssm" word="0" bits="15-14" type="ssm" for="aileron_l"/>
+      <field name="aileron_r_ssm" word="0" bits="13-12" type="ssm" for="aileron_r"/>
+      <field name="elevator_l_ssm" word="0" bits="11-10" type="ssm" for="elevator_l"/>
+      <field name="elevator_r_ssm" word="0" bits="9-8" type="ssm" for="elevator_r"/>
+      <field name="rudder_ssm" word="0" bits="7-6" type="ssm" for="rudder"/>
+      <field name="flap_l_ssm" word="0" bits="5-4" type="ssm" for="flap_l"/>
+      <field name="flap_r_ssm" word="0" bits="3-2" type="ssm" for="flap_r"/>
+      <field name="slat_l_ssm" word="0" bits="1-0" type="ssm" for="slat_l"/>
+      <field name="slat_r_ssm" word="1" bits="15-14" type="ssm" for="slat_r"/>
+      <field name="speedbrake_ssm" word="1" bits="13-12" type="ssm" for="speedbrake"/>
+      <field name="spare_1" word="1" bits="11-0" type="spare"/>
+      <field name="aileron_l" word="2" bits="15-0" type="sint" lsb="1/100" units="deg" min="-25" max="25" doc="Surface('aileron_l', rate 60 deg/s, limits +-25): minus the aileron command"/>
+      <field name="aileron_r" word="3" bits="15-0" type="sint" lsb="1/100" units="deg" min="-25" max="25" doc="Surface('aileron_r', rate 60, +-25): the aileron command, clamp(-0.5 x roll, +-25)"/>
+      <field name="elevator_l" word="4" bits="15-0" type="sint" lsb="1/100" units="deg" min="-30" max="30" doc="Surface('elevator_l', rate 50, +-30): clamp(-0.8 x pitch, +-30)"/>
+      <field name="elevator_r" word="5" bits="15-0" type="sint" lsb="1/100" units="deg" min="-30" max="30" doc="Surface('elevator_r', rate 50, +-30): the same command"/>
+      <field name="rudder" word="6" bits="15-0" type="sint" lsb="1/100" units="deg" min="-30" max="30" doc="Surface('rudder', rate 40, +-30): set_rudder's command; the sync never touches it"/>
+      <field name="flap_l" word="7" bits="15-0" type="uint" lsb="1/100" units="deg" min="0" max="30" doc="Surface('flap_l', rate 5, 0-30): the flap detent"/>
+      <field name="flap_r" word="8" bits="15-0" type="uint" lsb="1/100" units="deg" min="0" max="30" doc="Surface('flap_r', rate 5, 0-30): the flap detent"/>
+      <field name="slat_l" word="9" bits="15-0" type="uint" lsb="1/100" units="deg" min="0" max="20" doc="Surface('slat_l', rate 5, 0-20): 20 while the angle of attack is above 8 degrees, else 0"/>
+      <field name="slat_r" word="10" bits="15-0" type="uint" lsb="1/100" units="deg" min="0" max="20" doc="Surface('slat_r', rate 5, 0-20): the same command"/>
+      <field name="speedbrake" word="11" bits="15-0" type="uint" lsb="1/100" units="deg" min="0" max="60" doc="Surface('speedbrake', rate 30, 0-60): 0.6 x the commanded percent"/>
+    </message>
   </messages>
 
   <!-- RT-to-RT transfers the bus controller performs: in the minor frame where it polls `from`,
        it writes the same words into `to` straight away. The two must share a layout (one is
        layout_of the other); `from` transmits periodically, `to` receives. A producer may feed
-       several consumers (one relay each, at most four). This is how a producer's data reaches its
+       several consumers (one relay each, at most six). This is how a producer's data reaches its
        consumers, and how a display's command reaches the terminal it is for. A relay may also connect two block streams
        (section 8): the BC forwards the descriptor and every segment, and the receiving block is
        layout_of the transmitted one. -->
@@ -1747,6 +1819,7 @@
     <relay from="PLANT_ELECTRICAL" to="PWR_ELECTRICAL"/>
     <relay from="PWR_GEN_CMD" to="PLANT_GEN_CMD"/>
     <relay from="PWR_STATUS" to="EICAS_PWR_STATUS"/>
+    <relay from="PLANT_SENSORS" to="FSF_SENSORS"/>
   </relays>
 
   <!-- Payloads larger than one message use the block transfer format in README.md.

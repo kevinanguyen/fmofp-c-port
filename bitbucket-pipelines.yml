@@ -105,6 +105,8 @@ pipelines:
               - export FMOFP_SENSOR_TOOL=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_sensor_tool
               - export FMOFP_POWER=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_power
               - export FMOFP_POWER_TOOL=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_power_tool
+              - export FMOFP_SURFACES=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_surfaces
+              - export FMOFP_SURFACES_TOOL=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_surfaces_tool
               - export QT_QPA_PLATFORM=offscreen
               - python3 -m unittest discover -s fmofp_bus/tests -t . -v
               - cd ofp

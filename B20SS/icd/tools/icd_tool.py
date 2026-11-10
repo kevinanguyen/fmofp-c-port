@@ -49,7 +49,7 @@ MIN_SA, MAX_SA = 1, 29          # 0 and 31 are mode codes, 30 is data wraparound
 MAX_RT = 30                     # 31 is broadcast
 BROADCAST_RT = 31               # a message here is heard by every terminal that accepts its subaddress
 MAX_WORDS = 32
-MAX_RELAYS_PER_SOURCE = 4       # bc/schedule.hpp kMaxRelaysPerMessage
+MAX_RELAYS_PER_SOURCE = 6       # bc/schedule.hpp kMaxRelaysPerMessage (four until v1.21)
 BLOCK_SEGMENT_PAYLOAD_WORDS = 31  # a segment is 32 words, the first being version and index (README section 8)
 MAX_BLOCK_PAYLOAD_WORDS = 256 * BLOCK_SEGMENT_PAYLOAD_WORDS
 

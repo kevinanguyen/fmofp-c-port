@@ -165,3 +165,20 @@ target_link_libraries(fmofp_power PRIVATE ofp::power ofp::rt_process ofp::bc ofp
 
 add_executable(fmofp_power_tool power/tools/power_tool.cpp)
 target_link_libraries(fmofp_power_tool PRIVATE ofp::power ofp::warnings)
+
+# Flight surfaces, RT 21: FlightSurfaceService's ten control surfaces moved
+# toward their commands at their slew rates (the ailerons and elevators from the
+# sensed roll and pitch, the slats from the angle of attack, the flaps,
+# speedbrake, rudder and trim from FSF_CMD), plus fmofp_surfaces_tool for the
+# oracle tests.
+add_library(ofp_surfaces STATIC surfaces/src/flight_surfaces.cpp)
+add_library(ofp::surfaces ALIAS ofp_surfaces)
+add_dependencies(ofp_surfaces ofp_icd_generate)
+target_include_directories(ofp_surfaces PUBLIC surfaces/include)
+target_link_libraries(ofp_surfaces PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_surfaces surfaces/src/main.cpp)
+target_link_libraries(fmofp_surfaces PRIVATE ofp::surfaces ofp::rt_process ofp::bc ofp::warnings)
+
+add_executable(fmofp_surfaces_tool surfaces/tools/surfaces_tool.cpp)
+target_link_libraries(fmofp_surfaces_tool PRIVATE ofp::surfaces ofp::warnings)

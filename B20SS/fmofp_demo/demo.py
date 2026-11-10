@@ -7,7 +7,7 @@ It starts, in this order: the plant (the simulated aircraft with its weather,
 terrain, engines and RF environment, RT 27), the ported partitions (flight
 control RT 5, navigation RT 7, flight management RT 12, the radar computer RT 9,
 engine management RT 3, the mission computer RT 6, communications RT 2, defensive systems RT 22, sensor management RT 10,
-power management RT 8), the
+power management RT 8, the flight surfaces RT 21), the
 six display programs (the radar display RT 15, the PFD
 RT 11, the MFD RT 13, the EICAS RT 14, the TSD RT 16 and the SMS RT 17, each in its own window), and
 finally the bus
@@ -18,7 +18,7 @@ and heading from the FMS flight data, the ground collision avoidance state,
 the engines' N1 and the fuel, the radars' modes, the terrain clearance and the
 targeting tracks, the navigation fix, the mission's phase and route progress, the
 radio and satcom links, the countermeasures and the radar warning receiver, the sensors' health, the
-electrical system, and which terminals are answering.
+electrical system, the control surfaces, and which terminals are answering.
 
 Unless --no-events is given, a short scripted flight runs: the radars are
 switched on (the targeting and AEWC radars search, the SAR images the strip
@@ -30,8 +30,8 @@ and flown waypoint by waypoint, a target is designated, engaged and assessed, an
 enemy unit appears on the TSD, the radio is tuned and a satellite acquired, a SAM paints the radar
 warning receiver (two flares go out by themselves, and again every 3 s while it lasts), the jammer
 goes active and chaff is dispensed, the LIDAR is switched off and on again, the generator is switched off
-and back on (the EICAS shows GEN 1 and GEN 2 FAIL while the main battery discharges) and the emergency
-power comes on. Each event is
+and back on (the EICAS shows GEN 1 and GEN 2 FAIL while the main battery discharges), the flaps and the
+speedbrake go out and come back in, and the emergency power comes on. Each event is
 announced as it happens. The radar display window's own buttons keep working
 throughout: it is the radars' control panel.
 
@@ -48,7 +48,7 @@ from collections import namedtuple
 
 from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import (Affiliation, CommsCommand, DefensiveCommand, EcmMode, MissionCommand, MissionPhase,
-                                 PowerCommand, RadioMode, SensorCommand, SensorId,
+                                 PowerCommand, RadioMode, SensorCommand, SensorId, SurfaceCommand,
                                  RwrBand, TargetKind, ThreatType, UnitKind, WaypointType, Weapon, AewcMode, EngineCommand, EngineSelect, FmsFlightMode, FuelTank, LockStatus, SarMode,
                                  Ssm,
                                  TargetingMode, TerminalState, TfrMode, TrackFilter, WeatherMode)
@@ -66,7 +66,7 @@ PLANT_RT = m.PlantSensors.RT
 PARTITIONS = (("fcs", m.FcsStatus.RT), ("nav", m.NavSolution.RT), ("fms", m.FmsStatus.RT),
               ("radar", m.RdrWxStatus.RT), ("engine", m.EngStatus.RT), ("mission", m.MsnStatus.RT),
               ("comms", m.ComStatus.RT), ("defensive", m.DefStatus.RT), ("sensor", m.SnsStatus.RT),
-              ("power", m.PwrStatus.RT))
+              ("power", m.PwrStatus.RT), ("surfaces", m.FsfStatus.RT))
 # (fmofp_display argument, RT) of each display program.
 DISPLAYS = (("radar", m.DspRadarStatus.RT), ("pfd", m.DspPfdStatus.RT), ("mfd", m.DspMfdStatus.RT),
             ("eicas", m.DspEicasStatus.RT), ("tsd", m.DspTsdStatus.RT), ("sms", m.DspSmsStatus.RT))
@@ -74,7 +74,8 @@ NAMES = {PLANT_RT: "plant", m.FcsStatus.RT: "FCS", m.NavSolution.RT: "nav", m.Fm
          m.RdrWxStatus.RT: "radar", m.EngStatus.RT: "engine", m.DspRadarStatus.RT: "radar display",
          m.DspPfdStatus.RT: "PFD", m.DspMfdStatus.RT: "MFD", m.DspEicasStatus.RT: "EICAS",
          m.DspTsdStatus.RT: "TSD", m.DspSmsStatus.RT: "SMS", m.MsnStatus.RT: "mission",
-         m.ComStatus.RT: "comms", m.DefStatus.RT: "defensive", m.SnsStatus.RT: "sensors", m.PwrStatus.RT: "power"}
+         m.ComStatus.RT: "comms", m.DefStatus.RT: "defensive", m.SnsStatus.RT: "sensors", m.PwrStatus.RT: "power",
+         m.FsfStatus.RT: "surfaces"}
 
 Event = namedtuple("Event", "seconds what message")
 
@@ -153,8 +154,12 @@ def default_events():
         Event(38.0, "autothrottle disengaged", m.EngCmd(cmd_seq=202, command=EngineCommand.AUTOTHROTTLE_DISENGAGE)),
         Event(40.0, "engine 2 alone to 40 %: asymmetric thrust",
               m.EngCmd(cmd_seq=203, command=EngineCommand.SET_THRUST, engine=EngineSelect.ENGINE_2, thrust=40.0)),
+        Event(42.0, "flight surfaces: flaps to 15 deg (they travel at 5 deg/s: three seconds on the FSF line)",
+              m.FsfCmd(cmd_seq=201, command=SurfaceCommand.SET_FLAPS, value=15.0)),
         Event(45.0, "defensive: four chaff cartridges dispensed (the DEF line counts down)",
               m.DefCmd(cmd_seq=203, command=DefensiveCommand.DISPENSE_CHAFF, count=4)),
+        Event(47.0, "flight surfaces: speedbrake 50 % (30 deg, out within a second)",
+              m.FsfCmd(cmd_seq=202, command=SurfaceCommand.SET_SPEEDBRAKE, value=50.0)),
         Event(48.0, "sensors: LIDAR off (the EICAS SENSORS health goes DEGRADED; its points leave the fusion)",
               m.SnsCmd(cmd_seq=201, command=SensorCommand.DEACTIVATE, sensor=SensorId.LIDAR)),
         Event(50.0, "1000 kg from the Center tank to Main Left (it takes what fits)",
@@ -176,6 +181,10 @@ def default_events():
         Event(65.0, "SAR to SPOTLIGHT at 0.3 m: the lake abeam, a ship under way (a picture every 3 s)",
               m.RdrSarModeCmd(cmd_seq=202, requested_state=TerminalState.NORMAL, requested_mode=SarMode.SPOTLIGHT,
                               resolution=0.3)),
+        Event(68.0, "flight surfaces: flaps up",
+              m.FsfCmd(cmd_seq=203, command=SurfaceCommand.SET_FLAPS, value=0.0)),
+        Event(69.0, "flight surfaces: speedbrake in",
+              m.FsfCmd(cmd_seq=204, command=SurfaceCommand.SET_SPEEDBRAKE, value=0.0)),
         Event(70.0, "mission: target 1 assessed destroyed (it leaves the targets tab); phase EGRESS",
               m.MsnCmd(cmd_seq=211, command=MissionCommand.ASSESS_DAMAGE, id=1, destroyed=True)),
         Event(71.0, "mission: phase EGRESS", m.MsnCmd(cmd_seq=212, command=MissionCommand.ADVANCE_PHASE)),
@@ -478,6 +487,19 @@ class Dashboard:
                 text += " APU"
             if pwr.power_cmd_status.name not in ("NONE", "ACCEPTED"):
                 text += f" cmd {pwr.power_cmd_status.name}"
+            parts.append(text)
+        fsf = self.latest.get(m.FsfPositions)
+        if fsf is not None:
+            text = (f"FSF ail {fsf.aileron_l:+.1f}/{fsf.aileron_r:+.1f} el {fsf.elevator_l:+.1f} rud {fsf.rudder:+.1f} "
+                    f"flaps {fsf.flap_l:.0f} slats {fsf.slat_l:.0f} sb {fsf.speedbrake:.0f}")
+            status = self.latest.get(m.FsfStatus)
+            if status is not None:
+                if status.flap_cmd != fsf.flap_l:
+                    text += f" (flaps to {status.flap_cmd:.0f})"
+                if not status.sensors_valid:
+                    text += " NO SENSORS"
+                if status.surface_cmd_status.name not in ("NONE", "ACCEPTED"):
+                    text += f" cmd {status.surface_cmd_status.name}"
             parts.append(text)
         nav = self.latest.get(m.NavSolution)
         if nav is not None and nav.position_ssm == Ssm.NORMAL:

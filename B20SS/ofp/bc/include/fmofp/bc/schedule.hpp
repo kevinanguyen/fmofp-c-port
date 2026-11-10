@@ -29,8 +29,9 @@ constexpr std::uint32_t kUsPerWord = 20;
 constexpr std::uint32_t kUsPerMessageGap = 12;
 constexpr std::uint32_t kMinorFrameBudgetUs = 10 * 1000;
 
-// A producer may be relayed to this many consumers (icd_tool.py MAX_RELAYS_PER_SOURCE).
-constexpr std::size_t kMaxRelaysPerMessage = 4;
+// A producer may be relayed to this many consumers (icd_tool.py MAX_RELAYS_PER_SOURCE). Four until
+// ICD v1.21, when PLANT_SENSORS gained its fifth (FSF_SENSORS).
+constexpr std::size_t kMaxRelaysPerMessage = 6;
 
 // One consumer of a relayed transmit message: the terminal and subaddress
 // that receive the same words straight after the poll. The terminal may be

@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.19 (DRAFT, 2026-11-08). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.21 (DRAFT, 2026-11-10). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -27,7 +27,7 @@
 | 18 | `hud` | Head-up display | new | Interfaces/userInterface (HUDContainer) |  |
 | 19 | `hydraulics` | Hydraulics | new | Systems/hydraulics |  |
 | 20 | `airframe` | Airframe systems | new | Systems/airframeSystemManagement |  |
-| 21 | `flightsurfaces` | Flight surfaces | new | Systems/flightSurfaces |  |
+| 21 | `flightsurfaces` | Flight surfaces - the ten control surfaces and their motion | existing | Systems/flightSurfaces/flightSurfaceService.py | Ported in v1.21 (fmofp_surfaces). FlightSurfaceService's ten surfaces (two ailerons, two elevators, the rudder, two flaps, two slats, the speedbrake), each moved toward its command at its slew rate within its limits every minor frame (the Python's 50 Hz loop), under the service's own commands: the ailerons and elevators follow the sensed roll and pitch and the slats the angle of attack (_sync_from_fcc, which read the flight control computer's data dictionary, the sensed flight state the plant publishes: PLANT_SENSORS relayed as FSF_SENSORS), and the flaps, speedbrake, rudder and trim follow FSF_CMD (set_flaps, set_speedbrake, set_rudder, set_trim). FSF_POSITIONS carries the measured positions, FSF_STATUS the flap detent, the trim and the health. It does not follow the flight control computer's FCS_SURFACE_CMD, which the Python's service never read either (README section 2) |
 | 22 | `defensive` | Defensive systems - RWR, chaff, flare, ECM | new | Systems/defensiveSys/defensiveService.py | Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17) |
 | 23 | `flightdatamonitoring` | Flight data monitoring | new | Systems/flightDataMonitoring |  |
 | 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD) |
@@ -130,6 +130,11 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`DSP_SMS_STATUS`](#dsp_sms_status) | 17 | 16 | T | 2 | 1 | Stores management display status | DRAFT |
 | [`DSP_HUD_MODE_CMD`](#dsp_hud_mode_cmd) | 18 | 17 | R | 1 | aperiodic | Head-up display mode command | DRAFT |
 | [`DSP_HUD_STATUS`](#dsp_hud_status) | 18 | 17 | T | 2 | 1 | Head-up display status | DRAFT |
+| [`FSF_MODE_CMD`](#fsf_mode_cmd) | 21 | 10 | R | 1 | aperiodic | Flight surfaces mode command | DRAFT |
+| [`FSF_STATUS`](#fsf_status) | 21 | 10 | T | 6 | 5 | Flight surfaces status | DRAFT |
+| [`FSF_SENSORS`](#fsf_sensors) | 21 | 11 | R | 11 | 50 | Sensed flight state, for the flight surfaces | DRAFT |
+| [`FSF_CMD`](#fsf_cmd) | 21 | 12 | R | 2 | aperiodic | Flight surfaces command | DRAFT |
+| [`FSF_POSITIONS`](#fsf_positions) | 21 | 13 | T | 12 | 10 | Control surface positions, measured | DRAFT |
 | [`DEF_MODE_CMD`](#def_mode_cmd) | 22 | 10 | R | 1 | aperiodic | Defensive systems mode command | DRAFT |
 | [`DEF_STATUS`](#def_status) | 22 | 10 | T | 6 | 5 | Defensive systems status | DRAFT |
 | [`DEF_ESM`](#def_esm) | 22 | 11 | R | 26 | 5 | ESM signal intercepts, from the plant | DRAFT |
@@ -254,6 +259,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`PLANT_ELECTRICAL`](#plant_electrical) | [`PWR_ELECTRICAL`](#pwr_electrical) | 7 | 1 |
 | [`PWR_GEN_CMD`](#pwr_gen_cmd) | [`PLANT_GEN_CMD`](#plant_gen_cmd) | 2 | 5 |
 | [`PWR_STATUS`](#pwr_status) | [`EICAS_PWR_STATUS`](#eicas_pwr_status) | 16 | 5 |
+| [`PLANT_SENSORS`](#plant_sensors) | [`FSF_SENSORS`](#fsf_sensors) | 11 | 50 |
 
 ## Mode codes
 
@@ -1009,6 +1015,28 @@ What PWR_CMD asks of the power management terminal: PowerManagementSystem.set_ge
 | 11 | HVAC_POWER_OFF |  |  |
 | 12 | DISSIPATION_ON |  |  |
 | 13 | DISSIPATION_OFF |  |  |
+
+### `surface_command` (4 bits)
+
+What FSF_CMD asks of the flight surfaces terminal: FlightSurfaceService.set_flaps, set_speedbrake, set_rudder and set_trim, the manual controls nothing in the Python called
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | SET_FLAPS |  |  |
+| 2 | SET_SPEEDBRAKE |  |  |
+| 3 | SET_RUDDER |  |  |
+| 4 | SET_TRIM |  |  |
+
+### `trim_axis` (2 bits)
+
+FlightSurfaceService.set_trim's axis: the keys of its trim dictionary
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | PITCH |  |  |
+| 1 | ROLL |  |  |
+| 2 | YAW |  |  |
 
 ## Messages
 
@@ -2897,6 +2925,92 @@ Same layout as [`PWR_STATUS`](#pwr_status).
 PWR_GEN_CMD relayed to the plant: the generator held at the commanded output while override is 1.
 
 Same layout as [`PWR_GEN_CMD`](#pwr_gen_cmd).
+
+### FSF_STATUS
+
+**Flight surfaces status** — RT 21 · SA 10 · transmit (terminal to bus) · 6 words · 5 Hz
+
+The terminal's state and command handling as the other subsystems report them, plus what FlightSurfaceService.get_data() returned beside the positions: the commanded flap detent (set_flaps's nearest of 0, 5, 15 and 30 degrees), the three trim values (set_trim, clamped to +-10 degrees; no surface follows them: the Python kept them in a dictionary nothing read) and healthy (every surface healthy, a flag the Python never cleared). sensors_valid is 1 while the sensed flight state (FSF_SENSORS) arrives: 0 before the first and when it stops (3 frames), when the surfaces keep moving toward their last commands, as the Python's loop kept stepping on the flight control computer's last data. The positions are FSF_POSITIONS.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last FSF_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last FSF_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13-12 | `spare_1` | spare |  |  |
+| 1 | 11-8 | `surface_cmd_status` | enum | enum `cmd_status` | Outcome of the last FSF_CMD |
+| 1 | 7 | `sensors_valid` | bool |  | 1 = FSF_SENSORS with its roll, pitch and angle of attack NORMAL arrived within the last 3 frames |
+| 1 | 6 | `slats_extended` | bool |  | 1 = the slats are commanded out: the sensed angle of attack was above 8 degrees at the last sync |
+| 1 | 5-1 | `spare_2` | spare |  |  |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0): every surface healthy and the self test passed |
+| 2 | 15-0 | `flap_cmd` | uint | LSB 1 deg, range 0 to 30 | FlightSurfaceService._flap_cmd: the detent set_flaps chose, 0 / 5 / 15 / 30 |
+| 3 | 15-0 | `trim_pitch` | sint | LSB 1/100 deg, range -10 to 10 | set_trim('pitch', deg), clamped to +-10 |
+| 4 | 15-0 | `trim_roll` | sint | LSB 1/100 deg, range -10 to 10 | set_trim('roll', deg) |
+| 5 | 15-0 | `trim_yaw` | sint | LSB 1/100 deg, range -10 to 10 | set_trim('yaw', deg) |
+
+### FSF_MODE_CMD
+
+**Flight surfaces mode command** — RT 21 · SA 10 · receive (bus to terminal) · 1 words · aperiodic
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### FSF_SENSORS
+
+**Sensed flight state, for the flight surfaces** — RT 21 · SA 11 · receive (bus to terminal) · 11 words · 50 Hz
+
+PLANT_SENSORS relayed to the flight surfaces terminal: the roll, pitch and angle of attack FlightSurfaceService._sync_from_fcc read from the flight control computer's data dictionary (the sensed flight state, which the plant publishes since v1.1). Each frame with a fresh copy whose roll, pitch and angle of attack are NORMAL: aileron command = clamp(-0.5 x roll, +-25), the left aileron commanded to its negative and the right to it; elevator command = clamp(-0.8 x pitch, +-30) for both; the slats to 20 degrees while the angle of attack is above 8, else to 0. The rudder, flaps and speedbrake take their commands from FSF_CMD alone.
+
+Same layout as [`PLANT_SENSORS`](#plant_sensors).
+
+### FSF_CMD
+
+**Flight surfaces command** — RT 21 · SA 12 · receive (bus to terminal) · 2 words · aperiodic
+
+FlightSurfaceService's manual controls, which nothing in the Python called (README section 2). SET_FLAPS: set_flaps(value degrees), the nearest detent of 0, 5, 15 and 30 (a tie goes to the lower, as min() over the tuple had it); SET_SPEEDBRAKE: set_speedbrake(value percent), the speedbrake commanded to clamp(0.6 x value, 0, 60) degrees; SET_RUDDER: set_rudder(value degrees), clamped to +-30; SET_TRIM: set_trim(axis, value degrees), clamped to +-10. The outcome is FSF_STATUS.surface_cmd_status (REJECTED_INVALID for NONE); the surfaces then move at their slew rates (ailerons 60, elevators 50, rudder 40, speedbrake 30, flaps and slats 5 degrees a second).
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `surface_command` |  |
+| 0 | 11-10 | `axis` | enum | enum `trim_axis` | SET_TRIM: which trim |
+| 0 | 9-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+| 1 | 15-0 | `value` | sint | LSB 1/100, range -327.68 to 327.67 | SET_FLAPS: degrees; SET_SPEEDBRAKE: percent; SET_RUDDER and SET_TRIM: degrees; ignored otherwise |
+
+### FSF_POSITIONS
+
+**Control surface positions, measured** — RT 21 · SA 13 · transmit (terminal to bus) · 12 words · 10 Hz
+
+FlightSurfaceService.get_data()['surfaces']: where each of the ten surfaces is, in degrees (positive = trailing edge down, or right for the rudder; the Python rounded them to two decimals, the lsb here). Every minor frame each surface moves toward its command by at most its slew rate x 0.02 s and stays within its limits (ailerons +-25, elevators and rudder +-30, flaps 0-30, slats 0-20, speedbrake 0-60). The SSMs are NORMAL from the terminal's start: the surfaces start at neutral and are known, as the Python's were.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-14 | `aileron_l_ssm` | ssm | validity of `aileron_l` |  |
+| 0 | 13-12 | `aileron_r_ssm` | ssm | validity of `aileron_r` |  |
+| 0 | 11-10 | `elevator_l_ssm` | ssm | validity of `elevator_l` |  |
+| 0 | 9-8 | `elevator_r_ssm` | ssm | validity of `elevator_r` |  |
+| 0 | 7-6 | `rudder_ssm` | ssm | validity of `rudder` |  |
+| 0 | 5-4 | `flap_l_ssm` | ssm | validity of `flap_l` |  |
+| 0 | 3-2 | `flap_r_ssm` | ssm | validity of `flap_r` |  |
+| 0 | 1-0 | `slat_l_ssm` | ssm | validity of `slat_l` |  |
+| 1 | 15-14 | `slat_r_ssm` | ssm | validity of `slat_r` |  |
+| 1 | 13-12 | `speedbrake_ssm` | ssm | validity of `speedbrake` |  |
+| 1 | 11-0 | `spare_1` | spare |  |  |
+| 2 | 15-0 | `aileron_l` | sint | LSB 1/100 deg, range -25 to 25 | Surface('aileron_l', rate 60 deg/s, limits +-25): minus the aileron command |
+| 3 | 15-0 | `aileron_r` | sint | LSB 1/100 deg, range -25 to 25 | Surface('aileron_r', rate 60, +-25): the aileron command, clamp(-0.5 x roll, +-25) |
+| 4 | 15-0 | `elevator_l` | sint | LSB 1/100 deg, range -30 to 30 | Surface('elevator_l', rate 50, +-30): clamp(-0.8 x pitch, +-30) |
+| 5 | 15-0 | `elevator_r` | sint | LSB 1/100 deg, range -30 to 30 | Surface('elevator_r', rate 50, +-30): the same command |
+| 6 | 15-0 | `rudder` | sint | LSB 1/100 deg, range -30 to 30 | Surface('rudder', rate 40, +-30): set_rudder's command; the sync never touches it |
+| 7 | 15-0 | `flap_l` | uint | LSB 1/100 deg, range 0 to 30 | Surface('flap_l', rate 5, 0-30): the flap detent |
+| 8 | 15-0 | `flap_r` | uint | LSB 1/100 deg, range 0 to 30 | Surface('flap_r', rate 5, 0-30): the flap detent |
+| 9 | 15-0 | `slat_l` | uint | LSB 1/100 deg, range 0 to 20 | Surface('slat_l', rate 5, 0-20): 20 while the angle of attack is above 8 degrees, else 0 |
+| 10 | 15-0 | `slat_r` | uint | LSB 1/100 deg, range 0 to 20 | Surface('slat_r', rate 5, 0-20): the same command |
+| 11 | 15-0 | `speedbrake` | uint | LSB 1/100 deg, range 0 to 60 | Surface('speedbrake', rate 30, 0-60): 0.6 x the commanded percent |
 
 ## Block payloads
 

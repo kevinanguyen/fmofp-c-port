@@ -98,24 +98,25 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone: `a63556e` unit 16 power management, ICD v1.19 (2026-11-08;
-  CI run 42507980864 all ten jobs green). Before it: `c4057ed` (unit
+  `git log -1`. Last milestone: unit 19 flight surfaces, ICD v1.21 (2026-11-10, section 7; its CI
+  run is to be recorded). Before it: `a63556e` unit 16 power management, ICD v1.19 (2026-11-08;
+  CI run 42507980864 all ten jobs green), `c4057ed` (unit
   15 sensor management, ICD v1.18; CI run 42439181347 all ten jobs green), `d718e09` (unit 18
   defensive systems, ICD v1.17; CI run 42435137866: eight green, `linux-gcc` red on one
   unanswered poll in the display e2e on the slow runner, the same code green on the next run,
   the Linux 3.13 Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename
   and Alee), `8d67afd` (this file and `B20SS/verify.sh`), `d82173f` (merge of upstream/main
   `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.19 (`B20SS/icd/fmofp_icd.xml`): 26 terminals, 121 message definitions
-  (167 after per-terminal expansion), 42 message relays (15 broadcast), 24 block streams
+- **ICD** v1.21 (`B20SS/icd/fmofp_icd.xml`; v1.20 is unit 17's, on Alee's branch): 26 terminals,
+  126 message definitions (172 after per-terminal expansion), 43 message relays (15 broadcast), 24 block streams
   (12 layouts, 12 relayed copies), 9 mode codes, 89/89 legacy types mapped.
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
-  systems (RT 22), sensor management (RT 10), power management (RT 8); the bus controller
-  `fmofp_bc`; tools `fmofp_nav_tool`, `fmofp_radar_tool`, `fmofp_engine_tool`,
-  `fmofp_mission_tool`, `fmofp_defensive_tool`, `fmofp_sensor_tool`, `fmofp_power_tool`
-  (stdin oracles for the Python tests).
+  systems (RT 22), sensor management (RT 10), power management (RT 8), flight surfaces
+  (RT 21); the bus controller `fmofp_bc`; tools `fmofp_nav_tool`, `fmofp_radar_tool`,
+  `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool`, `fmofp_sensor_tool`,
+  `fmofp_power_tool`, `fmofp_surfaces_tool` (stdin oracles for the Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
   random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
   ground scene, the RF environment, the ESM intercepts, the sensor scans, the electrical
@@ -123,15 +124,16 @@ person may continue it in their next session; when it is green it is rebased ont
   (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display class fed from the bus through
   `fmofp_display/*_feed.py`; the one-command demo `py -m fmofp_demo`; the bus library
   `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: 17 terminals, 90 scheduled messages, worst minor frame 8128 us of the 10000 us
-  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns, 17/17 terminals
+- **Load**: 18 terminals, 93 scheduled messages, worst minor frame 8348 us of the 10000 us
+  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns, 18/18 terminals
   answering.
-- **Tests**: Python 217 OK (`fmofp_bus/tests`, about 42 s on Windows); C++ ctest 2/2
+- **Tests**: Python 221 OK (`fmofp_bus/tests`, about 47 s on Windows); C++ ctest 2/2
   (hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
   workflows/ci.yml` job `cpp`, linux-gcc + linux-asan, and Alee's eight Python legs).
-- **Meter**: 23 of 29.5 units = **78 %** (section 2). Pace measured over the log: about
-  5 units per full working day, so about a day and a half more to 100 % (6.5 units open); the
-  intern-ticket authoring phase comes after and is not in the number.
+- **Meter**: 23.5 of 29.5 units = **80 %** (section 2). Pace measured over the log: about
+  5 units per full working day, so a little over a day more to 100 % (6 units open, one of them
+  Alee's unit 17 in progress); the intern-ticket authoring phase comes after and is not in the
+  number.
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
@@ -142,9 +144,15 @@ person may continue it in their next session; when it is green it is rebased ont
   partition and tool, the oracle and e2e tests. Not done: the display tests, the full Python
   suite and the headless demo since the wiring, the ICD and ofp READMEs, this file. Next step for
   whoever continues it: rebase on `port/cpp`, finish those, `verify.sh` green, one commit on
-  `port/cpp`, delete the branch. Last session: Kevin's, 2026-11-10 (this record). Kevin's next
-  unit: 19 flight surfaces or 20 utilities (not 17), then 28, 29 last, 30; a unit landing on
-  `port/cpp` while unit 17 is open takes ICD v1.21 (v1.20 is unit 17's; section 8).
+  `port/cpp`, delete the branch. Unit 19 landed on `port/cpp` as ICD v1.21 while unit 17 (v1.20)
+  is open (section 8): unit 17's rebase will conflict where both units appended at the same
+  anchors (the ICD's enums, messages and relays tails and version line, the generated
+  `fmofp_bus/icd/*` and `ICD_TABLES.md`, the counts in `test_messages.py` and
+  `icd_messages_test.cpp`, `verify.sh`, both CI files, `_support.py`, the demo's PARTITIONS and
+  NAMES, the display e2e's and demo test's lists, both CMake lists, the ICD README's tables):
+  keep both additions, regenerate, and the counts become 131 messages, 44 relays, 19 terminals.
+  Last session: Kevin's, 2026-11-10 (unit 19). Kevin's next unit: 20 utilities (ICD v1.22),
+  then 28, 29 last, 30.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866 and the Windows 3.13 leg of 42729856922); the two `cpp` jobs are the ones
@@ -186,7 +194,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 16 | Power management (RT 8) | 0.75 | DONE 2026-11-08 |
 | 17 | Avionics: LRU health + BIT + fitness + SW configuration (RT 1) | 1 | IN PROGRESS (Alee, 2026-11-09) |
 | 18 | Defensive systems (RT 22) | 0.5 | DONE 2026-11-07 |
-| 19 | Flight surfaces (RT 21) | 0.5 | IN PROGRESS (Kevin, 2026-11-10) |
+| 19 | Flight surfaces (RT 21) | 0.5 | DONE 2026-11-10 |
 | 20 | Small utilities: ECS (RT 4), hydraulics (RT 19), airframe (RT 20), flight data monitoring (RT 23) | 1 | open |
 | 21 | Radar display + PFD on the bus | 1.5 | DONE 2026-10-25 |
 | 22 | MFD on the bus | 1 | DONE 2026-10-25 |
@@ -199,7 +207,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | open |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | open |
 
-**Done: 23 / 29.5 = 78 %.** Open: 6.5 units.
+**Done: 23.5 / 29.5 = 80 %.** Open: 6 units.
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -282,21 +290,13 @@ oracle records the Python's behaviour. The scenario engine's threat injection is
 
 ### 2.19 Flight surfaces (RT 21), 0.5
 
-- **Python to read in full**: `Systems/flightSurfaces/flightSurfaceService.py` (292; a
-  50 Hz loop; `Surface.step(dt)` moves each surface toward its command at a rate limit;
-  `_sync_from_fcc()` takes the commanded positions from the flight control computer (on the
-  bus that is `FCS_SURFACE_STATUS`); `set_flaps(detent)`, `set_speedbrake(pct)`,
-  `set_rudder(deg)`, `set_trim(axis, deg)`; `_persist` to SQLite; `get_data()` the positions;
-  `health_report`). `fsConfig.xml` is three lines.
-- **Consumers today**: none draws it. The natural consumer is the FCS itself: today
-  `FCS_SURFACE_STATUS` reports commands, never measured positions.
-- **Shape of the port**: RT 21 receives `FCS_SURFACE_STATUS` by relay, moves the surfaces at
-  the Python's rates (50 Hz = every minor frame), publishes `FSF_POSITIONS` (measured
-  positions with SSMs) relayed to the FCS, which reports them beside its commands (one new
-  field group, or a second message; keep `FCS_SURFACE_STATUS` compatible), and takes
-  `FSF_CMD` for flaps, speedbrake, rudder and trim. Smallest unit after the HUD: keep it so.
-- **Tests**: oracle = `Surface.step`; a C++ test for the rate limit; e2e: command a surface
-  through `FCS_SURFACE_CMD` and watch the position arrive over a few frames.
+DONE 2026-11-10 (section 7, ICD v1.21). The plan that stood here assumed the Python service followed
+the flight control computer's commanded deflections; it follows the sensed roll, pitch and angle of
+attack (the FCC's data dictionary, which is `PLANT_SENSORS` on the bus) and nothing read its positions,
+so the port takes `PLANT_SENSORS` by relay (`FSF_SENSORS`, the producer's fifth: the relay limit went to
+six), publishes `FSF_POSITIONS` with no consumer (the monitor, the dashboard, the recorder to come) and
+leaves `FCS_SURFACE_STATUS` alone; closing the loop is backlog (ICD README section 12). `FSF_CMD` carries
+`set_flaps`, `set_speedbrake`, `set_rudder` and `set_trim`.
 
 ### 2.20 Small utilities, 1 (ECS RT 4, hydraulics RT 19, airframe RT 20, flight data monitoring RT 23)
 
@@ -612,7 +612,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (217 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (221 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -708,6 +708,14 @@ Python tests and displays
   readings at zero, not two); window the assertions on the trough, not on a count of steps.
 - An `epoch` field that starts at 0 cannot say "no reading": `PLANT_ELECTRICAL`'s cycles 1-255
   and 0 is the plant without the model, which the terminal ignores.
+- A producer may be relayed to six consumers (`MAX_RELAYS_PER_SOURCE` in `icd_tool.py` = `kMaxRelaysPerMessage`
+  in `bc/schedule.hpp`; four until v1.21): `PLANT_SENSORS` has five. Past six, make the stream a broadcast.
+- An oracle tool's `status` command must print live accessors when the oracle drives a loop's halves: the status
+  message is filled by the frame (`step()`), not by the halves (cost one failed run in unit 19).
+- Demo events go into `default_events()` in time order (a test checks): insert after the earlier event, not
+  before the later one.
+- Sign conventions bite: FlightSurfaceService puts the LEFT aileron at minus the aileron command, so a right
+  roll (positive) gives it the positive command.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -1133,6 +1141,43 @@ done before this file existed are condensed from the private session notes.
   `test_weather_radar_live` only; both `cpp` jobs green, so the ten-second demo test held on the runner.
 - *Numbers*: meter unchanged, 23 / 29.5 = 78 %.
 
+### 2026-11-10 - unit 19 flight surfaces (RT 21) - ICD v1.21 - by Kevin's agent
+- *What*: `ofp/partitions/surfaces` (`FlightSurfaces`: FlightSurfaceService's ten surfaces, each a `Surface`
+  moved toward its command by at most its slew rate x 0.02 s a frame within its limits; the loop's sync from
+  the sensed roll, pitch and angle of attack (aileron = clamp(-0.5 roll, +-25) with the left aileron at minus
+  it, elevator = clamp(-0.8 pitch, +-30), the slats out above 8 degrees of AoA) and the manual controls
+  set_flaps (the 0/5/15/30 detents, ties to the lower), set_speedbrake (0.6 deg per %, 0-60), set_rudder (+-30),
+  set_trim (+-10, bookkeeping); `fmofp_surfaces_tool`). Nothing moved to the plant: the service invented
+  nothing, it read the flight control computer's data dictionary, which is PLANT_SENSORS on the bus. ICD v1.21
+  (v1.20 is Alee's unit 17 on its branch): `FSF_STATUS` (5 Hz), `FSF_MODE_CMD`, `FSF_SENSORS` (PLANT_SENSORS'
+  fifth relay), `FSF_CMD`, `FSF_POSITIONS` (10 Hz, no consumer: the monitor and the dashboard read it); enums
+  `surface_command`, `trim_axis`; the per-producer relay limit 4 -> 6 (`icd_tool.py MAX_RELAYS_PER_SOURCE`,
+  `bc/schedule.hpp kMaxRelaysPerMessage`). Demo `FSF` line and four events (flaps 15 at 42 s, speedbrake 50 %
+  at 47 s, flaps up at 68 s, speedbrake in at 69 s). No display reads the surfaces: no feed change.
+- *How*: `test_surfaces_oracle.py` runs the frozen `FlightSurfaceService` (its flight control computer a stand-in
+  answering the staged roll, pitch and AoA, its database a mock) beside the tool pass for pass to 12 places (the
+  same arithmetic in the same order), with the controls and their clamps, plus a quirk test; `test_surfaces_e2e.py`
+  (port base 52500) runs the plant with roll 20 / pitch 5 / AoA 10 held and the partition under the real
+  controller with flaps, speedbrake, rudder and trim commanded; display e2e, demo and message tests extended;
+  12 gtests.
+- *Warnings / lessons*: the section 2.19 plan assumed the service followed the FCS's commanded deflections
+  (`FCS_SURFACE_STATUS`); it follows the sensed attitude, and the FCC's surface commands move nothing, in the
+  Python as on the bus (ICD README section 2; closing the loop is backlog). The sign convention cost one failed
+  oracle run: a right roll (positive) gives the LEFT aileron the positive command. An oracle tool's `status` line
+  must read live state when the oracle drives the loop's halves (`fill_outputs` runs in the frame, not in the
+  halves). Demo events must be inserted in time order (a test checks; one failed run). PLANT_SENSORS had four
+  relays, the limit: FSF_SENSORS is the fifth, so the limit is six now; a broadcast would save about 1 ms a frame
+  (README section 12). Alee's `wip/unit17-avionics` touches the same wiring anchors (the counts, the RT lists,
+  `verify.sh`, both CI files, the demo tables, the ICD tails): his rebase will conflict there; keep both
+  additions and regenerate (131 messages, 44 relays, 19 terminals).
+- *Files*: `ofp/partitions/surfaces/{include/fmofp/surfaces/flight_surfaces.hpp, src/flight_surfaces.cpp,
+  src/main.cpp, tools/surfaces_tool.cpp}`, `ofp/tests/flight_surfaces_test.cpp`,
+  `ofp/bc/include/fmofp/bc/schedule.hpp`, `icd/tools/icd_tool.py`, `icd/fmofp_icd.xml` + README + generated
+  files, `fmofp_demo/demo.py`, `ofp/README.md`, `verify.sh`, both CI files, `_support.py`, the tests.
+- *Tests and numbers*: Python 221 OK (was 217), ctest 2/2 (284 gtests, was 272), cppcheck clean; load 93
+  messages for 18 terminals, worst minor frame 8348 us (was 8128 for 17); headless demo 30 s: 1500 frames,
+  0 overruns, 18/18 answering; meter 23.5 / 29.5 = 80 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1190,3 +1235,9 @@ done before this file existed are condensed from the private session notes.
   even if it lands first (the README's section 1 paragraph and revision row for v1.20 are then
   inserted in order when unit 17 lands). The message, relay and block counts are still whoever
   pushes second's to fix.
+- 2026-11-10, Kevin ("ok go unit 19") and his agent: unit 19 departs from the section 2.19 sketch where the
+  Python did: the service follows the sensed roll, pitch and angle of attack (PLANT_SENSORS by relay,
+  `FSF_SENSORS`), not the FCS's commanded deflections, and no measured position goes back to the FCS (no
+  consumer in the Python or the displays); closing that loop is backlog (ICD README section 12). A producer may
+  now be relayed to six consumers (four until v1.21). The trim stays bookkeeping, the 50 Hz SQLite persist is
+  dropped. Recorded in the ICD README section 2.

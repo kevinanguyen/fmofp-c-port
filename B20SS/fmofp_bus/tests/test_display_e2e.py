@@ -13,7 +13,7 @@ accepts the subaddresses it draws (ICD v1.7, v1.8). The feeds then make of it
 what the Qt windows would draw.
 
 Needs FMOFP_BC, FMOFP_FCS, FMOFP_NAV, FMOFP_FMS, FMOFP_RADAR, FMOFP_ENGINE, FMOFP_MISSION, FMOFP_COMMS,
-FMOFP_DEFENSIVE, FMOFP_SENSOR and FMOFP_POWER (CI sets them).
+FMOFP_DEFENSIVE, FMOFP_SENSOR, FMOFP_POWER and FMOFP_SURFACES (CI sets them).
 """
 
 import math
@@ -44,7 +44,7 @@ PORT_BASE = 61000
 FRAMES = 420  # the SAR's first picture: a fix, 150 frames of integration, 134 frames of segments
 SYNC_MODE_CODE = 17
 BINARIES = ("FMOFP_FCS", "FMOFP_NAV", "FMOFP_FMS", "FMOFP_RADAR", "FMOFP_ENGINE", "FMOFP_MISSION", "FMOFP_COMMS",
-            "FMOFP_DEFENSIVE", "FMOFP_SENSOR", "FMOFP_POWER")
+            "FMOFP_DEFENSIVE", "FMOFP_SENSOR", "FMOFP_POWER", "FMOFP_SURFACES")
 
 
 class PlantThread(threading.Thread):
@@ -125,7 +125,8 @@ class DisplaysEndToEndTest(unittest.TestCase):
         terminals = ["27", str(m.FcsStatus.RT), str(m.NavSolution.RT), str(m.FmsStatus.RT), str(m.RdrWxStatus.RT),
                      str(m.EngStatus.RT), str(m.DspPfdStatus.RT), str(m.DspRadarStatus.RT), str(m.DspMfdStatus.RT),
                      str(m.DspEicasStatus.RT), str(m.DspTsdStatus.RT), str(m.DspSmsStatus.RT), str(m.MsnStatus.RT),
-                     str(m.ComStatus.RT), str(m.DefStatus.RT), str(m.SnsStatus.RT), str(m.PwrStatus.RT)]
+                     str(m.ComStatus.RT), str(m.DefStatus.RT), str(m.SnsStatus.RT), str(m.PwrStatus.RT),
+                     str(m.FsfStatus.RT)]
         args = [os.environ["FMOFP_BC"]]
         for rt in terminals:
             args += ["--rt", rt]

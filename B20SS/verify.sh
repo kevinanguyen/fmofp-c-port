@@ -77,7 +77,7 @@ export_binaries() {
     # Python's subprocess wants native paths on Windows (K:/..., not /k/...).
     WB="$(cygpath -m "$BUILD" 2>/dev/null || echo "$BUILD")"
     export FMOFP_BC="$WB/bc/fmofp_bc$exe"
-    for p in fcs nav nav_tool fms radar radar_tool engine engine_tool mission mission_tool comms defensive defensive_tool sensor sensor_tool power power_tool; do
+    for p in fcs nav nav_tool fms radar radar_tool engine engine_tool mission mission_tool comms defensive defensive_tool sensor sensor_tool power power_tool surfaces surfaces_tool; do
         export "FMOFP_$(echo "$p" | tr '[:lower:]' '[:upper:]')=$WB/partitions/fmofp_$p$exe"
     done
 }
@@ -92,9 +92,9 @@ step_py() {
 
 step_load() {
     export_binaries
-    say "bus load, seventeen terminals"
+    say "bus load, eighteen terminals"
     "$FMOFP_BC" --schedule --rt 27 --rt 5 --rt 7 --rt 12 --rt 9 --rt 3 --rt 6 --rt 2 \
-        --rt 11 --rt 13 --rt 14 --rt 15 --rt 16 --rt 17 --rt 22 --rt 10 --rt 8 2>&1 | grep -i 'scheduled messages\|budget\|refus\|error' | tail -n 4
+        --rt 11 --rt 13 --rt 14 --rt 15 --rt 16 --rt 17 --rt 22 --rt 10 --rt 8 --rt 21 2>&1 | grep -i 'scheduled messages\|budget\|refus\|error' | tail -n 4
     [ "${PIPESTATUS[0]}" -eq 0 ] || fail "bus load (the schedule does not fit the 10 ms budget)"
 }
 
