@@ -41,9 +41,10 @@ class ScriptedFlightTest(unittest.TestCase):
     def test_the_binaries_are_named_per_partition(self):
         paths = binaries(os.path.join("build", "x"))
         self.assertEqual({"bc", "fcs", "nav", "fms", "radar", "engine", "mission", "comms", "defensive", "sensor",
-                          "power", "surfaces", "ecs", "hydraulics", "airframe", "fdm"}, set(paths))
+                          "power", "surfaces", "ecs", "hydraulics", "airframe", "fdm", "avionics"},
+                         set(paths))
         self.assertEqual(len(paths), len(missing_binaries(paths)), "a build directory that does not exist")
-        self.assertEqual([5, 7, 12, 9, 3, 6, 2, 22, 10, 8, 21, 4, 19, 20, 23], [rt for _, rt in PARTITIONS])
+        self.assertEqual([5, 7, 12, 9, 3, 6, 2, 22, 10, 8, 21, 4, 19, 20, 23, 1], [rt for _, rt in PARTITIONS])
         self.assertEqual([15, 11, 13, 14, 16, 17], [rt for _, rt in DISPLAYS])
         self.assertEqual(27, PLANT_RT)
 
@@ -99,7 +100,7 @@ class DemoRunTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, output)
         self.assertIn(">> t=2 s: weather radar on", output)
         self.assertIn(">> t=3 s: terrain-following radar on", output)
-        self.assertIn("22/22 answering", output)
+        self.assertIn("23/23 answering", output)
         self.assertIn("DEF chaff 60 flares 30 ECM STANDBY rwr", output)
         self.assertIn("SNS NOMINAL", output)
         self.assertIn("PWR gen ", output)
@@ -107,6 +108,7 @@ class DemoRunTest(unittest.TestCase):
         self.assertIn("HYD ", output)
         self.assertIn("gear RETRACTED", output)
         self.assertIn("FDR ", output)
+        self.assertIn("AVN ", output)
         self.assertIn(">> t=1 s: mission: route loaded", output)
         self.assertIn("MSN INGRESS wp 1/3", output)  # three waypoints loaded in the first two seconds
         self.assertIn("COM 243.000", output)

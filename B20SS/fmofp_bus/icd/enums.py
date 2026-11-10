@@ -632,6 +632,48 @@ class FdmCommand(enum.IntEnum):
     EJECT_STORAGE = 1
 
 
+class LruHealth(enum.IntEnum):
+    """LRUstatus.HealthState: the health of one line replaceable unit as LRUStatusMonitor derives it. UNKNOWN is the state before the first poll and after a forced fault is cleared"""
+    UNKNOWN = 0
+    NOMINAL = 1
+    DEGRADED = 2
+    FAULT = 3
+    OFFLINE = 4
+
+
+class BitStatus(enum.IntEnum):
+    """builtInTesting.BITStatus: the outcome of one built-in test probe. PENDING is also 'no result yet'"""
+    PENDING = 0
+    PASS = 1
+    FAIL = 2
+    ABORT = 3  # The test could not run: the avionics computer has no current picture of the bus
+
+
+class FitnessStatus(enum.IntEnum):
+    """FlightManagementFitness.check_thresholds' status string"""
+    OK = 0
+    WARNING = 1
+    CRITICAL = 2
+
+
+class FitnessComponent(enum.IntEnum):
+    """The three components of fmfConfig.xml, in its order"""
+    FLIGHT_CONTROL_FITNESS = 0
+    NAVIGATION_FITNESS = 1
+    AVIONICS_FITNESS = 2
+
+
+class AvionicsCommand(enum.IntEnum):
+    """What AVN_CMD asks of the avionics terminal: InitiatedBIT.run_all (the full built-in test suite on demand), LRUStatusMonitor.force_fault and clear_forced_fault (the scenario engine's failure injection), SoftwareConfigManager.perform_update and FlightManagementFitness.handle_redundancy (neither of which the Python ever called, README section 2)"""
+    NONE = 0
+    RUN_INITIATED_BIT = 1
+    FORCE_FAULT = 2
+    CLEAR_FAULT = 3
+    CLEAR_ALL_FAULTS = 4
+    APPLY_DATA_LOAD = 5
+    HANDLE_REDUNDANCY = 6
+
+
 def is_valid(enum_cls, value):
     """True if `value` is one of the enumerators the ICD defines for enum_cls."""
     try:

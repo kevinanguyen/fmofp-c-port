@@ -112,6 +112,8 @@ pipelines:
               - export FMOFP_AIRFRAME=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_airframe
               - export FMOFP_FDM=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_fdm
               - export FMOFP_UTILITIES_TOOL=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_utilities_tool
+              - export FMOFP_AVIONICS=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_avionics
+              - export FMOFP_AVIONICS_TOOL=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_avionics_tool
               - export QT_QPA_PLATFORM=offscreen
               - python3 -m unittest discover -s fmofp_bus/tests -t . -v
               - cd ofp

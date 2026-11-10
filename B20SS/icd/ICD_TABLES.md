@@ -39,6 +39,10 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 
 | ID | RT | SA | Dir | Words | Rate (Hz) | Title | Status |
 |---|---|---|---|---|---|---|---|
+| [`AVN_MODE_CMD`](#avn_mode_cmd) | 1 | 10 | R | 1 | aperiodic | Avionics mode command | DRAFT |
+| [`AVN_STATUS`](#avn_status) | 1 | 10 | T | 18 | 5 | Avionics status | DRAFT |
+| [`AVN_BUS_HEALTH`](#avn_bus_health) | 1 | 11 | R | 19 | 1 | Bus health report from the bus controller | DRAFT |
+| [`AVN_CMD`](#avn_cmd) | 1 | 13 | R | 16 | aperiodic | Avionics command | DRAFT |
 | [`COM_MODE_CMD`](#com_mode_cmd) | 2 | 10 | R | 1 | aperiodic | Communications mode command | DRAFT |
 | [`COM_STATUS`](#com_status) | 2 | 10 | T | 3 | 1 | Communications status | DRAFT |
 | [`COM_RF`](#com_rf) | 2 | 11 | R | 7 | 1 | RF environment, from the plant | DRAFT |
@@ -120,6 +124,7 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`EICAS_PWR_STATUS`](#eicas_pwr_status) | 14 | 4 | R | 16 | 5 | Power management status, for the EICAS | DRAFT |
 | [`EICAS_HYD_STATUS`](#eicas_hyd_status) | 14 | 6 | R | 4 | 5 | Hydraulics status, for the EICAS | DRAFT |
 | [`EICAS_ECS_STATUS`](#eicas_ecs_status) | 14 | 7 | R | 10 | 5 | Environmental control status, for the EICAS | DRAFT |
+| [`EICAS_AVN_STATUS`](#eicas_avn_status) | 14 | 8 | R | 18 | 5 | Avionics status, for the EICAS | DRAFT |
 | [`DSP_EICAS_MODE_CMD`](#dsp_eicas_mode_cmd) | 14 | 13 | R | 1 | aperiodic | EICAS mode command | DRAFT |
 | [`DSP_EICAS_STATUS`](#dsp_eicas_status) | 14 | 13 | T | 2 | 1 | EICAS status | DRAFT |
 | [`DSP_RADAR_MODE_CMD`](#dsp_radar_mode_cmd) | 15 | 14 | R | 1 | aperiodic | Weather radar display mode command | DRAFT |
@@ -287,6 +292,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`FMS_CONTROL_STATUS`](#fms_control_status) | [`AFR_FMS_CONTROL`](#afr_fms_control) | 3 | 5 |
 | [`HYD_STATUS`](#hyd_status) | [`EICAS_HYD_STATUS`](#eicas_hyd_status) | 4 | 5 |
 | [`ECS_STATUS`](#ecs_status) | [`EICAS_ECS_STATUS`](#eicas_ecs_status) | 10 | 5 |
+| [`AVN_STATUS`](#avn_status) | [`EICAS_AVN_STATUS`](#eicas_avn_status) | 18 | 5 |
 
 ## Mode codes
 
@@ -1132,6 +1138,63 @@ What FDM_CMD asks of the flight data monitoring terminal: eject_storage(slot)
 |---|---|---|---|
 | 0 | NONE |  |  |
 | 1 | EJECT_STORAGE |  |  |
+
+### `lru_health` (3 bits)
+
+LRUstatus.HealthState: the health of one line replaceable unit as LRUStatusMonitor derives it. UNKNOWN is the state before the first poll and after a forced fault is cleared
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | UNKNOWN |  |  |
+| 1 | NOMINAL |  |  |
+| 2 | DEGRADED |  |  |
+| 3 | FAULT |  |  |
+| 4 | OFFLINE |  |  |
+
+### `bit_status` (2 bits)
+
+builtInTesting.BITStatus: the outcome of one built-in test probe. PENDING is also 'no result yet'
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | PENDING |  |  |
+| 1 | PASS |  |  |
+| 2 | FAIL |  |  |
+| 3 | ABORT |  | The test could not run: the avionics computer has no current picture of the bus |
+
+### `fitness_status` (2 bits)
+
+FlightManagementFitness.check_thresholds' status string
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | OK |  |  |
+| 1 | WARNING |  |  |
+| 2 | CRITICAL |  |  |
+
+### `fitness_component` (2 bits)
+
+The three components of fmfConfig.xml, in its order
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | FLIGHT_CONTROL_FITNESS |  |  |
+| 1 | NAVIGATION_FITNESS |  |  |
+| 2 | AVIONICS_FITNESS |  |  |
+
+### `avionics_command` (4 bits)
+
+What AVN_CMD asks of the avionics terminal: InitiatedBIT.run_all (the full built-in test suite on demand), LRUStatusMonitor.force_fault and clear_forced_fault (the scenario engine's failure injection), SoftwareConfigManager.perform_update and FlightManagementFitness.handle_redundancy (neither of which the Python ever called, README section 2)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | RUN_INITIATED_BIT |  |  |
+| 2 | FORCE_FAULT |  |  |
+| 3 | CLEAR_FAULT |  |  |
+| 4 | CLEAR_ALL_FAULTS |  |  |
+| 5 | APPLY_DATA_LOAD |  |  |
+| 6 | HANDLE_REDUNDANCY |  |  |
 
 ## Messages
 
@@ -3384,6 +3447,150 @@ Same layout as [`HYD_STATUS`](#hyd_status).
 ECS_STATUS relayed to the EICAS, its one consumer: the ECS rows CAB TEMP (the cabin temperature) and CAB ALT (the pressure altitude of the cabin pressure, computed by the feed); OXY PSI stays unknown, since the Python's OxygenControl models a concentration, not a bottle pressure (README section 2).
 
 Same layout as [`ECS_STATUS`](#ecs_status).
+
+### AVN_STATUS
+
+**Avionics status** — RT 1 · SA 10 · transmit (terminal to bus) · 18 words · 5 Hz
+
+The avionics terminal's state and what its four functions hold: LRUStatusMonitor's table (overall_health(), the count of get_faults(), the forced faults, and one bit per table slot for FAULT, DEGRADED and forced: slots 0-10 are the catalogue in _build_catalogue()'s order, FCC-1, FMS-1, NAV-1, RDR-1, ECU-1, COMMS-1, MSN-1, DFS-1, SNS-1, GCAS-1, PERF-1; slots 11-14 the scenario-declared entries in the order they were made), the built-in tests (the power-on self test's six component results in bitsConfig.xml's order, the last result of each periodic probe and how many results each periodic test has stored, the last initiated run's counts), the fitness status of the three components of fmfConfig.xml and the software versions of swcmConfig.xml's three components with the last data load applied. Relayed to the EICAS as EICAS_AVN_STATUS.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last AVN_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last AVN_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13-11 | `overall_health` | enum | enum `lru_health` | LRUStatusMonitor.overall_health(): FAULT if any LRU is, else DEGRADED if any is DEGRADED or OFFLINE, else UNKNOWN if any is, else NOMINAL |
+| 1 | 10-7 | `avionics_cmd_status` | enum | enum `cmd_status` | Outcome of the last AVN_CMD |
+| 1 | 6 | `bus_health_valid` | bool |  | 1 = an AVN_BUS_HEALTH report arrived within the last 150 frames |
+| 1 | 5 | `post_complete` | bool |  | PowerOnSelfTest.is_complete() |
+| 1 | 4 | `backup_active` | bool |  | 1 = HANDLE_REDUNDANCY activated the backup of fmfConfig.xml's redundancy component |
+| 1 | 3-1 | `spare_1` | spare |  |  |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0) |
+| 2 | 15-8 | `lru_count` | uint | raw counts | Entries in the LRU table: the 11 of the catalogue plus the scenario-declared ones (at most 4) |
+| 2 | 7-0 | `fault_count` | uint | raw counts | len(get_faults()): LRUs in FAULT or DEGRADED |
+| 3 | 15-8 | `forced_count` | uint | raw counts | len(get_forced_faults()) |
+| 3 | 7-0 | `refused_count` | uint | raw counts | FORCE_FAULT commands refused because the four scenario-declared slots were taken; saturates at 255 |
+| 4 | 15-14 | `post_fcc_cpu` | enum | enum `bit_status` | POST-FCC, component cpu |
+| 4 | 13-12 | `post_fcc_memory` | enum | enum `bit_status` |  |
+| 4 | 11-10 | `post_fcc_databus` | enum | enum `bit_status` |  |
+| 4 | 9-8 | `post_nav_cpu` | enum | enum `bit_status` | POST-NAV, component cpu |
+| 4 | 7-6 | `post_nav_sensors` | enum | enum `bit_status` |  |
+| 4 | 5-4 | `post_nav_gps_receiver` | enum | enum `bit_status` |  |
+| 4 | 3-0 | `spare_4` | spare |  |  |
+| 5 | 15-14 | `pbit_flight_control` | enum | enum `bit_status` | BIT-AVIONICS, flightControlComputer: the last periodic probe |
+| 5 | 13-12 | `pbit_mission` | enum | enum `bit_status` | BIT-AVIONICS, missionComputer |
+| 5 | 11-10 | `pbit_datalink` | enum | enum `bit_status` | BIT-COMM, datalink |
+| 5 | 9-8 | `pbit_satcom` | enum | enum `bit_status` | BIT-COMM, satcom |
+| 5 | 7-6 | `pbit_radios` | enum | enum `bit_status` | BIT-COMM, radios |
+| 5 | 5-0 | `spare_5` | spare |  |  |
+| 6 | 15-8 | `pbit_avionics_stored` | uint | raw counts | Results PeriodicBIT holds under BIT-AVIONICS; saturates at 255 |
+| 6 | 7-0 | `pbit_comm_stored` | uint | raw counts | Results PeriodicBIT holds under BIT-COMM: five per run, the two of BIT-AVIONICS included (README section 2); saturates at 255 |
+| 7 | 15-12 | `ibit_runs` | uint | raw counts | Initiated runs since reset; saturates at 15 |
+| 7 | 11-8 | `ibit_pass` | uint | raw counts | PASS results of the last initiated run (15 probes) |
+| 7 | 7-4 | `ibit_fail` | uint | raw counts |  |
+| 7 | 3-0 | `ibit_abort` | uint | raw counts |  |
+| 8 | 15-14 | `fitness_flight_control` | enum | enum `fitness_status` | check_thresholds('flightControlFitness', ...) on the last 1 Hz pass |
+| 8 | 13-12 | `fitness_navigation` | enum | enum `fitness_status` |  |
+| 8 | 11-10 | `fitness_avionics` | enum | enum `fitness_status` |  |
+| 8 | 9-0 | `spare_8` | spare |  |  |
+| 9 | 15-10 | `sw_flight_control_major` | uint | raw counts | fltControlComp's current version, first number |
+| 9 | 9-5 | `sw_flight_control_minor` | uint | raw counts |  |
+| 9 | 4-1 | `sw_flight_control_patch` | uint | raw counts |  |
+| 9 | 0 | `sw_flight_control_has_patch` | bool |  | 1 = the version has a third number (5.2.1, not 5.2) |
+| 10 | 15-10 | `sw_mission_major` | uint | raw counts | missionComputer's current version, first number |
+| 10 | 9-5 | `sw_mission_minor` | uint | raw counts |  |
+| 10 | 4-1 | `sw_mission_patch` | uint | raw counts |  |
+| 10 | 0 | `sw_mission_has_patch` | bool |  | 1 = the version has a third number (5.2.1, not 5.2) |
+| 11 | 15-10 | `sw_comms_major` | uint | raw counts | commsSoftware's current version, first number |
+| 11 | 9-5 | `sw_comms_minor` | uint | raw counts |  |
+| 11 | 4-1 | `sw_comms_patch` | uint | raw counts |  |
+| 11 | 0 | `sw_comms_has_patch` | bool |  | 1 = the version has a third number (5.2.1, not 5.2) |
+| 12-13 | 31-0 | `last_data_load` | sint | LSB 1, range 0 to 99999999 | The id of the last data load applied (20191015); 0 while none has been |
+| 14 | 15-8 | `data_loads_applied` | uint | raw counts | Saturates at 255 |
+| 14 | 7-0 | `spare_14` | spare |  |  |
+| 15 | 14-0 | `lru_fault_mask` | uint | raw counts | Bit n = table slot n is in FAULT |
+| 15 | 15 | `spare_15` | spare |  |  |
+| 16 | 14-0 | `lru_degraded_mask` | uint | raw counts | Bit n = table slot n is DEGRADED |
+| 16 | 15 | `spare_16` | spare |  |  |
+| 17 | 14-0 | `lru_forced_mask` | uint | raw counts | Bit n = table slot n carries a forced fault |
+| 17 | 15 | `spare_17` | spare |  |  |
+
+### AVN_MODE_CMD
+
+**Avionics mode command** — RT 1 · SA 10 · receive (bus to terminal) · 1 words · aperiodic
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### AVN_BUS_HEALTH
+
+**Bus health report from the bus controller** — RT 1 · SA 11 · receive (bus to terminal) · 19 words · 1 Hz
+
+What the bus controller knows about every terminal, written by the controller itself once a second (v1.20; it is the one message whose producer is not a terminal): one bit per terminal address in each mask, bit n for RT n. It replaces the calls LRUStatusMonitor and the built-in test probes made into the other subsystems' get_status(): on the bus the avionics computer sees a terminal only through the controller's polls and the terminal's own TERM_STATUS.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-8 | `epoch` | uint | raw counts | 1-255, moving on with every report; 0 says there is no report yet, which the terminal ignores |
+| 0 | 7-0 | `spare_0` | spare |  |  |
+| 1 | 15-0 | `listed_mask_hi` | uint | raw counts | Bit n = RT 16+n is in the bus controller's terminal list |
+| 2 | 15-0 | `listed_mask_lo` | uint | raw counts | Bit n = RT n is in the bus controller's terminal list |
+| 3 | 15-0 | `responded_mask_hi` | uint | raw counts | Bit n = RT 16+n has answered at least one transaction since the controller started |
+| 4 | 15-0 | `responded_mask_lo` | uint | raw counts | Bit n = RT n has answered at least one transaction since the controller started |
+| 5 | 15-0 | `answering_mask_hi` | uint | raw counts | Bit n = RT 16+n has responded and drew no unanswered transaction since the previous report |
+| 6 | 15-0 | `answering_mask_lo` | uint | raw counts | Bit n = RT n has responded and drew no unanswered transaction since the previous report |
+| 7 | 15-0 | `status_mask_hi` | uint | raw counts | Bit n = RT 16+n has a TERM_STATUS no older than 150 frames; the four masks below are 0 for a terminal without one |
+| 8 | 15-0 | `status_mask_lo` | uint | raw counts | Bit n = RT n has a TERM_STATUS no older than 150 frames; the four masks below are 0 for a terminal without one |
+| 9 | 15-0 | `healthy_mask_hi` | uint | raw counts | Bit n = RT 16+n reports TERM_STATUS.healthy |
+| 10 | 15-0 | `healthy_mask_lo` | uint | raw counts | Bit n = RT n reports TERM_STATUS.healthy |
+| 11 | 15-0 | `bit_failed_mask_hi` | uint | raw counts | Bit n = RT 16+n reports TERM_STATUS.bit_failed |
+| 12 | 15-0 | `bit_failed_mask_lo` | uint | raw counts | Bit n = RT n reports TERM_STATUS.bit_failed |
+| 13 | 15-0 | `normal_mask_hi` | uint | raw counts | Bit n = RT 16+n reports the state NORMAL |
+| 14 | 15-0 | `normal_mask_lo` | uint | raw counts | Bit n = RT n reports the state NORMAL |
+| 15 | 15-0 | `degraded_mask_hi` | uint | raw counts | Bit n = RT 16+n reports the state DEGRADED |
+| 16 | 15-0 | `degraded_mask_lo` | uint | raw counts | Bit n = RT n reports the state DEGRADED |
+| 17 | 15-0 | `failure_mask_hi` | uint | raw counts | Bit n = RT 16+n reports the state FAILURE |
+| 18 | 15-0 | `failure_mask_lo` | uint | raw counts | Bit n = RT n reports the state FAILURE |
+
+### AVN_CMD
+
+**Avionics command** — RT 1 · SA 13 · receive (bus to terminal) · 16 words · aperiodic
+
+RUN_INITIATED_BIT is InitiatedBIT.run_all: the six self-test probes, the five periodic probes whatever their intervals and the four interface-test probes, counted in AVN_STATUS (it does not replace the power-on results, as the Python's did not). FORCE_FAULT is LRUStatusMonitor.force_fault(key, state): key is resolved as resolve_lru_id did (an LRU id, a system key, or a part of exactly one name, whatever the case), and a key that resolves to nothing makes a scenario-declared entry named after it; CLEAR_FAULT is clear_forced_fault(key), CLEAR_ALL_FAULTS clear_forced_fault(None). APPLY_DATA_LOAD is SoftwareConfigManager.perform_update(data_load): REJECTED_INVALID for an id that is not in swcmConfig.xml. HANDLE_REDUNDANCY is FlightManagementFitness.handle_redundancy(component). The key is up to 24 characters of ASCII, two per word, the first in the high byte, padded with zeros.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `avionics_command` |  |
+| 0 | 11-9 | `health` | enum | enum `lru_health` | FORCE_FAULT: the state to force (the scenario's default is FAULT) |
+| 0 | 8-7 | `component` | enum | enum `fitness_component` | HANDLE_REDUNDANCY: the component |
+| 0 | 6-0 | `spare_0` | spare |  |  |
+| 1 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+| 1 | 15-8 | `spare_1` | spare |  |  |
+| 2-3 | 31-0 | `data_load` | sint | LSB 1, range 0 to 99999999 | APPLY_DATA_LOAD: the load's id as a number (20191015) |
+| 4 | 15-0 | `key_0` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 1 and 2 of the key |
+| 5 | 15-0 | `key_1` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 3 and 4 of the key |
+| 6 | 15-0 | `key_2` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 5 and 6 of the key |
+| 7 | 15-0 | `key_3` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 7 and 8 of the key |
+| 8 | 15-0 | `key_4` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 9 and 10 of the key |
+| 9 | 15-0 | `key_5` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 11 and 12 of the key |
+| 10 | 15-0 | `key_6` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 13 and 14 of the key |
+| 11 | 15-0 | `key_7` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 15 and 16 of the key |
+| 12 | 15-0 | `key_8` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 17 and 18 of the key |
+| 13 | 15-0 | `key_9` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 19 and 20 of the key |
+| 14 | 15-0 | `key_10` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 21 and 22 of the key |
+| 15 | 15-0 | `key_11` | uint | raw counts | FORCE_FAULT, CLEAR_FAULT: characters 23 and 24 of the key |
+
+### EICAS_AVN_STATUS
+
+**Avionics status, for the EICAS** — RT 14 · SA 8 · receive (bus to terminal) · 18 words · 5 Hz
+
+AVN_STATUS relayed to the EICAS, its one consumer (section 8): the BITS rows (the power-on self tests' results).
+
+Same layout as [`AVN_STATUS`](#avn_status).
 
 ## Block payloads
 

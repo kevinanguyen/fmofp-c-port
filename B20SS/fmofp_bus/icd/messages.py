@@ -8148,6 +8148,621 @@ class EicasEcsStatus:
         return status, (cls(payload=payload) if payload is not None else None)
 
 
+@dataclass
+class AvnStatus:
+    """AVN_STATUS - Avionics status. RT 1 · SA 10 · transmit (terminal to bus) · 18 words · 5 Hz.
+
+    The avionics terminal's state and what its four functions hold: LRUStatusMonitor's table (overall_health(), the count of get_faults(), the forced faults, and one bit per table slot for FAULT, DEGRADED and forced: slots 0-10 are the catalogue in _build_catalogue()'s order, FCC-1, FMS-1, NAV-1, RDR-1, ECU-1, COMMS-1, MSN-1, DFS-1, SNS-1, GCAS-1, PERF-1; slots 11-14 the scenario-declared entries in the order they were made), the built-in tests (the power-on self test's six component results in bitsConfig.xml's order, the last result of each periodic probe and how many results each periodic test has stored, the last initiated run's counts), the fitness status of the three components of fmfConfig.xml and the software versions of swcmConfig.xml's three components with the last data load applied. Relayed to the EICAS as EICAS_AVN_STATUS.
+    """
+    RT: ClassVar[int] = 1
+    SUBADDRESS: ClassVar[int] = 10
+    DIRECTION: ClassVar[str] = "T"
+    RATE_HZ: ClassVar[int] = 5
+    WORDS: ClassVar[int] = 18
+
+    state: TerminalState = TerminalState.STANDBY
+    last_cmd_seq: int = 0  # cmd_seq of the last AVN_MODE_CMD processed (see Command sequence rule)
+    cmd_rejected: bool = False  # 1 = the last AVN_MODE_CMD was rejected
+    mode_transition: bool = False  # 1 = a commanded mode change is still in progress
+    overall_health: LruHealth = LruHealth.UNKNOWN  # LRUStatusMonitor.overall_health(): FAULT if any LRU is, else DEGRADED if any is DEGRADED or OFFLINE, else UNKNOWN if any is, else NOMINAL
+    avionics_cmd_status: CmdStatus = CmdStatus.NONE  # Outcome of the last AVN_CMD
+    bus_health_valid: bool = False  # 1 = an AVN_BUS_HEALTH report arrived within the last 150 frames
+    post_complete: bool = False  # PowerOnSelfTest.is_complete()
+    backup_active: bool = False  # 1 = HANDLE_REDUNDANCY activated the backup of fmfConfig.xml's redundancy component
+    healthy: bool = False  # 1 = healthy (legacy health_status, bit 0)
+    lru_count: int = 0  # Entries in the LRU table: the 11 of the catalogue plus the scenario-declared ones (at most 4)
+    fault_count: int = 0  # len(get_faults()): LRUs in FAULT or DEGRADED
+    forced_count: int = 0  # len(get_forced_faults())
+    refused_count: int = 0  # FORCE_FAULT commands refused because the four scenario-declared slots were taken; saturates at 255
+    post_fcc_cpu: BitStatus = BitStatus.PENDING  # POST-FCC, component cpu
+    post_fcc_memory: BitStatus = BitStatus.PENDING
+    post_fcc_databus: BitStatus = BitStatus.PENDING
+    post_nav_cpu: BitStatus = BitStatus.PENDING  # POST-NAV, component cpu
+    post_nav_sensors: BitStatus = BitStatus.PENDING
+    post_nav_gps_receiver: BitStatus = BitStatus.PENDING
+    pbit_flight_control: BitStatus = BitStatus.PENDING  # BIT-AVIONICS, flightControlComputer: the last periodic probe
+    pbit_mission: BitStatus = BitStatus.PENDING  # BIT-AVIONICS, missionComputer
+    pbit_datalink: BitStatus = BitStatus.PENDING  # BIT-COMM, datalink
+    pbit_satcom: BitStatus = BitStatus.PENDING  # BIT-COMM, satcom
+    pbit_radios: BitStatus = BitStatus.PENDING  # BIT-COMM, radios
+    pbit_avionics_stored: int = 0  # Results PeriodicBIT holds under BIT-AVIONICS; saturates at 255
+    pbit_comm_stored: int = 0  # Results PeriodicBIT holds under BIT-COMM: five per run, the two of BIT-AVIONICS included (README section 2); saturates at 255
+    ibit_runs: int = 0  # Initiated runs since reset; saturates at 15
+    ibit_pass: int = 0  # PASS results of the last initiated run (15 probes)
+    ibit_fail: int = 0
+    ibit_abort: int = 0
+    fitness_flight_control: FitnessStatus = FitnessStatus.OK  # check_thresholds('flightControlFitness', ...) on the last 1 Hz pass
+    fitness_navigation: FitnessStatus = FitnessStatus.OK
+    fitness_avionics: FitnessStatus = FitnessStatus.OK
+    sw_flight_control_major: int = 0  # fltControlComp's current version, first number
+    sw_flight_control_minor: int = 0
+    sw_flight_control_patch: int = 0
+    sw_flight_control_has_patch: bool = False  # 1 = the version has a third number (5.2.1, not 5.2)
+    sw_mission_major: int = 0  # missionComputer's current version, first number
+    sw_mission_minor: int = 0
+    sw_mission_patch: int = 0
+    sw_mission_has_patch: bool = False  # 1 = the version has a third number (5.2.1, not 5.2)
+    sw_comms_major: int = 0  # commsSoftware's current version, first number
+    sw_comms_minor: int = 0
+    sw_comms_patch: int = 0
+    sw_comms_has_patch: bool = False  # 1 = the version has a third number (5.2.1, not 5.2)
+    last_data_load: float = 0.0  # LSB 1, 0 .. 99999999, The id of the last data load applied (20191015); 0 while none has been
+    data_loads_applied: int = 0  # Saturates at 255
+    lru_fault_mask: int = 0  # Bit n = table slot n is in FAULT
+    lru_degraded_mask: int = 0  # Bit n = table slot n is DEGRADED
+    lru_forced_mask: int = 0  # Bit n = table slot n carries a forced fault
+
+    def encode(self) -> Tuple[Status, List[int]]:
+        w = [0] * 18
+        result = Status.OK
+        if not is_valid(TerminalState, self.state):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[0] = _w.set_field(w[0], 15, 12, int(self.state))
+        s, v = _w.check_uint(self.last_cmd_seq, 8)
+        result = worst(result, s)
+        w[0] = _w.set_field(w[0], 7, 0, v)
+        w[1] = _w.set_bit(w[1], 15, bool(self.cmd_rejected))
+        w[1] = _w.set_bit(w[1], 14, bool(self.mode_transition))
+        if not is_valid(LruHealth, self.overall_health):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[1] = _w.set_field(w[1], 13, 11, int(self.overall_health))
+        if not is_valid(CmdStatus, self.avionics_cmd_status):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[1] = _w.set_field(w[1], 10, 7, int(self.avionics_cmd_status))
+        w[1] = _w.set_bit(w[1], 6, bool(self.bus_health_valid))
+        w[1] = _w.set_bit(w[1], 5, bool(self.post_complete))
+        w[1] = _w.set_bit(w[1], 4, bool(self.backup_active))
+        w[1] = _w.set_bit(w[1], 0, bool(self.healthy))
+        s, v = _w.check_uint(self.lru_count, 8)
+        result = worst(result, s)
+        w[2] = _w.set_field(w[2], 15, 8, v)
+        s, v = _w.check_uint(self.fault_count, 8)
+        result = worst(result, s)
+        w[2] = _w.set_field(w[2], 7, 0, v)
+        s, v = _w.check_uint(self.forced_count, 8)
+        result = worst(result, s)
+        w[3] = _w.set_field(w[3], 15, 8, v)
+        s, v = _w.check_uint(self.refused_count, 8)
+        result = worst(result, s)
+        w[3] = _w.set_field(w[3], 7, 0, v)
+        if not is_valid(BitStatus, self.post_fcc_cpu):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[4] = _w.set_field(w[4], 15, 14, int(self.post_fcc_cpu))
+        if not is_valid(BitStatus, self.post_fcc_memory):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[4] = _w.set_field(w[4], 13, 12, int(self.post_fcc_memory))
+        if not is_valid(BitStatus, self.post_fcc_databus):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[4] = _w.set_field(w[4], 11, 10, int(self.post_fcc_databus))
+        if not is_valid(BitStatus, self.post_nav_cpu):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[4] = _w.set_field(w[4], 9, 8, int(self.post_nav_cpu))
+        if not is_valid(BitStatus, self.post_nav_sensors):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[4] = _w.set_field(w[4], 7, 6, int(self.post_nav_sensors))
+        if not is_valid(BitStatus, self.post_nav_gps_receiver):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[4] = _w.set_field(w[4], 5, 4, int(self.post_nav_gps_receiver))
+        if not is_valid(BitStatus, self.pbit_flight_control):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[5] = _w.set_field(w[5], 15, 14, int(self.pbit_flight_control))
+        if not is_valid(BitStatus, self.pbit_mission):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[5] = _w.set_field(w[5], 13, 12, int(self.pbit_mission))
+        if not is_valid(BitStatus, self.pbit_datalink):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[5] = _w.set_field(w[5], 11, 10, int(self.pbit_datalink))
+        if not is_valid(BitStatus, self.pbit_satcom):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[5] = _w.set_field(w[5], 9, 8, int(self.pbit_satcom))
+        if not is_valid(BitStatus, self.pbit_radios):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[5] = _w.set_field(w[5], 7, 6, int(self.pbit_radios))
+        s, v = _w.check_uint(self.pbit_avionics_stored, 8)
+        result = worst(result, s)
+        w[6] = _w.set_field(w[6], 15, 8, v)
+        s, v = _w.check_uint(self.pbit_comm_stored, 8)
+        result = worst(result, s)
+        w[6] = _w.set_field(w[6], 7, 0, v)
+        s, v = _w.check_uint(self.ibit_runs, 4)
+        result = worst(result, s)
+        w[7] = _w.set_field(w[7], 15, 12, v)
+        s, v = _w.check_uint(self.ibit_pass, 4)
+        result = worst(result, s)
+        w[7] = _w.set_field(w[7], 11, 8, v)
+        s, v = _w.check_uint(self.ibit_fail, 4)
+        result = worst(result, s)
+        w[7] = _w.set_field(w[7], 7, 4, v)
+        s, v = _w.check_uint(self.ibit_abort, 4)
+        result = worst(result, s)
+        w[7] = _w.set_field(w[7], 3, 0, v)
+        if not is_valid(FitnessStatus, self.fitness_flight_control):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[8] = _w.set_field(w[8], 15, 14, int(self.fitness_flight_control))
+        if not is_valid(FitnessStatus, self.fitness_navigation):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[8] = _w.set_field(w[8], 13, 12, int(self.fitness_navigation))
+        if not is_valid(FitnessStatus, self.fitness_avionics):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[8] = _w.set_field(w[8], 11, 10, int(self.fitness_avionics))
+        s, v = _w.check_uint(self.sw_flight_control_major, 6)
+        result = worst(result, s)
+        w[9] = _w.set_field(w[9], 15, 10, v)
+        s, v = _w.check_uint(self.sw_flight_control_minor, 5)
+        result = worst(result, s)
+        w[9] = _w.set_field(w[9], 9, 5, v)
+        s, v = _w.check_uint(self.sw_flight_control_patch, 4)
+        result = worst(result, s)
+        w[9] = _w.set_field(w[9], 4, 1, v)
+        w[9] = _w.set_bit(w[9], 0, bool(self.sw_flight_control_has_patch))
+        s, v = _w.check_uint(self.sw_mission_major, 6)
+        result = worst(result, s)
+        w[10] = _w.set_field(w[10], 15, 10, v)
+        s, v = _w.check_uint(self.sw_mission_minor, 5)
+        result = worst(result, s)
+        w[10] = _w.set_field(w[10], 9, 5, v)
+        s, v = _w.check_uint(self.sw_mission_patch, 4)
+        result = worst(result, s)
+        w[10] = _w.set_field(w[10], 4, 1, v)
+        w[10] = _w.set_bit(w[10], 0, bool(self.sw_mission_has_patch))
+        s, v = _w.check_uint(self.sw_comms_major, 6)
+        result = worst(result, s)
+        w[11] = _w.set_field(w[11], 15, 10, v)
+        s, v = _w.check_uint(self.sw_comms_minor, 5)
+        result = worst(result, s)
+        w[11] = _w.set_field(w[11], 9, 5, v)
+        s, v = _w.check_uint(self.sw_comms_patch, 4)
+        result = worst(result, s)
+        w[11] = _w.set_field(w[11], 4, 1, v)
+        w[11] = _w.set_bit(w[11], 0, bool(self.sw_comms_has_patch))
+        s, raw = _w.encode_scaled(self.last_data_load, 1, 1, 0, 99999999)
+        result = worst(result, s)
+        w[12], w[13] = divmod(_w.to_twos32(raw), 0x10000)
+        s, v = _w.check_uint(self.data_loads_applied, 8)
+        result = worst(result, s)
+        w[14] = _w.set_field(w[14], 15, 8, v)
+        s, v = _w.check_uint(self.lru_fault_mask, 15)
+        result = worst(result, s)
+        w[15] = _w.set_field(w[15], 14, 0, v)
+        s, v = _w.check_uint(self.lru_degraded_mask, 15)
+        result = worst(result, s)
+        w[16] = _w.set_field(w[16], 14, 0, v)
+        s, v = _w.check_uint(self.lru_forced_mask, 15)
+        result = worst(result, s)
+        w[17] = _w.set_field(w[17], 14, 0, v)
+        return result, w
+
+    @classmethod
+    def decode(cls, words) -> Tuple[Status, Optional["AvnStatus"]]:
+        if len(words) != cls.WORDS:
+            return Status.BAD_LENGTH, None
+        m = cls()
+        raw = _w.get_field(words[0], 15, 12)
+        if not is_valid(TerminalState, raw):
+            return Status.INVALID_ENUM, None
+        m.state = TerminalState(raw)
+        m.last_cmd_seq = _w.get_field(words[0], 7, 0)
+        m.cmd_rejected = _w.get_bit(words[1], 15)
+        m.mode_transition = _w.get_bit(words[1], 14)
+        raw = _w.get_field(words[1], 13, 11)
+        if not is_valid(LruHealth, raw):
+            return Status.INVALID_ENUM, None
+        m.overall_health = LruHealth(raw)
+        raw = _w.get_field(words[1], 10, 7)
+        if not is_valid(CmdStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.avionics_cmd_status = CmdStatus(raw)
+        m.bus_health_valid = _w.get_bit(words[1], 6)
+        m.post_complete = _w.get_bit(words[1], 5)
+        m.backup_active = _w.get_bit(words[1], 4)
+        m.healthy = _w.get_bit(words[1], 0)
+        m.lru_count = _w.get_field(words[2], 15, 8)
+        m.fault_count = _w.get_field(words[2], 7, 0)
+        m.forced_count = _w.get_field(words[3], 15, 8)
+        m.refused_count = _w.get_field(words[3], 7, 0)
+        raw = _w.get_field(words[4], 15, 14)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.post_fcc_cpu = BitStatus(raw)
+        raw = _w.get_field(words[4], 13, 12)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.post_fcc_memory = BitStatus(raw)
+        raw = _w.get_field(words[4], 11, 10)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.post_fcc_databus = BitStatus(raw)
+        raw = _w.get_field(words[4], 9, 8)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.post_nav_cpu = BitStatus(raw)
+        raw = _w.get_field(words[4], 7, 6)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.post_nav_sensors = BitStatus(raw)
+        raw = _w.get_field(words[4], 5, 4)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.post_nav_gps_receiver = BitStatus(raw)
+        raw = _w.get_field(words[5], 15, 14)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.pbit_flight_control = BitStatus(raw)
+        raw = _w.get_field(words[5], 13, 12)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.pbit_mission = BitStatus(raw)
+        raw = _w.get_field(words[5], 11, 10)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.pbit_datalink = BitStatus(raw)
+        raw = _w.get_field(words[5], 9, 8)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.pbit_satcom = BitStatus(raw)
+        raw = _w.get_field(words[5], 7, 6)
+        if not is_valid(BitStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.pbit_radios = BitStatus(raw)
+        m.pbit_avionics_stored = _w.get_field(words[6], 15, 8)
+        m.pbit_comm_stored = _w.get_field(words[6], 7, 0)
+        m.ibit_runs = _w.get_field(words[7], 15, 12)
+        m.ibit_pass = _w.get_field(words[7], 11, 8)
+        m.ibit_fail = _w.get_field(words[7], 7, 4)
+        m.ibit_abort = _w.get_field(words[7], 3, 0)
+        raw = _w.get_field(words[8], 15, 14)
+        if not is_valid(FitnessStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.fitness_flight_control = FitnessStatus(raw)
+        raw = _w.get_field(words[8], 13, 12)
+        if not is_valid(FitnessStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.fitness_navigation = FitnessStatus(raw)
+        raw = _w.get_field(words[8], 11, 10)
+        if not is_valid(FitnessStatus, raw):
+            return Status.INVALID_ENUM, None
+        m.fitness_avionics = FitnessStatus(raw)
+        m.sw_flight_control_major = _w.get_field(words[9], 15, 10)
+        m.sw_flight_control_minor = _w.get_field(words[9], 9, 5)
+        m.sw_flight_control_patch = _w.get_field(words[9], 4, 1)
+        m.sw_flight_control_has_patch = _w.get_bit(words[9], 0)
+        m.sw_mission_major = _w.get_field(words[10], 15, 10)
+        m.sw_mission_minor = _w.get_field(words[10], 9, 5)
+        m.sw_mission_patch = _w.get_field(words[10], 4, 1)
+        m.sw_mission_has_patch = _w.get_bit(words[10], 0)
+        m.sw_comms_major = _w.get_field(words[11], 15, 10)
+        m.sw_comms_minor = _w.get_field(words[11], 9, 5)
+        m.sw_comms_patch = _w.get_field(words[11], 4, 1)
+        m.sw_comms_has_patch = _w.get_bit(words[11], 0)
+        m.last_data_load = _w.decode_scaled(_w.from_twos32((words[12] << 16) | words[13]), 1, 1)
+        m.data_loads_applied = _w.get_field(words[14], 15, 8)
+        m.lru_fault_mask = _w.get_field(words[15], 14, 0)
+        m.lru_degraded_mask = _w.get_field(words[16], 14, 0)
+        m.lru_forced_mask = _w.get_field(words[17], 14, 0)
+        return Status.OK, m
+
+
+@dataclass
+class AvnModeCmd:
+    """AVN_MODE_CMD - Avionics mode command. RT 1 · SA 10 · receive (bus to terminal) · 1 words · aperiodic.
+    """
+    RT: ClassVar[int] = 1
+    SUBADDRESS: ClassVar[int] = 10
+    DIRECTION: ClassVar[str] = "R"
+    RATE_HZ: ClassVar[int] = APERIODIC
+    WORDS: ClassVar[int] = 1
+
+    requested_state: TerminalState = TerminalState.STANDBY
+    cmd_seq: int = 0  # Incremented by the sender for each new command
+
+    def encode(self) -> Tuple[Status, List[int]]:
+        w = [0] * 1
+        result = Status.OK
+        if not is_valid(TerminalState, self.requested_state):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[0] = _w.set_field(w[0], 15, 12, int(self.requested_state))
+        s, v = _w.check_uint(self.cmd_seq, 8)
+        result = worst(result, s)
+        w[0] = _w.set_field(w[0], 7, 0, v)
+        return result, w
+
+    @classmethod
+    def decode(cls, words) -> Tuple[Status, Optional["AvnModeCmd"]]:
+        if len(words) != cls.WORDS:
+            return Status.BAD_LENGTH, None
+        m = cls()
+        raw = _w.get_field(words[0], 15, 12)
+        if not is_valid(TerminalState, raw):
+            return Status.INVALID_ENUM, None
+        m.requested_state = TerminalState(raw)
+        m.cmd_seq = _w.get_field(words[0], 7, 0)
+        return Status.OK, m
+
+
+@dataclass
+class AvnBusHealth:
+    """AVN_BUS_HEALTH - Bus health report from the bus controller. RT 1 · SA 11 · receive (bus to terminal) · 19 words · 1 Hz.
+
+    What the bus controller knows about every terminal, written by the controller itself once a second (v1.20; it is the one message whose producer is not a terminal): one bit per terminal address in each mask, bit n for RT n. It replaces the calls LRUStatusMonitor and the built-in test probes made into the other subsystems' get_status(): on the bus the avionics computer sees a terminal only through the controller's polls and the terminal's own TERM_STATUS.
+    """
+    RT: ClassVar[int] = 1
+    SUBADDRESS: ClassVar[int] = 11
+    DIRECTION: ClassVar[str] = "R"
+    RATE_HZ: ClassVar[int] = 1
+    WORDS: ClassVar[int] = 19
+
+    epoch: int = 0  # 1-255, moving on with every report; 0 says there is no report yet, which the terminal ignores
+    listed_mask_hi: int = 0  # Bit n = RT 16+n is in the bus controller's terminal list
+    listed_mask_lo: int = 0  # Bit n = RT n is in the bus controller's terminal list
+    responded_mask_hi: int = 0  # Bit n = RT 16+n has answered at least one transaction since the controller started
+    responded_mask_lo: int = 0  # Bit n = RT n has answered at least one transaction since the controller started
+    answering_mask_hi: int = 0  # Bit n = RT 16+n has responded and drew no unanswered transaction since the previous report
+    answering_mask_lo: int = 0  # Bit n = RT n has responded and drew no unanswered transaction since the previous report
+    status_mask_hi: int = 0  # Bit n = RT 16+n has a TERM_STATUS no older than 150 frames; the four masks below are 0 for a terminal without one
+    status_mask_lo: int = 0  # Bit n = RT n has a TERM_STATUS no older than 150 frames; the four masks below are 0 for a terminal without one
+    healthy_mask_hi: int = 0  # Bit n = RT 16+n reports TERM_STATUS.healthy
+    healthy_mask_lo: int = 0  # Bit n = RT n reports TERM_STATUS.healthy
+    bit_failed_mask_hi: int = 0  # Bit n = RT 16+n reports TERM_STATUS.bit_failed
+    bit_failed_mask_lo: int = 0  # Bit n = RT n reports TERM_STATUS.bit_failed
+    normal_mask_hi: int = 0  # Bit n = RT 16+n reports the state NORMAL
+    normal_mask_lo: int = 0  # Bit n = RT n reports the state NORMAL
+    degraded_mask_hi: int = 0  # Bit n = RT 16+n reports the state DEGRADED
+    degraded_mask_lo: int = 0  # Bit n = RT n reports the state DEGRADED
+    failure_mask_hi: int = 0  # Bit n = RT 16+n reports the state FAILURE
+    failure_mask_lo: int = 0  # Bit n = RT n reports the state FAILURE
+
+    def encode(self) -> Tuple[Status, List[int]]:
+        w = [0] * 19
+        result = Status.OK
+        s, v = _w.check_uint(self.epoch, 8)
+        result = worst(result, s)
+        w[0] = _w.set_field(w[0], 15, 8, v)
+        s, v = _w.check_uint(self.listed_mask_hi, 16)
+        result = worst(result, s)
+        w[1] = _w.set_field(w[1], 15, 0, v)
+        s, v = _w.check_uint(self.listed_mask_lo, 16)
+        result = worst(result, s)
+        w[2] = _w.set_field(w[2], 15, 0, v)
+        s, v = _w.check_uint(self.responded_mask_hi, 16)
+        result = worst(result, s)
+        w[3] = _w.set_field(w[3], 15, 0, v)
+        s, v = _w.check_uint(self.responded_mask_lo, 16)
+        result = worst(result, s)
+        w[4] = _w.set_field(w[4], 15, 0, v)
+        s, v = _w.check_uint(self.answering_mask_hi, 16)
+        result = worst(result, s)
+        w[5] = _w.set_field(w[5], 15, 0, v)
+        s, v = _w.check_uint(self.answering_mask_lo, 16)
+        result = worst(result, s)
+        w[6] = _w.set_field(w[6], 15, 0, v)
+        s, v = _w.check_uint(self.status_mask_hi, 16)
+        result = worst(result, s)
+        w[7] = _w.set_field(w[7], 15, 0, v)
+        s, v = _w.check_uint(self.status_mask_lo, 16)
+        result = worst(result, s)
+        w[8] = _w.set_field(w[8], 15, 0, v)
+        s, v = _w.check_uint(self.healthy_mask_hi, 16)
+        result = worst(result, s)
+        w[9] = _w.set_field(w[9], 15, 0, v)
+        s, v = _w.check_uint(self.healthy_mask_lo, 16)
+        result = worst(result, s)
+        w[10] = _w.set_field(w[10], 15, 0, v)
+        s, v = _w.check_uint(self.bit_failed_mask_hi, 16)
+        result = worst(result, s)
+        w[11] = _w.set_field(w[11], 15, 0, v)
+        s, v = _w.check_uint(self.bit_failed_mask_lo, 16)
+        result = worst(result, s)
+        w[12] = _w.set_field(w[12], 15, 0, v)
+        s, v = _w.check_uint(self.normal_mask_hi, 16)
+        result = worst(result, s)
+        w[13] = _w.set_field(w[13], 15, 0, v)
+        s, v = _w.check_uint(self.normal_mask_lo, 16)
+        result = worst(result, s)
+        w[14] = _w.set_field(w[14], 15, 0, v)
+        s, v = _w.check_uint(self.degraded_mask_hi, 16)
+        result = worst(result, s)
+        w[15] = _w.set_field(w[15], 15, 0, v)
+        s, v = _w.check_uint(self.degraded_mask_lo, 16)
+        result = worst(result, s)
+        w[16] = _w.set_field(w[16], 15, 0, v)
+        s, v = _w.check_uint(self.failure_mask_hi, 16)
+        result = worst(result, s)
+        w[17] = _w.set_field(w[17], 15, 0, v)
+        s, v = _w.check_uint(self.failure_mask_lo, 16)
+        result = worst(result, s)
+        w[18] = _w.set_field(w[18], 15, 0, v)
+        return result, w
+
+    @classmethod
+    def decode(cls, words) -> Tuple[Status, Optional["AvnBusHealth"]]:
+        if len(words) != cls.WORDS:
+            return Status.BAD_LENGTH, None
+        m = cls()
+        m.epoch = _w.get_field(words[0], 15, 8)
+        m.listed_mask_hi = _w.get_field(words[1], 15, 0)
+        m.listed_mask_lo = _w.get_field(words[2], 15, 0)
+        m.responded_mask_hi = _w.get_field(words[3], 15, 0)
+        m.responded_mask_lo = _w.get_field(words[4], 15, 0)
+        m.answering_mask_hi = _w.get_field(words[5], 15, 0)
+        m.answering_mask_lo = _w.get_field(words[6], 15, 0)
+        m.status_mask_hi = _w.get_field(words[7], 15, 0)
+        m.status_mask_lo = _w.get_field(words[8], 15, 0)
+        m.healthy_mask_hi = _w.get_field(words[9], 15, 0)
+        m.healthy_mask_lo = _w.get_field(words[10], 15, 0)
+        m.bit_failed_mask_hi = _w.get_field(words[11], 15, 0)
+        m.bit_failed_mask_lo = _w.get_field(words[12], 15, 0)
+        m.normal_mask_hi = _w.get_field(words[13], 15, 0)
+        m.normal_mask_lo = _w.get_field(words[14], 15, 0)
+        m.degraded_mask_hi = _w.get_field(words[15], 15, 0)
+        m.degraded_mask_lo = _w.get_field(words[16], 15, 0)
+        m.failure_mask_hi = _w.get_field(words[17], 15, 0)
+        m.failure_mask_lo = _w.get_field(words[18], 15, 0)
+        return Status.OK, m
+
+
+@dataclass
+class AvnCmd:
+    """AVN_CMD - Avionics command. RT 1 · SA 13 · receive (bus to terminal) · 16 words · aperiodic.
+
+    RUN_INITIATED_BIT is InitiatedBIT.run_all: the six self-test probes, the five periodic probes whatever their intervals and the four interface-test probes, counted in AVN_STATUS (it does not replace the power-on results, as the Python's did not). FORCE_FAULT is LRUStatusMonitor.force_fault(key, state): key is resolved as resolve_lru_id did (an LRU id, a system key, or a part of exactly one name, whatever the case), and a key that resolves to nothing makes a scenario-declared entry named after it; CLEAR_FAULT is clear_forced_fault(key), CLEAR_ALL_FAULTS clear_forced_fault(None). APPLY_DATA_LOAD is SoftwareConfigManager.perform_update(data_load): REJECTED_INVALID for an id that is not in swcmConfig.xml. HANDLE_REDUNDANCY is FlightManagementFitness.handle_redundancy(component). The key is up to 24 characters of ASCII, two per word, the first in the high byte, padded with zeros.
+    """
+    RT: ClassVar[int] = 1
+    SUBADDRESS: ClassVar[int] = 13
+    DIRECTION: ClassVar[str] = "R"
+    RATE_HZ: ClassVar[int] = APERIODIC
+    WORDS: ClassVar[int] = 16
+
+    command: AvionicsCommand = AvionicsCommand.NONE
+    health: LruHealth = LruHealth.UNKNOWN  # FORCE_FAULT: the state to force (the scenario's default is FAULT)
+    component: FitnessComponent = FitnessComponent.FLIGHT_CONTROL_FITNESS  # HANDLE_REDUNDANCY: the component
+    cmd_seq: int = 0  # Incremented by the sender for each new command
+    data_load: float = 0.0  # LSB 1, 0 .. 99999999, APPLY_DATA_LOAD: the load's id as a number (20191015)
+    key_0: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 1 and 2 of the key
+    key_1: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 3 and 4 of the key
+    key_2: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 5 and 6 of the key
+    key_3: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 7 and 8 of the key
+    key_4: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 9 and 10 of the key
+    key_5: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 11 and 12 of the key
+    key_6: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 13 and 14 of the key
+    key_7: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 15 and 16 of the key
+    key_8: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 17 and 18 of the key
+    key_9: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 19 and 20 of the key
+    key_10: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 21 and 22 of the key
+    key_11: int = 0  # FORCE_FAULT, CLEAR_FAULT: characters 23 and 24 of the key
+
+    def encode(self) -> Tuple[Status, List[int]]:
+        w = [0] * 16
+        result = Status.OK
+        if not is_valid(AvionicsCommand, self.command):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[0] = _w.set_field(w[0], 15, 12, int(self.command))
+        if not is_valid(LruHealth, self.health):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[0] = _w.set_field(w[0], 11, 9, int(self.health))
+        if not is_valid(FitnessComponent, self.component):
+            result = worst(result, Status.INVALID_ARGUMENT)
+        w[0] = _w.set_field(w[0], 8, 7, int(self.component))
+        s, v = _w.check_uint(self.cmd_seq, 8)
+        result = worst(result, s)
+        w[1] = _w.set_field(w[1], 7, 0, v)
+        s, raw = _w.encode_scaled(self.data_load, 1, 1, 0, 99999999)
+        result = worst(result, s)
+        w[2], w[3] = divmod(_w.to_twos32(raw), 0x10000)
+        s, v = _w.check_uint(self.key_0, 16)
+        result = worst(result, s)
+        w[4] = _w.set_field(w[4], 15, 0, v)
+        s, v = _w.check_uint(self.key_1, 16)
+        result = worst(result, s)
+        w[5] = _w.set_field(w[5], 15, 0, v)
+        s, v = _w.check_uint(self.key_2, 16)
+        result = worst(result, s)
+        w[6] = _w.set_field(w[6], 15, 0, v)
+        s, v = _w.check_uint(self.key_3, 16)
+        result = worst(result, s)
+        w[7] = _w.set_field(w[7], 15, 0, v)
+        s, v = _w.check_uint(self.key_4, 16)
+        result = worst(result, s)
+        w[8] = _w.set_field(w[8], 15, 0, v)
+        s, v = _w.check_uint(self.key_5, 16)
+        result = worst(result, s)
+        w[9] = _w.set_field(w[9], 15, 0, v)
+        s, v = _w.check_uint(self.key_6, 16)
+        result = worst(result, s)
+        w[10] = _w.set_field(w[10], 15, 0, v)
+        s, v = _w.check_uint(self.key_7, 16)
+        result = worst(result, s)
+        w[11] = _w.set_field(w[11], 15, 0, v)
+        s, v = _w.check_uint(self.key_8, 16)
+        result = worst(result, s)
+        w[12] = _w.set_field(w[12], 15, 0, v)
+        s, v = _w.check_uint(self.key_9, 16)
+        result = worst(result, s)
+        w[13] = _w.set_field(w[13], 15, 0, v)
+        s, v = _w.check_uint(self.key_10, 16)
+        result = worst(result, s)
+        w[14] = _w.set_field(w[14], 15, 0, v)
+        s, v = _w.check_uint(self.key_11, 16)
+        result = worst(result, s)
+        w[15] = _w.set_field(w[15], 15, 0, v)
+        return result, w
+
+    @classmethod
+    def decode(cls, words) -> Tuple[Status, Optional["AvnCmd"]]:
+        if len(words) != cls.WORDS:
+            return Status.BAD_LENGTH, None
+        m = cls()
+        raw = _w.get_field(words[0], 15, 12)
+        if not is_valid(AvionicsCommand, raw):
+            return Status.INVALID_ENUM, None
+        m.command = AvionicsCommand(raw)
+        raw = _w.get_field(words[0], 11, 9)
+        if not is_valid(LruHealth, raw):
+            return Status.INVALID_ENUM, None
+        m.health = LruHealth(raw)
+        raw = _w.get_field(words[0], 8, 7)
+        if not is_valid(FitnessComponent, raw):
+            return Status.INVALID_ENUM, None
+        m.component = FitnessComponent(raw)
+        m.cmd_seq = _w.get_field(words[1], 7, 0)
+        m.data_load = _w.decode_scaled(_w.from_twos32((words[2] << 16) | words[3]), 1, 1)
+        m.key_0 = _w.get_field(words[4], 15, 0)
+        m.key_1 = _w.get_field(words[5], 15, 0)
+        m.key_2 = _w.get_field(words[6], 15, 0)
+        m.key_3 = _w.get_field(words[7], 15, 0)
+        m.key_4 = _w.get_field(words[8], 15, 0)
+        m.key_5 = _w.get_field(words[9], 15, 0)
+        m.key_6 = _w.get_field(words[10], 15, 0)
+        m.key_7 = _w.get_field(words[11], 15, 0)
+        m.key_8 = _w.get_field(words[12], 15, 0)
+        m.key_9 = _w.get_field(words[13], 15, 0)
+        m.key_10 = _w.get_field(words[14], 15, 0)
+        m.key_11 = _w.get_field(words[15], 15, 0)
+        return Status.OK, m
+
+
+@dataclass
+class EicasAvnStatus:
+    """EICAS_AVN_STATUS - Avionics status, for the EICAS. RT 14 · SA 8 · receive (bus to terminal) · 18 words · 5 Hz.
+
+    AVN_STATUS relayed to the EICAS, its one consumer (section 8): the BITS rows (the power-on self tests' results).
+    """
+    RT: ClassVar[int] = 14
+    SUBADDRESS: ClassVar[int] = 8
+    DIRECTION: ClassVar[str] = "R"
+    RATE_HZ: ClassVar[int] = 5
+    WORDS: ClassVar[int] = AvnStatus.WORDS
+
+    payload: AvnStatus = field(default_factory=AvnStatus)
+
+    def encode(self) -> Tuple[Status, List[int]]:
+        return self.payload.encode()
+
+    @classmethod
+    def decode(cls, words) -> Tuple[Status, Optional["EicasAvnStatus"]]:
+        status, payload = AvnStatus.decode(words)
+        return status, (cls(payload=payload) if payload is not None else None)
+
+
 MessageInfo = namedtuple("MessageInfo", "id rt subaddress direction words rate_hz cls")
 
 # Every message in the ICD, in ICD order.
@@ -8299,6 +8914,11 @@ MESSAGES = (
     MessageInfo("FDM_CMD", FdmCmd.RT, FdmCmd.SUBADDRESS, FdmCmd.DIRECTION, FdmCmd.WORDS, FdmCmd.RATE_HZ, FdmCmd),
     MessageInfo("EICAS_HYD_STATUS", EicasHydStatus.RT, EicasHydStatus.SUBADDRESS, EicasHydStatus.DIRECTION, EicasHydStatus.WORDS, EicasHydStatus.RATE_HZ, EicasHydStatus),
     MessageInfo("EICAS_ECS_STATUS", EicasEcsStatus.RT, EicasEcsStatus.SUBADDRESS, EicasEcsStatus.DIRECTION, EicasEcsStatus.WORDS, EicasEcsStatus.RATE_HZ, EicasEcsStatus),
+    MessageInfo("AVN_STATUS", AvnStatus.RT, AvnStatus.SUBADDRESS, AvnStatus.DIRECTION, AvnStatus.WORDS, AvnStatus.RATE_HZ, AvnStatus),
+    MessageInfo("AVN_MODE_CMD", AvnModeCmd.RT, AvnModeCmd.SUBADDRESS, AvnModeCmd.DIRECTION, AvnModeCmd.WORDS, AvnModeCmd.RATE_HZ, AvnModeCmd),
+    MessageInfo("AVN_BUS_HEALTH", AvnBusHealth.RT, AvnBusHealth.SUBADDRESS, AvnBusHealth.DIRECTION, AvnBusHealth.WORDS, AvnBusHealth.RATE_HZ, AvnBusHealth),
+    MessageInfo("AVN_CMD", AvnCmd.RT, AvnCmd.SUBADDRESS, AvnCmd.DIRECTION, AvnCmd.WORDS, AvnCmd.RATE_HZ, AvnCmd),
+    MessageInfo("EICAS_AVN_STATUS", EicasAvnStatus.RT, EicasAvnStatus.SUBADDRESS, EicasAvnStatus.DIRECTION, EicasAvnStatus.WORDS, EicasAvnStatus.RATE_HZ, EicasAvnStatus),
 )
 
 MESSAGE_CLASSES = {info.id: info.cls for info in MESSAGES}
@@ -8358,4 +8978,5 @@ RELAYS = (
     RelayInfo("FMS_CONTROL_STATUS", "AFR_FMS_CONTROL", FmsControlStatus.RT, FmsControlStatus.SUBADDRESS, AfrFmsControl.RT, AfrFmsControl.SUBADDRESS, FmsControlStatus.WORDS, FmsControlStatus.RATE_HZ, ()),
     RelayInfo("HYD_STATUS", "EICAS_HYD_STATUS", HydStatus.RT, HydStatus.SUBADDRESS, EicasHydStatus.RT, EicasHydStatus.SUBADDRESS, HydStatus.WORDS, HydStatus.RATE_HZ, ()),
     RelayInfo("ECS_STATUS", "EICAS_ECS_STATUS", EcsStatus.RT, EcsStatus.SUBADDRESS, EicasEcsStatus.RT, EicasEcsStatus.SUBADDRESS, EcsStatus.WORDS, EcsStatus.RATE_HZ, ()),
+    RelayInfo("AVN_STATUS", "EICAS_AVN_STATUS", AvnStatus.RT, AvnStatus.SUBADDRESS, EicasAvnStatus.RT, EicasAvnStatus.SUBADDRESS, AvnStatus.WORDS, AvnStatus.RATE_HZ, ()),
 )

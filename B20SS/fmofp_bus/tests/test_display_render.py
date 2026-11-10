@@ -19,13 +19,13 @@ except ImportError:  # pragma: no cover - depends on the machine
 
 from fmofp_bus.icd import blocks as b
 from fmofp_bus.icd import messages as m
-from fmofp_bus.icd.enums import (AewcMode, SarMode, ClearanceLevel, CountermeasuresState, FmsFlightMode, GcasStatus, ShearSeverity,
+from fmofp_bus.icd.enums import (AewcMode, BitStatus, SarMode, ClearanceLevel, CountermeasuresState, FmsFlightMode, GcasStatus, ShearSeverity,
                                  Ssm, TargetingMode, TargetingState, TerminalState, TfrMode, WeaponsState, WeatherMode)
 from fmofp_bus.tests.test_display_feeds import (FakeTerminal, flight_payload, sample_aewc, sample_elevation, sample_fused, sample_sar_image,
                                                 sample_link, sample_mission_status, sample_plan, sample_products,
                                                 sample_tracks, sample_def_status, sample_rwr_contacts,
                                                 sample_sns_status, sample_pwr_status, sample_hyd_status,
-                                                sample_ecs_status)
+                                                sample_ecs_status, sample_avn_status)
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import RadarFeed
 from fmofp_display.systems_feed import SystemsFeed
@@ -377,6 +377,7 @@ class DisplayWindowsTest(unittest.TestCase):
             terminal.put(sample_pwr_status())
             terminal.put(sample_hyd_status())
             terminal.put(sample_ecs_status())
+            terminal.put(sample_avn_status(nav=BitStatus.FAIL))
             window.tick()        # the oil and fuel readings go in through set_engine_readings()
             eicas._poll_data()   # the 10 Hz poll reads the getters
             window.tick()
@@ -426,6 +427,12 @@ class DisplayWindowsTest(unittest.TestCase):
             self.assertEqual(22.4, eicas._ecs_state["cabin_temp_c"])
             self.assertTrue(80.0 < eicas._ecs_state["cabin_alt_ft"] < 100.0, eicas._ecs_state)
             self.assertIn("HYD C  PRESSURE UNKNOWN", texts, "no third hydraulic system")
+            # The avionics terminal (v1.20): the BITS rows are its power-on results, not the "<id>: PASS" eicas.py
+            # wrote for every test of a BuiltInTestController (the poll above found none in the stand-in's).
+            self.assertEqual(["POST-FCC: PASS", "POST-NAV: FAIL"], eicas._bits_results)
+            terminal.put(sample_avn_status(), age=5.0)
+            window.tick()
+            self.assertEqual([], eicas._bits_results, "no row from a stale status")
             self.assertIn("4 warnings 5 cautions", window.status.text())
             self.assertIn("ENG N1 82.0%", window.status.text())
         finally:

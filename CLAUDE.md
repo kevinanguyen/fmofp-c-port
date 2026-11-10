@@ -98,8 +98,9 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone: unit 20 small utilities, ICD v1.22 (2026-11-10, section 7; its CI
-  run is to be recorded). Before it: `337820b` unit 19 flight surfaces, ICD v1.21 (2026-11-10, CI run
+  `git log -1`. Last milestone: unit 17 avionics, ICD v1.20 (2026-11-10, section 7; landed after
+  v1.22; its CI run is to be recorded). Before it: `888eafe` unit 20 small utilities, ICD v1.22
+  (2026-11-10, section 7; CI run 42900090742 green), `337820b` unit 19 flight surfaces, ICD v1.21 (2026-11-10, CI run
   42885140093, section 7), `a63556e` unit 16 power management, ICD v1.19 (2026-11-08; CI run
   42507980864 all ten jobs green), `c4057ed` (unit
   15 sensor management, ICD v1.18; CI run 42439181347 all ten jobs green), `d718e09` (unit 18
@@ -108,18 +109,21 @@ person may continue it in their next session; when it is green it is rebased ont
   the Linux 3.13 Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename
   and Alee), `8d67afd` (this file and `B20SS/verify.sh`), `d82173f` (merge of upstream/main
   `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.22 (`B20SS/icd/fmofp_icd.xml`; v1.20 is unit 17's, on Alee's branch): 26 terminals,
-  147 message definitions (193 after per-terminal expansion), 49 message relays (15 broadcast), 24 block streams
+- **ICD** v1.22 (`B20SS/icd/fmofp_icd.xml`; v1.20, unit 17's, is in it since 2026-11-10: the version line
+  stays the newest number; the next unit takes v1.23): 26 terminals,
+  152 message definitions (198 after per-terminal expansion), 50 message relays (15 broadcast), 24 block streams
   (12 layouts, 12 relayed copies), 9 mode codes, 89/89 legacy types mapped.
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
   systems (RT 22), sensor management (RT 10), power management (RT 8), flight surfaces
   (RT 21), environmental control (RT 4), hydraulics (RT 19), airframe systems (RT 20), flight
-  data monitoring (RT 23); the bus controller `fmofp_bc`; tools `fmofp_nav_tool`,
+  data monitoring (RT 23), avionics (RT 1: LRU health, built-in tests, fitness, software
+  configuration); the bus controller `fmofp_bc`, which also writes `AVN_BUS_HEALTH` for RT 1 once
+  a second; tools `fmofp_nav_tool`,
   `fmofp_radar_tool`, `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool`,
-  `fmofp_sensor_tool`, `fmofp_power_tool`, `fmofp_surfaces_tool`, `fmofp_utilities_tool` (stdin
-  oracles for the Python tests).
+  `fmofp_sensor_tool`, `fmofp_power_tool`, `fmofp_surfaces_tool`, `fmofp_utilities_tool`,
+  `fmofp_avionics_tool` (stdin oracles for the Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
   random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
   ground scene, the RF environment, the ESM intercepts, the sensor scans, the electrical
@@ -127,37 +131,28 @@ person may continue it in their next session; when it is green it is rebased ont
   (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display class fed from the bus through
   `fmofp_display/*_feed.py`; the one-command demo `py -m fmofp_demo`; the bus library
   `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: 22 terminals, 104 scheduled messages, worst minor frame 8492 us of the 10000 us
-  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns, 22/22 terminals
-  answering.
-- **Tests**: Python 239 OK (`fmofp_bus/tests`, about 48 s on Windows); C++ ctest 2/2
-  (hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
+- **Load**: 23 terminals, 107 scheduled messages, worst minor frame 8612 us of the 10000 us
+  budget. Thirty seconds of headless demo on Kevin's machine with 22 terminals (before unit 17): 1500
+  frames, 0 overruns, 22/22 answering. On Alee's machine with 23: 23/23 answering on every line, 0
+  overruns with `--no-events` (worst frame 16 ms), but 21-36 overruns in 1500 frames with the scripted
+  events on; the same machine overruns 9-24 times on `888eafe` without the avionics terminal (section 7,
+  2026-11-10): it does not hold the real-time demo under the events' load either way. To be measured on
+  Kevin's machine with 23 terminals.
+- **Tests**: Python 261 OK (`fmofp_bus/tests`, about 53 s on Windows); C++ ctest 2/2
+  (319 hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
   workflows/ci.yml` job `cpp`, linux-gcc + linux-asan, and Alee's eight Python legs).
-- **Meter**: 24.5 of 29.5 units = **83 %** (section 2). Pace measured over the log: about
-  5 units per full working day, so about a day more to 100 % (5 units open: 17 in progress at
-  Alee's, then 28, 29, 30); the intern-ticket authoring phase comes after and is not in the
-  number.
+- **Meter**: 25.5 of 29.5 units = **86 %** (section 2). Pace measured over the log: about
+  5 units per full working day, so under a day more to 100 % (4 units open: 28, 29, 30); the
+  intern-ticket authoring phase comes after and is not in the number.
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: unit 17 avionics is `IN PROGRESS (Alee, 2026-11-09)`, on branch
-  `wip/unit17-avionics` (`95f6fca`, Alee, 2026-11-09, on top of `d5aa844`; its commit message is
-  its record, condensed in section 7 under 2026-11-10; it merges onto `port/cpp` without conflict
-  as of 2026-11-10). Green there: ICD v1.20, the bus controller's bus-health message, the C++
-  partition and tool, the oracle and e2e tests. Not done: the display tests, the full Python
-  suite and the headless demo since the wiring, the ICD and ofp READMEs, this file. Next step for
-  whoever continues it: rebase on `port/cpp`, finish those, `verify.sh` green, one commit on
-  `port/cpp`, delete the branch. Units 19 (ICD v1.21) and 20 (v1.22) landed on `port/cpp` while
-  unit 17 (v1.20) is open (section 8): unit 17's rebase will conflict where the units appended at
-  the same anchors (the ICD's enums, messages and relays tails and version line, the generated
-  `fmofp_bus/icd/*` and `ICD_TABLES.md`, the counts in `test_messages.py` and
-  `icd_messages_test.cpp`, `verify.sh`, both CI files, `_support.py`, the demo's PARTITIONS and
-  NAMES, the display e2e's and demo test's lists, both CMake lists, the ICD README's tables, the
-  gate tests' stub addresses in `bus_controller_test.cpp` and `schedule_test.cpp`): keep both
-  additions, regenerate, and the counts become 152 messages, 50 relays, 23 terminals; the stubs
-  are at RT 24 and 25 here (his branch has 24 and 4; RT 4 is the ECS since v1.22: keep 24 and 25).
-  Last session: Kevin's, 2026-11-10 (units 19 and 20). Kevin's next unit: 28 scenario engine +
-  CLI (ICD v1.23), then 29 last, 30.
+- **Open work / claims**: none. No `wip/` branches (`wip/unit17-avionics` was rebased onto `888eafe`,
+  landed as one commit and deleted, 2026-11-10). Last session: Alee's, 2026-11-10 (unit 17 finished).
+  Kevin's next unit by his own note: 28 scenario engine + CLI (ICD v1.23), then 29 last, 30. For unit
+  28: the scenario engine's failure injection is `AVN_CMD FORCE_FAULT` / `CLEAR_FAULT` /
+  `CLEAR_ALL_FAULTS` with `fmofp_bus.avionics.key_fields(<system>)` (section 2.17), and the demo's
+  overruns on Alee's machine (the Load line above) want a look before more terminals are added.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866 and the Windows 3.13 leg of 42729856922); the two `cpp` jobs are the ones
@@ -198,7 +193,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 14 | Communications (RT 2) | 0.5 | DONE 2026-11-02 |
 | 15 | Sensor management (RT 10) | 0.75 | DONE 2026-11-08 |
 | 16 | Power management (RT 8) | 0.75 | DONE 2026-11-08 |
-| 17 | Avionics: LRU health + BIT + fitness + SW configuration (RT 1) | 1 | IN PROGRESS (Alee, 2026-11-09) |
+| 17 | Avionics: LRU health + BIT + fitness + SW configuration (RT 1) | 1 | DONE 2026-11-10 |
 | 18 | Defensive systems (RT 22) | 0.5 | DONE 2026-11-07 |
 | 19 | Flight surfaces (RT 21) | 0.5 | DONE 2026-11-10 |
 | 20 | Small utilities: ECS (RT 4), hydraulics (RT 19), airframe (RT 20), flight data monitoring (RT 23) | 1 | DONE 2026-11-10 |
@@ -213,7 +208,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | open |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | open |
 
-**Done: 24.5 / 29.5 = 83 %.** Open: 5 units.
+**Done: 25.5 / 29.5 = 86 %.** Open: 4 units.
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -245,43 +240,20 @@ row the 28 V auxiliary bus; the mission equipment batteries stay off the bus.
 
 ### 2.17 Avionics: LRU health, built-in test, FM fitness, software configuration (RT 1), 1
 
-- **Python to read in full**: `Systems/avionics/hardwareHealth/LRUstatus.py` (449;
-  `LRUStatusMonitor` at 1 Hz: `_build_catalogue()` maps each LRU to a live subsystem's getter
-  (`_acc(import_path, func)`), `_derive_health(status, lru)` turns a status dict into a
-  `HealthState`, forced faults for the scenario engine (`force_fault`, `clear_forced_fault`,
-  `get_forced_faults`), `get_faults`, `overall_health`, `update_bit_result`),
-  `builtInTesting.py` (297; `PowerOnSelfTest`, `PeriodicBIT` whose intervals are minutes
-  from the config, `InitiatedBIT`; `_probe_system` pokes a live subsystem),
-  `Systems/builtInTestSystems/bitControl.py` (153; `BuiltInTestController` parses
-  `bitsConfig.xml` (72 lines: self tests, periodic tests with intervals, interface tests) and
-  runs them), `Systems/fmFitness/fmStatus.py` (155; `FlightManagementFitness` at 1 Hz:
-  `check_thresholds(component, metrics)` from `fmfConfig.xml` (33 lines),
-  `handle_redundancy`), `Systems/configurationManagement/swConfigure.py` (121;
-  `SoftwareConfigManager` reads `swcmConfig.xml` (52 lines: components, versions, data
-  loads); `run()` applies one hard-coded data load "20191015"; it has no thread).
-- **Consumers today**: the EICAS lists `BuiltInTestController().self_tests` as "id: PASS"
-  strings (`eicas.py` around 343; `SystemsFeed.bit.self_tests = []` for now); the scenario
-  engine's failure injection calls `LRUStatusMonitor.force_fault` (unit 28 will send it as a
-  command). The scenario engine's forced fault is the only path that makes an LRU unhealthy.
-- **Shape of the port**: on the bus the LRU monitor cannot call other subsystems' getters.
-  Its inputs are what the bus controller already knows: every terminal's TERM_STATUS reply
-  (state, BIT word) and its poll statistics. The clean design is a bus-health message from
-  the bus controller (per RT: state, BIT word, answered/no-response counts) that RT 1
-  receives at 1 Hz; RT 1 derives the LRU table from it, applies forced faults, runs the BIT
-  schedule (power-on, periodic, initiated), the fitness thresholds and the software
-  configuration table, and publishes `AVN_STATUS` (overall health, fault count, BIT
-  summary) and an `AVN_LRU` block (per LRU: health, last BIT result, forced) for the EICAS,
-  with `AVN_CMD` (initiated BIT; force/clear a fault; apply a data load). This touches the
-  bus controller (`B20SS/ofp/bc/`): keep that change small, with its own test in
-  `bus_controller_test.cpp`.
-- **Tests**: oracle = `_derive_health`, `check_thresholds` and `PeriodicBIT.run_due` with a
-  patched clock; the EICAS BIT list in the feed and render tests; a scripted forced fault
-  end to end.
-- **Traps**: `_probe_system` and `_build_catalogue` import every live subsystem (do not port
-  the probe, port the catalogue and the rules; construct the monitor in the oracle without
-  starting it); periodic intervals are 90 minutes (nothing happens in a test without a clock
-  you control); `swConfigure.run()` is a one-shot hard-coded load; `avConfig.xml` is a
-  placeholder.
+DONE 2026-11-10 (section 7, ICD v1.20, landed after v1.22). The plan that stood here became the ICD
+README's v1.20 paragraph and its section 2 rows. As planned: the bus controller writes a bus-health
+message for RT 1 once a second (`AVN_BUS_HEALTH`, from its poll statistics and each terminal's
+`TERM_STATUS`), and RT 1 derives the LRU table from it, applies the forced faults, runs the three
+built-in test families, the fitness rule and the software configuration, and publishes `AVN_STATUS`
+(the EICAS's own relay, RT 14 SA 8). Changed from the plan: the report is nine masks of one bit per
+terminal, not a word per terminal (the ICD tool has no repeated groups); there is no `AVN_LRU` block
+(nothing draws the LRUs: three slot masks in `AVN_STATUS` instead); `AVN_CMD` names an LRU by a
+key of up to 24 characters, resolved in C++ as `resolve_lru_id` did, so unit 28's scenario engine
+sends `failureScenario.xml`'s `<system>` values as written (`fmofp_bus/avionics.py` `key_fields`);
+a key that names no LRU declares an entry (four slots). Almost all of this was dead in the Python
+(the monitor never started, the tests never run, the EICAS wrote PASS without reading a result):
+the quirks kept and the two departures (no random probe fault; the monitor and the power-on test
+do run) are Alee's choices of 2026-11-09 (section 8).
 
 ### 2.18 Defensive systems (RT 22), 0.5
 
@@ -646,6 +618,13 @@ Bus and C++
   least 10; count frames from the MC17 syncs on the monitor.
 - The gate tests' stub terminals must not use an RT that has messages now (RT 2 became
   comms: the stubs moved to RT 4).
+  RT 1 is the avionics terminal since v1.20 and RT 4 the ECS since v1.22: the stubs are at the free
+  addresses 24 and 25, in `bus_controller_test.cpp`, `schedule_test.cpp` and `test_bus_integration.py`.
+- The controller's bus-health report (`AVN_BUS_HEALTH`) says nothing before the first major frame is done
+  (epoch 0): a test of anything RT 1 derives from it needs frames 0-49 for the first poll of every terminal,
+  up to 50 more for the report's 1 Hz slot, and 10 for `AVN_STATUS`: assert from frame 110.
+- A message whose producer is the controller is a periodic `dir="R"` message with no relay: the schedule
+  gives it a receive slot and the controller sends what `set_receive_data` stored (zeros until then).
 - The load model: the fourteen-terminal aircraft sits at 6908 us; a 25 Hz block costs
   roughly a quarter of a frame per segment; before adding a 50 Hz message check the line.
 - A custom CMake target that runs ctest must `add_dependencies` on the test executables;
@@ -695,6 +674,14 @@ Python tests and displays
   readings at zero, not two); window the assertions on the trough, not on a count of steps.
 - An `epoch` field that starts at 0 cannot say "no reading": `PLANT_ELECTRICAL`'s cycles 1-255
   and 0 is the plant without the model, which the terminal ignores.
+- The ICD tool has no 32-bit unsigned field (a double-word field must be `sint` with an `lsb`) and no
+  repeated group or character type in a message: a 32-bit mask is two 16-bit words (`_hi`, `_lo`), a number
+  like a data load's id a `sint` with `lsb="1"`, text two characters a word (`fmofp_bus/avionics.py`).
+- A stand-in module in `sys.modules` answers `from a.b.c import f` without importing `a` or `a.b`: how the
+  avionics oracle replaces the five subsystems `_probe_system` imports (`mock.patch.dict(sys.modules, ...)`).
+- When two units land out of order, take the other side's ICD XML and generated files whole
+  (`git checkout --ours` in a rebase) and re-apply your own additions with the script that made them: the
+  conflict blocks interleave both units' enums and a union of them is not well-formed XML.
 - A producer may be relayed to six consumers (`MAX_RELAYS_PER_SOURCE` in `icd_tool.py` = `kMaxRelaysPerMessage`
   in `bc/schedule.hpp`; four until v1.21): `PLANT_SENSORS` has five. Past six, make the stream a broadcast.
 - An oracle tool's `status` command must print live accessors when the oracle drives a loop's halves: the status
@@ -733,6 +720,10 @@ Working on Alee's machine
 - `verify.sh icd` reports the four `fmofp_bus/icd` files and `ICD_TABLES.md` as changed on a
   CRLF checkout: the generator writes LF and `git diff` is empty. Not a change: `git restore`
   them, do not commit them.
+- `sed -i` under Git Bash rewrites a CRLF file with LF endings: git shows only the real change (and warns
+  `LF will be replaced by CRLF`), but the Edit tool then wants the file read again.
+- A rebase in this OneDrive worktree can end with `could not remove ... rebase-merge`: the rebase is done;
+  remove the empty directory under `.git/worktrees/<name>/` by hand.
 
 ---
 
@@ -1224,6 +1215,71 @@ done before this file existed are condensed from the private session notes.
   messages for 22 terminals, worst minor frame 8492 us (was 8348 for 18); headless demo 30 s: 1500 frames,
   0 overruns, 22/22 answering; meter 24.5 / 29.5 = 83 %.
 
+### 2026-11-10 - unit 17 avionics (RT 1) - ICD v1.20 - by Alee's agent
+- *What*: `ofp/partitions/avionics` (`Avionics` around four ported classes: `LruMonitor`, LRUStatusMonitor's
+  table of the catalogue's eleven LRUs, `_derive_health`, `resolve_lru_id`, the forced faults with their
+  scenario-declared entries (four slots), `overall_health`, `get_faults`; `BuiltInTest`, the power-on self
+  test, `PeriodicBIT.run_due` by its intervals and `InitiatedBIT.run_all` over bitsConfig.xml's tables;
+  `FmFitness.check_thresholds` and `handle_redundancy`; `SoftwareConfig`, swcmConfig.xml's versions and data
+  loads; `fmofp_avionics_tool`). The bus controller writes `AVN_BUS_HEALTH` for RT 1 once a second
+  (`ofp/bc`: `BusHealthReporter` in `bus_health.{hpp,cpp}`, `BusController::set_receive_data`, three lines in
+  `main.cpp`): nine masks of one bit per terminal from its poll statistics and each terminal's last
+  `TERM_STATUS`. ICD v1.20 (inside v1.22's file): `AVN_STATUS` (18 words, 5 Hz) -> `EICAS_AVN_STATUS` (RT 14
+  SA 8), `AVN_MODE_CMD`, `AVN_BUS_HEALTH` (19 words, 1 Hz, a receive message with no relay), `AVN_CMD` (16
+  words, the key as characters); enums `lru_health`, `bit_status`, `fitness_status`, `fitness_component`,
+  `avionics_command`. The EICAS's BITS rows are the power-on results (`SystemsFeed.bit_results()`, set by
+  `EicasWindow.tick()`), an `AVN` status text and demo line, three demo events (a failure forced on the flight
+  control computer at 24 s, cleared at 42 s, an initiated test at 57 s). `fmofp_bus/avionics.py`
+  (`key_fields`, `key_text`).
+- *How*: scoped 2026-11-09 (the five modules, four config files, every caller), designed with Alee, built on
+  `wip/unit17-avionics` when the session ran out, rebased over units 19 and 20 on 2026-11-10 and finished.
+  `test_avionics_oracle.py` (15 tests) runs the frozen `LRUstatus.py`, `builtInTesting.py`, `bitControl.py`,
+  `fmStatus.py` and `swConfigure.py` beside the tool: every subsystem they reached into is a stand-in that
+  answers what the bus view says of its terminal (accessors replaced on the unstarted monitor, the probe's five
+  modules replaced in `sys.modules`, `time` and `random` patched in `builtInTesting`, the fitness logger
+  captured). `test_avionics_e2e.py` (port base 55500) runs plant + FCS + avionics + the EICAS's bus half under
+  the real controller with seven scripted commands, and a second run without the plant in which the FCS's
+  DEGRADED reaches FCC-1, GCAS-1 and PERF-1. Feed, render, display e2e, demo and message tests extended; 14
+  gtests for the partition and one for the controller's report.
+- *What the Python was*: nearly all dead. `LRUStatusMonitor` was never started (only the scenario engine's
+  `force_fault` touched it); nothing ran the built-in tests outside the file's `__main__`; the EICAS wrote
+  "<id>: PASS" for each self test without reading a result; `check_thresholds` compares with `==` on fixed
+  metrics and only logs; `PeriodicBIT` stores the earlier tests' results under the later test; the data load
+  parser keeps the first component of each load; `update_bit_result` has no caller. All kept and in the oracle
+  except two departures (ICD README section 2): the probe's random 1 % fault is gone, and the monitor and the
+  power-on test do run.
+- *Warnings / lessons*: the first bus-health report must wait for the first major frame, or the power-on test
+  judges a bus nobody has answered on yet (found while planning the e2e, before any test showed it). The plant
+  leaves `TERM_STATUS.healthy` at 0. RT 1 can no longer be a blank stub (three tests moved to RT 24). The
+  rebase: Kevin's `EICAS_HYD_STATUS` had taken RT 14 SA 6, so `EICAS_AVN_STATUS` moved to SA 8; the ICD XML's
+  conflict blocks interleaved both units' enums, so his file was taken whole and the additions re-applied by
+  script (section 6). cppcheck: three locals named after accessors (`lru`, `view`, `bit`), two raw search
+  loops, one struct without initializers. An inline heredoc in a Bash command hung on stdin once (section
+  4.8 stands).
+- *The demo on this machine*: `py -m fmofp_demo --headless --seconds 30`, 23/23 answering on every line, `AVN
+  NOMINAL 0/11 faults` and `AVN FAULT 1/11 faults (1 forced)` after the 24 s event; **not** 0 overruns: 21,
+  31, 32 and 36 in four runs of 1500 frames (worst frame 39-62 ms), spread about one a second. Measured against
+  it: the same demo without the avionics partition and its events (Kevin's 22 terminals, his events) overran
+  9, 24 and 18 times on this machine (worst 28-36 ms); with `--no-events` both are 0 (worst 14 and 16 ms). So
+  this machine does not hold the real-time demo once the radars are on, with or without unit 17, and unit 17's
+  share (one more process, three scheduled messages, five more transactions a second into the EICAS's Python
+  terminal) adds to it. The demo test does not assert overruns. Not resolved here: Kevin's machine, where 22
+  terminals ran with 0, is the reference; if 23 overrun there too, `AVN_STATUS` at 1 Hz instead of 5 is the
+  first thing to try (its content changes once a second).
+- *Files*: `ofp/partitions/avionics/{include/fmofp/avionics/avionics.hpp, src/avionics.cpp, src/main.cpp,
+  tools/avionics_tool.cpp}`, `ofp/bc/{include/fmofp/bc/bus_health.hpp, include/fmofp/bc/bus_controller.hpp,
+  src/bus_health.cpp, src/bus_controller.cpp, src/main.cpp, CMakeLists.txt}`, `ofp/partitions/CMakeLists.txt`,
+  `ofp/tests/{avionics_test.cpp, bus_controller_test.cpp, schedule_test.cpp, icd_messages_test.cpp,
+  CMakeLists.txt}`, `fmofp_bus/avionics.py`, `fmofp_display/systems_feed.py` (`avionics_data`, `bit_results`,
+  the `AVN` text), `fmofp_display/app.py`, `fmofp_demo/demo.py`, `icd/fmofp_icd.xml` + README + generated
+  files, `ofp/README.md`, `verify.sh`, both CI files, `_support.py`, the tests (`test_avionics_oracle.py`,
+  `test_avionics_e2e.py`, `test_bus_integration.py`, `test_display_feeds.py`, `test_display_render.py`,
+  `test_display_e2e.py`, `test_demo.py`, `test_messages.py`).
+- *CI*: `888eafe` (unit 20) run 42900090742 green, read from the public Actions API.
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 261 OK (was 239), ctest 2/2 (319 gtests),
+  cppcheck clean; load 107 messages for 23 terminals, worst minor frame 8612 us (was 8492 for 22); meter
+  25.5 / 29.5 = 86 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1297,3 +1353,14 @@ done before this file existed are condensed from the private session notes.
   ejecting stops nothing; CAB ALT is the cabin pressure's altitude and OXY PSI stays unknown. The EICAS's own
   g-load hydraulics model is overridden by the terminal's readings in the display process, not by editing the
   frozen display. Recorded in the ICD README section 2.
+- 2026-11-09, Alee ("Yes, build it") and Alee's agent: unit 17 as designed in section 2.17 with four choices put to
+  Alee: the built-in test probe's random 1 % failure is left out (a probe with no terminal behind it always
+  passes); the fitness rule is ported as written (`==`, not `>=`, on the placeholder metrics 75 and 80, so it
+  never fires) and documented as a defect; a forced fault on a system that is no LRU declares an entry, in four
+  slots, with the name on the bus as characters; the periodic test's cumulative result list and the data load
+  parser's first-component-only reading are reproduced and proven by oracle tests. Decided by the agent while
+  building, and told to Alee: the bus-health report is nine masks rather than a word per terminal; the
+  controller's first report waits for the first major frame; there is no `AVN_LRU` block; the EICAS's BITS rows
+  are one per self test with its worst component's status, set by the window from `EICAS_AVN_STATUS`. After the
+  rebase over v1.21 and v1.22 (2026-11-10): `EICAS_AVN_STATUS` is RT 14 SA 8 (6 and 7 are the hydraulics' and
+  the ECS's), and the ICD's version line stays 1.22. Recorded in the ICD README section 2.

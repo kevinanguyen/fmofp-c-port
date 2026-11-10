@@ -230,3 +230,18 @@ target_link_libraries(fmofp_fdm PRIVATE ofp::fdm ofp::rt_process ofp::bc ofp::wa
 # The four utilities' logic on stdin/stdout for the oracle tests.
 add_executable(fmofp_utilities_tool utilities_tool/utilities_tool.cpp)
 target_link_libraries(fmofp_utilities_tool PRIVATE ofp::ecs ofp::hydraulics ofp::airframe ofp::fdm ofp::warnings)
+# Avionics, RT 1: the LRU health monitor with its forced faults, the built-in
+# tests (power-on, periodic, initiated), the FM fitness rule and the software
+# configuration table, over the bus controller's AVN_BUS_HEALTH report.
+# fmofp_avionics_tool exposes the logic on stdin/stdout for the oracle tests.
+add_library(ofp_avionics STATIC avionics/src/avionics.cpp)
+add_library(ofp::avionics ALIAS ofp_avionics)
+add_dependencies(ofp_avionics ofp_icd_generate)
+target_include_directories(ofp_avionics PUBLIC avionics/include)
+target_link_libraries(ofp_avionics PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_avionics avionics/src/main.cpp)
+target_link_libraries(fmofp_avionics PRIVATE ofp::avionics ofp::rt_process ofp::bc ofp::warnings)
+
+add_executable(fmofp_avionics_tool avionics/tools/avionics_tool.cpp)
+target_link_libraries(fmofp_avionics_tool PRIVATE ofp::avionics ofp::warnings)

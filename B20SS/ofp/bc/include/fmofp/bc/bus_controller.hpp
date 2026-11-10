@@ -84,6 +84,12 @@ public:
     [[nodiscard]] Status queue_receive(std::uint8_t rt, std::uint8_t sa, const bus::Word* words,
                                        std::uint8_t count) noexcept;
 
+    // Sets the data a scheduled receive slot of rt/sa carries from now on: for
+    // the one periodic message the controller itself produces
+    // (AVN_BUS_HEALTH, bus_health.hpp).
+    [[nodiscard]] Status set_receive_data(std::uint8_t rt, std::uint8_t sa, const bus::Word* words,
+                                          std::uint8_t count) noexcept;
+
     // Last data received from rt/sa. kNotReady if nothing has arrived yet.
     [[nodiscard]] Status get_latest(std::uint8_t rt, std::uint8_t sa, bus::Word* out,
                                     std::uint8_t capacity, std::uint8_t& count,

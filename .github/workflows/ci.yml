@@ -240,6 +240,8 @@ jobs:
           FMOFP_AIRFRAME: ${{ github.workspace }}/B20SS/ofp/build/linux-gcc/partitions/fmofp_airframe
           FMOFP_FDM: ${{ github.workspace }}/B20SS/ofp/build/linux-gcc/partitions/fmofp_fdm
           FMOFP_UTILITIES_TOOL: ${{ github.workspace }}/B20SS/ofp/build/linux-gcc/partitions/fmofp_utilities_tool
+          FMOFP_AVIONICS: ${{ github.workspace }}/B20SS/ofp/build/linux-gcc/partitions/fmofp_avionics
+          FMOFP_AVIONICS_TOOL: ${{ github.workspace }}/B20SS/ofp/build/linux-gcc/partitions/fmofp_avionics_tool
           QT_QPA_PLATFORM: offscreen  # the display windows render to images in test_display_render.py
         run: |
           python3 B20SS/icd/tools/icd_tool.py gen-py

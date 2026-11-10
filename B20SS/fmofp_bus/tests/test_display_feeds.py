@@ -11,8 +11,9 @@ from fmofp_bus.icd.enums import (AewcMode, Affiliation, ChangeType, ClearanceLev
                                  SatcomState, ShearSeverity, Ssm, TargetClass, TargetKind, TargetStatus,
                                  TargetingMode, TargetingState, TerminalState, TfrMode, Threat, TurbulenceCategory,
                                  UnitKind, UnitStatus, WaypointType, Weapon, WeaponsState, WeatherMode)
-from fmofp_bus.icd.enums import (EcmMode, HydraulicSystem, PressureStatus, RwrBand, RwrSource, SensorHealth,
-                                 ThermalStatus, ThreatType)
+from fmofp_bus.avionics import key_fields, key_text
+from fmofp_bus.icd.enums import (AvionicsCommand, BitStatus, EcmMode, HydraulicSystem, LruHealth, PressureStatus,
+                                 RwrBand, RwrSource, SensorHealth, ThermalStatus, ThreatType)
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import (BROADCAST_SOURCES, SYMBOL_CLASS, RadarFeed, aewc_item, cell_velocity_nm_s,
                                       polar_to_nm, sar_corners_nm, sar_pgm, targeting_item, weather_items)
@@ -233,6 +234,19 @@ def sample_ecs_status(temperature=22.4, pressure=101.0, air_quality=97.5, oxygen
                                                 temperature=temperature, pressure=pressure, air_quality=air_quality,
                                                 climate_temperature=temperature, humidity=50.0, oxygen_level=oxygen,
                                                 oxygen_rate=1.0, passes=3))
+
+
+def sample_avn_status(nav=BitStatus.PASS, overall=LruHealth.NOMINAL, faults=0, forced=0, post_complete=True,
+                      bus_health_valid=True):
+    """An EICAS_AVN_STATUS: the power-on self test done (POST-NAV's components as given), eleven LRUs."""
+    post = BitStatus.PASS if post_complete else BitStatus.PENDING
+    nav = nav if post_complete else BitStatus.PENDING
+    return m.EicasAvnStatus(payload=m.AvnStatus(
+        state=TerminalState.NORMAL, healthy=True, bus_health_valid=bus_health_valid, post_complete=post_complete,
+        overall_health=overall, lru_count=11, fault_count=faults, forced_count=forced,
+        post_fcc_cpu=post, post_fcc_memory=post, post_fcc_databus=post,
+        post_nav_cpu=post, post_nav_sensors=nav, post_nav_gps_receiver=post,
+        ibit_runs=1, ibit_pass=14, ibit_fail=1, ibit_abort=0))
 
 
 class WeatherItemsTest(unittest.TestCase):
@@ -1083,6 +1097,56 @@ class UtilitiesFeedTest(unittest.TestCase):
         self.terminal.put(sample_ecs_status(), age=5.0)
         self.assertEqual({}, self.feed.system_readings())
         self.assertEqual({}, self.feed.hydraulics.get_status())
+
+
+class AvionicsFeedTest(unittest.TestCase):
+    """The EICAS's BITS rows and the LRU summary from the avionics terminal (v1.20)."""
+
+    def setUp(self):
+        self.terminal = FakeTerminal()
+        self.feed = SystemsFeed(self.terminal, clock=lambda: 1000.0)
+
+    def test_without_the_terminal_there_are_no_rows(self):
+        self.assertEqual([], self.feed.bit_results())
+        self.assertEqual({}, self.feed.avionics_data())
+        self.assertEqual([], self.feed.bit.self_tests, "the stand-in lists no test: eicas.py would write PASS for each")
+        self.assertNotIn("AVN", self.feed.status_text())
+
+    def test_one_row_per_self_test_with_its_worst_component(self):
+        self.terminal.put(sample_avn_status())
+        self.assertEqual(["POST-FCC: PASS", "POST-NAV: PASS"], self.feed.bit_results())
+        self.terminal.put(sample_avn_status(nav=BitStatus.FAIL, overall=LruHealth.FAULT, faults=1, forced=1))
+        self.assertEqual(["POST-FCC: PASS", "POST-NAV: FAIL"], self.feed.bit_results(), "one component of three failed")
+        self.terminal.put(sample_avn_status(nav=BitStatus.ABORT))
+        self.assertEqual(["POST-FCC: PASS", "POST-NAV: ABORT"], self.feed.bit_results())
+
+    def test_the_summary_and_the_status_line(self):
+        self.terminal.put(sample_avn_status(overall=LruHealth.FAULT, faults=3, forced=1))
+        data = self.feed.avionics_data()
+        self.assertEqual(("FAULT", 11, 3, 1, True), (data["overall_health"], data["lru_count"], data["fault_count"],
+                                                     data["forced_count"], data["post_complete"]))
+        self.assertEqual((1, 14, 1, 0), (data["ibit_runs"], data["ibit_pass"], data["ibit_fail"], data["ibit_abort"]))
+        self.assertIn("AVN FAULT 3/11 faults", self.feed.status_text())
+
+    def test_nothing_is_shown_before_the_power_on_test_or_when_stale(self):
+        self.terminal.put(sample_avn_status(post_complete=False, bus_health_valid=False, overall=LruHealth.UNKNOWN))
+        self.assertEqual(([], {}), (self.feed.bit_results(), self.feed.avionics_data()))
+        self.terminal.put(sample_avn_status(), age=5.0)
+        self.assertEqual(([], {}), (self.feed.bit_results(), self.feed.avionics_data()))
+
+    def test_the_command_key_is_two_characters_a_word(self):
+        fields = key_fields("flight_control_computer")
+        self.assertEqual(12, len(fields))
+        self.assertEqual((ord("f") << 8) | ord("l"), fields["key_0"])
+        self.assertEqual(ord("r") << 8, fields["key_11"], "23 characters: the last word's low byte is the padding")
+        command = m.AvnCmd(cmd_seq=1, command=AvionicsCommand.FORCE_FAULT, health=LruHealth.FAULT, **fields)
+        status, words = command.encode()
+        status, back = m.AvnCmd.decode(words)
+        self.assertEqual(("flight_control_computer", AvionicsCommand.FORCE_FAULT, LruHealth.FAULT),
+                         (key_text(back), back.command, back.health))
+        self.assertEqual("exactly_twenty_four_char", key_text(m.AvnCmd(**key_fields("exactly_twenty_four_char_and_more"))))
+        self.assertEqual("", key_text(m.AvnCmd(**key_fields(""))))
+        self.assertEqual("caf?", key_text(m.AvnCmd(**key_fields("café"))), "outside printable ASCII")
 
 
 class CommsFeedTest(unittest.TestCase):

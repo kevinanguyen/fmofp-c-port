@@ -20,7 +20,7 @@ from fmofp_bus.rt_process import RtProcess
 from fmofp_bus.status import Status
 
 PORT_BASE = 54000
-RT = 1
+RT = 24  # a free address: a terminal with no messages of its own (RT 1 is the avionics terminal since v1.20)
 FRAMES = 60
 
 
@@ -70,7 +70,7 @@ class BusIntegrationTest(unittest.TestCase):
             stub.join(timeout=2)
             process.shutdown()
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn("rt  1: transactions=2 retries=0 no_response=0", result.stdout)
+        self.assertIn("rt 24: transactions=2 retries=0 no_response=0", result.stdout)
         self.assertEqual(FRAMES, stub.syncs)
         self.assertEqual(FRAMES, process.terminal.counters.syncs)
         self.assertEqual(2, process.terminal.counters.transmits)  # TERM_STATUS at 1 Hz over 60 frames

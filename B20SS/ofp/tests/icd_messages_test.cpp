@@ -180,8 +180,8 @@ TEST(MessageTable, NoTwoMessagesShareAnAddress) {
             EXPECT_FALSE(clash) << a.id << " and " << b.id;
         }
     }
-    EXPECT_EQ(147U, kMessages.size());
-    EXPECT_EQ(49U, kRelays.size());
+    EXPECT_EQ(152U, kMessages.size());
+    EXPECT_EQ(50U, kRelays.size());
 }
 
 }  // namespace

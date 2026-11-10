@@ -26,6 +26,8 @@ The binaries are named by environment variables (CI sets them):
     FMOFP_AIRFRAME  partitions/fmofp_airframe
     FMOFP_FDM       partitions/fmofp_fdm
     FMOFP_UTILITIES_TOOL partitions/fmofp_utilities_tool
+    FMOFP_AVIONICS  partitions/fmofp_avionics
+    FMOFP_AVIONICS_TOOL partitions/fmofp_avionics_tool
 """
 
 import os

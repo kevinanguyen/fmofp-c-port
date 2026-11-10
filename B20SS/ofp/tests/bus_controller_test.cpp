@@ -12,6 +12,7 @@
 #include <thread>
 
 #include <fmofp/bc/bus_controller.hpp>
+#include <fmofp/bc/bus_health.hpp>
 #include <fmofp/bc/icd_schedule.hpp>
 #include <fmofp/bc/schedule.hpp>
 #include <fmofp/bus/transport.hpp>
@@ -352,6 +353,68 @@ TEST(BusController, RefusesABadConfiguration) {
     cfg.response_timeout = 0;
     EXPECT_EQ(Status::kInvalidArgument, bc->init(cfg, built));
     EXPECT_EQ(Status::kNotReady, bc->run_minor_frame()) << "not initialised";
+}
+
+// AVN_BUS_HEALTH (ICD v1.20): the controller's own report of its terminals,
+// stored as the data its receive slot at the avionics terminal carries.
+TEST(BusController, ReportsTheBusHealthOfItsTerminals) {
+    using fmofp::icd::AvnBusHealth;
+    StubTerminal a;
+    ASSERT_EQ(Status::kOk, a.start(24));
+    BcConfig cfg = config({24, 7}, BcMode::kFreeRun);  // nobody is listening at RT 7
+    cfg.response_timeout = 2 * kNsPerMs;
+    auto bc = make_bc();
+    ASSERT_EQ(Status::kOk, bc->init(cfg, schedule_for(cfg)));
+    fmofp::bc::BusHealthReporter reporter;
+
+    (void)bc->run_frames(kMinorFramesPerMajor);
+    ASSERT_EQ(Status::kOk, reporter.report(*bc));
+    const std::uint16_t rt24 = 1U << (24U - 16U);
+    const std::uint16_t rt7 = 1U << 7U;
+    AvnBusHealth first = reporter.last();
+    EXPECT_EQ(1U, first.epoch);
+    EXPECT_EQ(rt24, first.listed_mask_hi);
+    EXPECT_EQ(rt7, first.listed_mask_lo);
+    EXPECT_EQ(rt24, first.responded_mask_hi) << "RT 24 answers";
+    EXPECT_EQ(0U, first.responded_mask_lo) << "RT 7 never has";
+    EXPECT_EQ(rt24, first.answering_mask_hi);
+    EXPECT_EQ(rt24, first.status_mask_hi) << "its TERM_STATUS arrived this major frame";
+    EXPECT_EQ(rt24, first.healthy_mask_hi);
+    EXPECT_EQ(rt24, first.normal_mask_hi);
+    EXPECT_EQ(0U, first.degraded_mask_hi);
+    EXPECT_EQ(0U, first.failure_mask_hi);
+    EXPECT_EQ(0U, first.bit_failed_mask_hi);
+
+    // The report is what the controller will send to RT 1 SA 11.
+    AvnBusHealth::Words words{};
+    std::uint8_t count = 0;
+    std::uint32_t frame = 0;
+    ASSERT_EQ(Status::kOk,
+              bc->get_latest(AvnBusHealth::kRt, AvnBusHealth::kSubaddress, words.data(), AvnBusHealth::kWords, count, frame));
+    AvnBusHealth stored{};
+    ASSERT_EQ(Status::kOk, AvnBusHealth::decode(words, stored));
+    EXPECT_EQ(1U, stored.epoch);
+    EXPECT_EQ(rt24, stored.answering_mask_hi);
+
+    // The terminal goes away: it has responded, but the polls of the next second go unanswered.
+    a.stop();
+    (void)bc->run_frames(kMinorFramesPerMajor);
+    ASSERT_EQ(Status::kOk, reporter.report(*bc));
+    EXPECT_EQ(2U, reporter.last().epoch);
+    EXPECT_EQ(rt24, reporter.last().responded_mask_hi);
+    EXPECT_EQ(0U, reporter.last().answering_mask_hi) << "silent since the last report";
+    EXPECT_EQ(rt24, reporter.last().status_mask_hi) << "the last TERM_STATUS is still under three periods old";
+
+    // Three periods without a TERM_STATUS and it no longer counts.
+    (void)bc->run_frames(3 * kMinorFramesPerMajor);
+    ASSERT_EQ(Status::kOk, reporter.report(*bc));
+    EXPECT_EQ(0U, reporter.last().status_mask_hi);
+    EXPECT_EQ(0U, reporter.last().healthy_mask_hi);
+
+    EXPECT_EQ(Status::kInvalidArgument, bc->set_receive_data(31, 11, words.data(), 1));
+    EXPECT_EQ(Status::kInvalidArgument, bc->set_receive_data(1, 0, words.data(), 1));
+    EXPECT_EQ(Status::kInvalidArgument, bc->set_receive_data(1, 11, nullptr, 1));
+    bc->shutdown();
 }
 
 }  // namespace

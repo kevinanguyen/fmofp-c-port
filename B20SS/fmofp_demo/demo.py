@@ -8,7 +8,7 @@ terrain, engines and RF environment, RT 27), the ported partitions (flight
 control RT 5, navigation RT 7, flight management RT 12, the radar computer RT 9,
 engine management RT 3, the mission computer RT 6, communications RT 2, defensive systems RT 22, sensor management RT 10,
 power management RT 8, the flight surfaces RT 21, environmental control RT 4, hydraulics RT 19, the airframe
-RT 20, flight data monitoring RT 23), the
+RT 20, flight data monitoring RT 23, avionics RT 1), the
 six display programs (the radar display RT 15, the PFD
 RT 11, the MFD RT 13, the EICAS RT 14, the TSD RT 16 and the SMS RT 17, each in its own window), and
 finally the bus
@@ -20,7 +20,8 @@ the engines' N1 and the fuel, the radars' modes, the terrain clearance and the
 targeting tracks, the navigation fix, the mission's phase and route progress, the
 radio and satcom links, the countermeasures and the radar warning receiver, the sensors' health, the
 electrical system, the control surfaces, the hydraulics, the cabin, the landing gear and the flight data
-recorder, and which terminals are answering.
+recorder, the avionics health (the line replaceable units and the built-in tests), and which terminals are
+answering.
 
 Unless --no-events is given, a short scripted flight runs: the radars are
 switched on (the targeting and AEWC radars search, the SAR images the strip
@@ -34,7 +35,8 @@ warning receiver (two flares go out by themselves, and again every 3 s while it 
 goes active and chaff is dispensed, the LIDAR is switched off and on again, the generator is switched off
 and back on (the EICAS shows GEN 1 and GEN 2 FAIL while the main battery discharges), the flaps and the
 speedbrake go out and come back in, the backup hydraulic system is switched in, the oxygen generation rate is
-raised, the landing gear goes down and up, a recorder card is ejected, and the emergency power comes on. Each
+raised, the landing gear goes down and up, a recorder card is ejected, the emergency power comes on, a scenario
+failure is forced on the flight control computer and cleared, and the crew runs the built-in tests. Each
 event is
 announced as it happens. The radar display window's own buttons keep working
 throughout: it is the radars' control panel.
@@ -50,8 +52,9 @@ import sys
 import time
 from collections import namedtuple
 
+from fmofp_bus.avionics import key_fields
 from fmofp_bus.icd import messages as m
-from fmofp_bus.icd.enums import (Affiliation, CommsCommand, DefensiveCommand, EcmMode, MissionCommand, MissionPhase,
+from fmofp_bus.icd.enums import (Affiliation, AvionicsCommand, LruHealth, CommsCommand, DefensiveCommand, EcmMode, MissionCommand, MissionPhase,
                                  PowerCommand, RadioMode, SensorCommand, SensorId, SurfaceCommand, EcsCommand,
                                  FdmCommand, GearPosition, HydraulicCommand,
                                  RwrBand, TargetKind, ThreatType, UnitKind, WaypointType, Weapon, AewcMode, EngineCommand, EngineSelect, FmsFlightMode, FuelTank, LockStatus, SarMode,
@@ -72,7 +75,8 @@ PARTITIONS = (("fcs", m.FcsStatus.RT), ("nav", m.NavSolution.RT), ("fms", m.FmsS
               ("radar", m.RdrWxStatus.RT), ("engine", m.EngStatus.RT), ("mission", m.MsnStatus.RT),
               ("comms", m.ComStatus.RT), ("defensive", m.DefStatus.RT), ("sensor", m.SnsStatus.RT),
               ("power", m.PwrStatus.RT), ("surfaces", m.FsfStatus.RT), ("ecs", m.EcsStatus.RT),
-              ("hydraulics", m.HydStatus.RT), ("airframe", m.AfrStatus.RT), ("fdm", m.FdmStatus.RT))
+              ("hydraulics", m.HydStatus.RT), ("airframe", m.AfrStatus.RT), ("fdm", m.FdmStatus.RT),
+              ("avionics", m.AvnStatus.RT))
 # (fmofp_display argument, RT) of each display program.
 DISPLAYS = (("radar", m.DspRadarStatus.RT), ("pfd", m.DspPfdStatus.RT), ("mfd", m.DspMfdStatus.RT),
             ("eicas", m.DspEicasStatus.RT), ("tsd", m.DspTsdStatus.RT), ("sms", m.DspSmsStatus.RT))
@@ -82,7 +86,7 @@ NAMES = {PLANT_RT: "plant", m.FcsStatus.RT: "FCS", m.NavSolution.RT: "nav", m.Fm
          m.DspTsdStatus.RT: "TSD", m.DspSmsStatus.RT: "SMS", m.MsnStatus.RT: "mission",
          m.ComStatus.RT: "comms", m.DefStatus.RT: "defensive", m.SnsStatus.RT: "sensors", m.PwrStatus.RT: "power",
          m.FsfStatus.RT: "surfaces", m.EcsStatus.RT: "ECS", m.HydStatus.RT: "hydraulics", m.AfrStatus.RT: "airframe",
-         m.FdmStatus.RT: "FDM"}
+         m.FdmStatus.RT: "FDM", m.AvnStatus.RT: "avionics"}
 
 Event = namedtuple("Event", "seconds what message")
 
@@ -151,6 +155,9 @@ def default_events():
               m.DefCmd(cmd_seq=202, command=DefensiveCommand.SET_ECM_MODE, ecm_mode=EcmMode.ACTIVE)),
         Event(20.0, "autothrottle engaged: hold 500 kt",
               m.EngCmd(cmd_seq=201, command=EngineCommand.AUTOTHROTTLE_ENGAGE, target_airspeed=500.0)),
+        Event(24.0, "avionics: a scenario failure on the flight control computer (FCC-1 forced to FAULT: AVN reads FAULT)",
+              m.AvnCmd(cmd_seq=201, command=AvionicsCommand.FORCE_FAULT, health=LruHealth.FAULT,
+                       **key_fields("flight_control_computer"))),
         Event(30.0, "flight mode COMBAT (the SMS's master arm goes ARMED)",
               m.FmsFlightModeCmd(cmd_seq=201, flight_mode=FmsFlightMode.COMBAT)),
         Event(34.0, "mission: acquire target 1, then engage it with a JDAM",
@@ -163,6 +170,8 @@ def default_events():
               m.EngCmd(cmd_seq=203, command=EngineCommand.SET_THRUST, engine=EngineSelect.ENGINE_2, thrust=40.0)),
         Event(42.0, "flight surfaces: flaps to 15 deg (they travel at 5 deg/s: three seconds on the FSF line)",
               m.FsfCmd(cmd_seq=201, command=SurfaceCommand.SET_FLAPS, value=15.0)),
+        Event(42.0, "avionics: the failure is cleared (FCC-1 is UNKNOWN until the next bus report, then NOMINAL)",
+              m.AvnCmd(cmd_seq=202, command=AvionicsCommand.CLEAR_FAULT, **key_fields("flight_control_computer"))),
         Event(45.0, "defensive: four chaff cartridges dispensed (the DEF line counts down)",
               m.DefCmd(cmd_seq=203, command=DefensiveCommand.DISPENSE_CHAFF, count=4)),
         Event(47.0, "flight surfaces: speedbrake 50 % (30 deg, out within a second)",
@@ -180,6 +189,8 @@ def default_events():
                               lock_track_id=1)),
         Event(56.0, "hydraulics: backup system switched in by hand (HYD BACKUP on the systems line)",
               m.HydCmd(cmd_seq=201, command=HydraulicCommand.ACTIVATE_BACKUP)),
+        Event(57.0, "avionics: an initiated built-in test (fifteen probes: ibit 15/15 on the AVN line)",
+              m.AvnCmd(cmd_seq=203, command=AvionicsCommand.RUN_INITIATED_BIT)),
         Event(58.0, "sensors: LIDAR back on (NOMINAL)",
               m.SnsCmd(cmd_seq=202, command=SensorCommand.ACTIVATE, sensor=SensorId.LIDAR)),
         Event(60.0, "weather radar to MAPPING",
@@ -534,6 +545,16 @@ class Dashboard:
             bits.append(f"FDR {fdm.records:.0f} rec" + ("" if fdm.slot_2_present else " CVR card out"))
         if bits:
             parts.append(" ".join(bits))
+        avn = self.latest.get(m.AvnStatus)
+        if avn is not None and avn.bus_health_valid:
+            text = f"AVN {avn.overall_health.name} {avn.fault_count}/{avn.lru_count} faults"
+            if avn.forced_count:
+                text += f" ({avn.forced_count} forced)"
+            if avn.ibit_runs:
+                text += f" ibit {avn.ibit_pass}/{avn.ibit_pass + avn.ibit_fail + avn.ibit_abort}"
+            if avn.avionics_cmd_status.name not in ("NONE", "ACCEPTED"):
+                text += f" cmd {avn.avionics_cmd_status.name}"
+            parts.append(text)
         nav = self.latest.get(m.NavSolution)
         if nav is not None and nav.position_ssm == Ssm.NORMAL:
             parts.append(f"nav {nav.latitude:+.4f} {nav.longitude:+.4f} ({nav.sats_used} sats)")
@@ -564,6 +585,7 @@ def banner(args, terminals, events, log_dir, paths):
               "  EICAS window: the engine readings, the fuel quantity and balance, the FCS alerts and the crew alert\n"
               "    list, the countermeasures and the radar warning ring, the sensors' health and fused track count,\n"
               "    the electrical rows (main and essential bus, the generators: FAIL during the generator-off event)\n"
+              "    the BITS rows (the power-on self tests, from the avionics terminal)\n"
               "    (hydraulics and ECS read unknown until their terminals exist).\n"
               "  TSD window: the fused air tracks around the aircraft (bearing and range), the route's waypoints,\n"
               "    the enemy unit as a hostile contact, the radar warning contacts on the ring's edge (red dots with\n"

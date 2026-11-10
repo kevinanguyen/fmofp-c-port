@@ -517,6 +517,38 @@
       <value name="NONE" value="0"/>
       <value name="EJECT_STORAGE" value="1"/>
     </enum>
+    <enum id="lru_health" bits="3" doc="LRUstatus.HealthState: the health of one line replaceable unit as LRUStatusMonitor derives it. UNKNOWN is the state before the first poll and after a forced fault is cleared">
+      <value name="UNKNOWN" value="0"/>
+      <value name="NOMINAL" value="1"/>
+      <value name="DEGRADED" value="2"/>
+      <value name="FAULT" value="3"/>
+      <value name="OFFLINE" value="4"/>
+    </enum>
+    <enum id="bit_status" bits="2" doc="builtInTesting.BITStatus: the outcome of one built-in test probe. PENDING is also 'no result yet'">
+      <value name="PENDING" value="0"/>
+      <value name="PASS" value="1"/>
+      <value name="FAIL" value="2"/>
+      <value name="ABORT" value="3" doc="The test could not run: the avionics computer has no current picture of the bus"/>
+    </enum>
+    <enum id="fitness_status" bits="2" doc="FlightManagementFitness.check_thresholds' status string">
+      <value name="OK" value="0"/>
+      <value name="WARNING" value="1"/>
+      <value name="CRITICAL" value="2"/>
+    </enum>
+    <enum id="fitness_component" bits="2" doc="The three components of fmfConfig.xml, in its order">
+      <value name="FLIGHT_CONTROL_FITNESS" value="0"/>
+      <value name="NAVIGATION_FITNESS" value="1"/>
+      <value name="AVIONICS_FITNESS" value="2"/>
+    </enum>
+    <enum id="avionics_command" bits="4" doc="What AVN_CMD asks of the avionics terminal: InitiatedBIT.run_all (the full built-in test suite on demand), LRUStatusMonitor.force_fault and clear_forced_fault (the scenario engine's failure injection), SoftwareConfigManager.perform_update and FlightManagementFitness.handle_redundancy (neither of which the Python ever called, README section 2)">
+      <value name="NONE" value="0"/>
+      <value name="RUN_INITIATED_BIT" value="1"/>
+      <value name="FORCE_FAULT" value="2"/>
+      <value name="CLEAR_FAULT" value="3"/>
+      <value name="CLEAR_ALL_FAULTS" value="4"/>
+      <value name="APPLY_DATA_LOAD" value="5"/>
+      <value name="HANDLE_REDUNDANCY" value="6"/>
+    </enum>
   </enums>
 
   <terminals>
@@ -1960,6 +1992,122 @@
     <message id="EICAS_ECS_STATUS" rt="14" sa="7" dir="R" layout_of="ECS_STATUS" rate="5" title="Environmental control status, for the EICAS">
       <doc>ECS_STATUS relayed to the EICAS, its one consumer: the ECS rows CAB TEMP (the cabin temperature) and CAB ALT (the pressure altitude of the cabin pressure, computed by the feed); OXY PSI stays unknown, since the Python's OxygenControl models a concentration, not a bottle pressure (README section 2).</doc>
     </message>
+    <message id="AVN_STATUS" rt="1" sa="10" dir="T" words="18" rate="5" title="Avionics status">
+      <doc>The avionics terminal's state and what its four functions hold: LRUStatusMonitor's table (overall_health(), the count of get_faults(), the forced faults, and one bit per table slot for FAULT, DEGRADED and forced: slots 0-10 are the catalogue in _build_catalogue()'s order, FCC-1, FMS-1, NAV-1, RDR-1, ECU-1, COMMS-1, MSN-1, DFS-1, SNS-1, GCAS-1, PERF-1; slots 11-14 the scenario-declared entries in the order they were made), the built-in tests (the power-on self test's six component results in bitsConfig.xml's order, the last result of each periodic probe and how many results each periodic test has stored, the last initiated run's counts), the fitness status of the three components of fmfConfig.xml and the software versions of swcmConfig.xml's three components with the last data load applied. Relayed to the EICAS as EICAS_AVN_STATUS.</doc>
+      <field name="state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="last_cmd_seq" word="0" bits="7-0" type="uint" doc="cmd_seq of the last AVN_MODE_CMD processed (see Command sequence rule)"/>
+      <field name="cmd_rejected" word="1" bits="15" type="bool" doc="1 = the last AVN_MODE_CMD was rejected"/>
+      <field name="mode_transition" word="1" bits="14" type="bool" doc="1 = a commanded mode change is still in progress"/>
+      <field name="overall_health" word="1" bits="13-11" type="enum" enum="lru_health" doc="LRUStatusMonitor.overall_health(): FAULT if any LRU is, else DEGRADED if any is DEGRADED or OFFLINE, else UNKNOWN if any is, else NOMINAL"/>
+      <field name="avionics_cmd_status" word="1" bits="10-7" type="enum" enum="cmd_status" doc="Outcome of the last AVN_CMD"/>
+      <field name="bus_health_valid" word="1" bits="6" type="bool" doc="1 = an AVN_BUS_HEALTH report arrived within the last 150 frames"/>
+      <field name="post_complete" word="1" bits="5" type="bool" doc="PowerOnSelfTest.is_complete()"/>
+      <field name="backup_active" word="1" bits="4" type="bool" doc="1 = HANDLE_REDUNDANCY activated the backup of fmfConfig.xml's redundancy component"/>
+      <field name="spare_1" word="1" bits="3-1" type="spare"/>
+      <field name="healthy" word="1" bits="0" type="bool" doc="1 = healthy (legacy health_status, bit 0)"/>
+      <field name="lru_count" word="2" bits="15-8" type="uint" doc="Entries in the LRU table: the 11 of the catalogue plus the scenario-declared ones (at most 4)"/>
+      <field name="fault_count" word="2" bits="7-0" type="uint" doc="len(get_faults()): LRUs in FAULT or DEGRADED"/>
+      <field name="forced_count" word="3" bits="15-8" type="uint" doc="len(get_forced_faults())"/>
+      <field name="refused_count" word="3" bits="7-0" type="uint" doc="FORCE_FAULT commands refused because the four scenario-declared slots were taken; saturates at 255"/>
+      <field name="post_fcc_cpu" word="4" bits="15-14" type="enum" enum="bit_status" doc="POST-FCC, component cpu"/>
+      <field name="post_fcc_memory" word="4" bits="13-12" type="enum" enum="bit_status"/>
+      <field name="post_fcc_databus" word="4" bits="11-10" type="enum" enum="bit_status"/>
+      <field name="post_nav_cpu" word="4" bits="9-8" type="enum" enum="bit_status" doc="POST-NAV, component cpu"/>
+      <field name="post_nav_sensors" word="4" bits="7-6" type="enum" enum="bit_status"/>
+      <field name="post_nav_gps_receiver" word="4" bits="5-4" type="enum" enum="bit_status"/>
+      <field name="spare_4" word="4" bits="3-0" type="spare"/>
+      <field name="pbit_flight_control" word="5" bits="15-14" type="enum" enum="bit_status" doc="BIT-AVIONICS, flightControlComputer: the last periodic probe"/>
+      <field name="pbit_mission" word="5" bits="13-12" type="enum" enum="bit_status" doc="BIT-AVIONICS, missionComputer"/>
+      <field name="pbit_datalink" word="5" bits="11-10" type="enum" enum="bit_status" doc="BIT-COMM, datalink"/>
+      <field name="pbit_satcom" word="5" bits="9-8" type="enum" enum="bit_status" doc="BIT-COMM, satcom"/>
+      <field name="pbit_radios" word="5" bits="7-6" type="enum" enum="bit_status" doc="BIT-COMM, radios"/>
+      <field name="spare_5" word="5" bits="5-0" type="spare"/>
+      <field name="pbit_avionics_stored" word="6" bits="15-8" type="uint" doc="Results PeriodicBIT holds under BIT-AVIONICS; saturates at 255"/>
+      <field name="pbit_comm_stored" word="6" bits="7-0" type="uint" doc="Results PeriodicBIT holds under BIT-COMM: five per run, the two of BIT-AVIONICS included (README section 2); saturates at 255"/>
+      <field name="ibit_runs" word="7" bits="15-12" type="uint" doc="Initiated runs since reset; saturates at 15"/>
+      <field name="ibit_pass" word="7" bits="11-8" type="uint" doc="PASS results of the last initiated run (15 probes)"/>
+      <field name="ibit_fail" word="7" bits="7-4" type="uint"/>
+      <field name="ibit_abort" word="7" bits="3-0" type="uint"/>
+      <field name="fitness_flight_control" word="8" bits="15-14" type="enum" enum="fitness_status" doc="check_thresholds('flightControlFitness', ...) on the last 1 Hz pass"/>
+      <field name="fitness_navigation" word="8" bits="13-12" type="enum" enum="fitness_status"/>
+      <field name="fitness_avionics" word="8" bits="11-10" type="enum" enum="fitness_status"/>
+      <field name="spare_8" word="8" bits="9-0" type="spare"/>
+      <field name="sw_flight_control_major" word="9" bits="15-10" type="uint" doc="fltControlComp's current version, first number"/>
+      <field name="sw_flight_control_minor" word="9" bits="9-5" type="uint"/>
+      <field name="sw_flight_control_patch" word="9" bits="4-1" type="uint"/>
+      <field name="sw_flight_control_has_patch" word="9" bits="0" type="bool" doc="1 = the version has a third number (5.2.1, not 5.2)"/>
+      <field name="sw_mission_major" word="10" bits="15-10" type="uint" doc="missionComputer's current version, first number"/>
+      <field name="sw_mission_minor" word="10" bits="9-5" type="uint"/>
+      <field name="sw_mission_patch" word="10" bits="4-1" type="uint"/>
+      <field name="sw_mission_has_patch" word="10" bits="0" type="bool" doc="1 = the version has a third number (5.2.1, not 5.2)"/>
+      <field name="sw_comms_major" word="11" bits="15-10" type="uint" doc="commsSoftware's current version, first number"/>
+      <field name="sw_comms_minor" word="11" bits="9-5" type="uint"/>
+      <field name="sw_comms_patch" word="11" bits="4-1" type="uint"/>
+      <field name="sw_comms_has_patch" word="11" bits="0" type="bool" doc="1 = the version has a third number (5.2.1, not 5.2)"/>
+      <field name="last_data_load" word="12-13" bits="31-0" type="sint" lsb="1" min="0" max="99999999" doc="The id of the last data load applied (20191015); 0 while none has been"/>
+      <field name="data_loads_applied" word="14" bits="15-8" type="uint" doc="Saturates at 255"/>
+      <field name="spare_14" word="14" bits="7-0" type="spare"/>
+      <field name="lru_fault_mask" word="15" bits="14-0" type="uint" doc="Bit n = table slot n is in FAULT"/>
+      <field name="spare_15" word="15" bits="15" type="spare"/>
+      <field name="lru_degraded_mask" word="16" bits="14-0" type="uint" doc="Bit n = table slot n is DEGRADED"/>
+      <field name="spare_16" word="16" bits="15" type="spare"/>
+      <field name="lru_forced_mask" word="17" bits="14-0" type="uint" doc="Bit n = table slot n carries a forced fault"/>
+      <field name="spare_17" word="17" bits="15" type="spare"/>
+    </message>
+    <message id="AVN_MODE_CMD" rt="1" sa="10" dir="R" words="1" rate="aperiodic" title="Avionics mode command">
+      <field name="requested_state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="cmd_seq" word="0" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+    </message>
+    <message id="AVN_BUS_HEALTH" rt="1" sa="11" dir="R" words="19" rate="1" title="Bus health report from the bus controller">
+      <doc>What the bus controller knows about every terminal, written by the controller itself once a second (v1.20; it is the one message whose producer is not a terminal): one bit per terminal address in each mask, bit n for RT n. It replaces the calls LRUStatusMonitor and the built-in test probes made into the other subsystems' get_status(): on the bus the avionics computer sees a terminal only through the controller's polls and the terminal's own TERM_STATUS.</doc>
+      <field name="epoch" word="0" bits="15-8" type="uint" doc="1-255, moving on with every report; 0 says there is no report yet, which the terminal ignores"/>
+      <field name="spare_0" word="0" bits="7-0" type="spare"/>
+      <field name="listed_mask_hi" word="1" bits="15-0" type="uint" doc="Bit n = RT 16+n is in the bus controller's terminal list"/>
+      <field name="listed_mask_lo" word="2" bits="15-0" type="uint" doc="Bit n = RT n is in the bus controller's terminal list"/>
+      <field name="responded_mask_hi" word="3" bits="15-0" type="uint" doc="Bit n = RT 16+n has answered at least one transaction since the controller started"/>
+      <field name="responded_mask_lo" word="4" bits="15-0" type="uint" doc="Bit n = RT n has answered at least one transaction since the controller started"/>
+      <field name="answering_mask_hi" word="5" bits="15-0" type="uint" doc="Bit n = RT 16+n has responded and drew no unanswered transaction since the previous report"/>
+      <field name="answering_mask_lo" word="6" bits="15-0" type="uint" doc="Bit n = RT n has responded and drew no unanswered transaction since the previous report"/>
+      <field name="status_mask_hi" word="7" bits="15-0" type="uint" doc="Bit n = RT 16+n has a TERM_STATUS no older than 150 frames; the four masks below are 0 for a terminal without one"/>
+      <field name="status_mask_lo" word="8" bits="15-0" type="uint" doc="Bit n = RT n has a TERM_STATUS no older than 150 frames; the four masks below are 0 for a terminal without one"/>
+      <field name="healthy_mask_hi" word="9" bits="15-0" type="uint" doc="Bit n = RT 16+n reports TERM_STATUS.healthy"/>
+      <field name="healthy_mask_lo" word="10" bits="15-0" type="uint" doc="Bit n = RT n reports TERM_STATUS.healthy"/>
+      <field name="bit_failed_mask_hi" word="11" bits="15-0" type="uint" doc="Bit n = RT 16+n reports TERM_STATUS.bit_failed"/>
+      <field name="bit_failed_mask_lo" word="12" bits="15-0" type="uint" doc="Bit n = RT n reports TERM_STATUS.bit_failed"/>
+      <field name="normal_mask_hi" word="13" bits="15-0" type="uint" doc="Bit n = RT 16+n reports the state NORMAL"/>
+      <field name="normal_mask_lo" word="14" bits="15-0" type="uint" doc="Bit n = RT n reports the state NORMAL"/>
+      <field name="degraded_mask_hi" word="15" bits="15-0" type="uint" doc="Bit n = RT 16+n reports the state DEGRADED"/>
+      <field name="degraded_mask_lo" word="16" bits="15-0" type="uint" doc="Bit n = RT n reports the state DEGRADED"/>
+      <field name="failure_mask_hi" word="17" bits="15-0" type="uint" doc="Bit n = RT 16+n reports the state FAILURE"/>
+    <field name="failure_mask_lo" word="18" bits="15-0" type="uint" doc="Bit n = RT n reports the state FAILURE"/>
+    </message>
+    <message id="AVN_CMD" rt="1" sa="13" dir="R" words="16" rate="aperiodic" title="Avionics command">
+      <doc>RUN_INITIATED_BIT is InitiatedBIT.run_all: the six self-test probes, the five periodic probes whatever their intervals and the four interface-test probes, counted in AVN_STATUS (it does not replace the power-on results, as the Python's did not). FORCE_FAULT is LRUStatusMonitor.force_fault(key, state): key is resolved as resolve_lru_id did (an LRU id, a system key, or a part of exactly one name, whatever the case), and a key that resolves to nothing makes a scenario-declared entry named after it; CLEAR_FAULT is clear_forced_fault(key), CLEAR_ALL_FAULTS clear_forced_fault(None). APPLY_DATA_LOAD is SoftwareConfigManager.perform_update(data_load): REJECTED_INVALID for an id that is not in swcmConfig.xml. HANDLE_REDUNDANCY is FlightManagementFitness.handle_redundancy(component). The key is up to 24 characters of ASCII, two per word, the first in the high byte, padded with zeros.</doc>
+      <field name="command" word="0" bits="15-12" type="enum" enum="avionics_command"/>
+      <field name="health" word="0" bits="11-9" type="enum" enum="lru_health" doc="FORCE_FAULT: the state to force (the scenario's default is FAULT)"/>
+      <field name="component" word="0" bits="8-7" type="enum" enum="fitness_component" doc="HANDLE_REDUNDANCY: the component"/>
+      <field name="spare_0" word="0" bits="6-0" type="spare"/>
+      <field name="cmd_seq" word="1" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+      <field name="spare_1" word="1" bits="15-8" type="spare"/>
+      <field name="data_load" word="2-3" bits="31-0" type="sint" lsb="1" min="0" max="99999999" doc="APPLY_DATA_LOAD: the load's id as a number (20191015)"/>
+      <field name="key_0" word="4" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 1 and 2 of the key"/>
+      <field name="key_1" word="5" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 3 and 4 of the key"/>
+      <field name="key_2" word="6" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 5 and 6 of the key"/>
+      <field name="key_3" word="7" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 7 and 8 of the key"/>
+      <field name="key_4" word="8" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 9 and 10 of the key"/>
+      <field name="key_5" word="9" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 11 and 12 of the key"/>
+      <field name="key_6" word="10" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 13 and 14 of the key"/>
+      <field name="key_7" word="11" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 15 and 16 of the key"/>
+      <field name="key_8" word="12" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 17 and 18 of the key"/>
+      <field name="key_9" word="13" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 19 and 20 of the key"/>
+      <field name="key_10" word="14" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 21 and 22 of the key"/>
+      <field name="key_11" word="15" bits="15-0" type="uint" doc="FORCE_FAULT, CLEAR_FAULT: characters 23 and 24 of the key"/>
+    </message>
+    <message id="EICAS_AVN_STATUS" rt="14" sa="8" dir="R" layout_of="AVN_STATUS" rate="5" title="Avionics status, for the EICAS">
+      <doc>AVN_STATUS relayed to the EICAS, its one consumer (section 8): the BITS rows (the power-on self tests' results).</doc>
+    </message>
   </messages>
 
   <!-- RT-to-RT transfers the bus controller performs: in the minor frame where it polls `from`,
@@ -2031,6 +2179,7 @@
     <relay from="FMS_CONTROL_STATUS" to="AFR_FMS_CONTROL"/>
     <relay from="HYD_STATUS" to="EICAS_HYD_STATUS"/>
     <relay from="ECS_STATUS" to="EICAS_ECS_STATUS"/>
+    <relay from="AVN_STATUS" to="EICAS_AVN_STATUS"/>
   </relays>
 
   <!-- Payloads larger than one message use the block transfer format in README.md.

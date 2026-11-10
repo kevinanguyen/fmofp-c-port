@@ -12,7 +12,7 @@
 #   py    the full Python suite in fmofp_bus/tests against the binaries just built
 #         (unit tests, the oracle tests against the frozen Python, the end-to-end
 #         runs over the real bus, the display feeds/render/e2e, the headless demo)
-#   load  the bus controller's schedule for the full sixteen-terminal aircraft; the
+#   load  the bus controller's schedule for the full twenty-three-terminal aircraft; the
 #         worst minor frame must stay under the 10000 us budget
 #
 # Works from Git Bash or an MSYS2 UCRT64 shell on Windows (MSYS2 at C:\msys64) and
@@ -77,7 +77,7 @@ export_binaries() {
     # Python's subprocess wants native paths on Windows (K:/..., not /k/...).
     WB="$(cygpath -m "$BUILD" 2>/dev/null || echo "$BUILD")"
     export FMOFP_BC="$WB/bc/fmofp_bc$exe"
-    for p in fcs nav nav_tool fms radar radar_tool engine engine_tool mission mission_tool comms defensive defensive_tool sensor sensor_tool power power_tool surfaces surfaces_tool ecs hydraulics airframe fdm utilities_tool; do
+    for p in fcs nav nav_tool fms radar radar_tool engine engine_tool mission mission_tool comms defensive defensive_tool sensor sensor_tool power power_tool surfaces surfaces_tool ecs hydraulics airframe fdm utilities_tool avionics avionics_tool; do
         export "FMOFP_$(echo "$p" | tr '[:lower:]' '[:upper:]')=$WB/partitions/fmofp_$p$exe"
     done
 }
@@ -92,9 +92,9 @@ step_py() {
 
 step_load() {
     export_binaries
-    say "bus load, twenty-two terminals"
+    say "bus load, twenty-three terminals"
     "$FMOFP_BC" --schedule --rt 27 --rt 5 --rt 7 --rt 12 --rt 9 --rt 3 --rt 6 --rt 2 \
-        --rt 11 --rt 13 --rt 14 --rt 15 --rt 16 --rt 17 --rt 22 --rt 10 --rt 8 --rt 21 --rt 4 --rt 19 --rt 20 --rt 23 2>&1 | grep -i 'scheduled messages\|budget\|refus\|error' | tail -n 4
+        --rt 11 --rt 13 --rt 14 --rt 15 --rt 16 --rt 17 --rt 22 --rt 10 --rt 8 --rt 21 --rt 4 --rt 19 --rt 20 --rt 23 --rt 1 2>&1 | grep -i 'scheduled messages\|budget\|refus\|error' | tail -n 4
     [ "${PIPESTATUS[0]}" -eq 0 ] || fail "bus load (the schedule does not fit the 10 ms budget)"
 }
 

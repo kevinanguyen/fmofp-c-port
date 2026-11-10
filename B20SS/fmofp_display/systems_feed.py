@@ -62,6 +62,13 @@ pressure, shown as a pressure altitude (OXY PSI stays unknown: the Python's oxyg
 model is a concentration, not a bottle pressure). Both go in through
 set_system_readings(); hydraulics_data() and ecs_data() are the two controllers'
 get_status() dictionaries.
+From v1.20 the EICAS's BITS rows come from the avionics terminal (RT 1):
+AVN_STATUS, relayed to the EICAS as EICAS_AVN_STATUS, carries the power-on self
+test's results. eicas.py wrote "<id>: PASS" for every self test it found in a
+BuiltInTestController without reading a result, so the stand-in keeps an empty
+test list (the display invents nothing) and the window sets the rows from
+bit_results() each tick: one row per self test, with its worst component's
+status. avionics_data() is the LRU monitor's summary for the status line.
 """
 
 import math
@@ -546,6 +553,36 @@ class SystemsFeed:
                 "temperature_adjusting": p.temperature_adjusting, "pressure_adjusting": p.pressure_adjusting,
                 "purification_active": p.purification_active}
 
+    def avionics_data(self):
+        """The avionics terminal's summary from the relayed AVN_STATUS (EICAS_AVN_STATUS): LRUStatusMonitor's
+        overall_health(), its fault, forced and table counts (get_status()'s keys where it had them), whether the
+        power-on self test is complete and the last initiated run's counts; empty until the status arrives with a
+        bus health report behind it."""
+        message = self.terminal.fresh(m.EicasAvnStatus, self.stale_after_s)
+        if message is None or not message.payload.bus_health_valid:
+            return {}
+        p = message.payload
+        return {"overall_health": p.overall_health.name, "lru_count": p.lru_count, "fault_count": p.fault_count,
+                "forced_count": p.forced_count, "post_complete": p.post_complete, "ibit_runs": p.ibit_runs,
+                "ibit_pass": p.ibit_pass, "ibit_fail": p.ibit_fail, "ibit_abort": p.ibit_abort}
+
+    def bit_results(self):
+        """The EICAS's BITS rows (v1.20): "<id>: <status>" for each self test of bitsConfig.xml, the status the
+        worst of its three components' (FAIL over ABORT over PASS), from the relayed AVN_STATUS once the power-on
+        self test is complete; empty before that and when the status is stale, so the display shows no row it
+        cannot stand behind (ICD README section 2)."""
+        message = self.terminal.fresh(m.EicasAvnStatus, self.stale_after_s)
+        if message is None or not message.payload.post_complete:
+            return []
+        p = message.payload
+        rows = []
+        for test_id, results in (("POST-FCC", (p.post_fcc_cpu, p.post_fcc_memory, p.post_fcc_databus)),
+                                 ("POST-NAV", (p.post_nav_cpu, p.post_nav_sensors, p.post_nav_gps_receiver))):
+            names = {r.name for r in results}
+            status = next((s for s in ("FAIL", "ABORT", "PENDING") if s in names), "PASS")
+            rows.append(f"{test_id}: {status}")
+        return rows
+
     def fused_tracks(self):
         """RadarDataFusion.get_fused_tracks(): the tracks of the last fused tracks block the bus delivered whole, while
         it is fresh; empty when the fusion is silent, as the Python's table was with the fusion not running."""
@@ -680,6 +717,9 @@ class SystemsFeed:
         if ecs:
             parts.append(f"ECS {ecs['temperature_c']:.1f}C {ecs['pressure_kpa']:.1f}kPa "
                          f"O2 {ecs['oxygen']['oxygen_level']:.1f}%")
+        avionics = self.avionics_data()
+        if avionics:
+            parts.append(f"AVN {avionics['overall_health']} {avionics['fault_count']}/{avionics['lru_count']} faults")
         position = self.mission_data().get("current_position")
         if position is not None:
             parts.append(f"pos {position['lat']:.4f} {position['lon']:.4f}")

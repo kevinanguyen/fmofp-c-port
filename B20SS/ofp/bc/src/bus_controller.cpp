@@ -77,6 +77,22 @@ Status BusController::queue_receive(std::uint8_t rt, std::uint8_t sa, const bus:
     return Status::kOk;
 }
 
+Status BusController::set_receive_data(std::uint8_t rt, std::uint8_t sa, const bus::Word* words,
+                                       std::uint8_t count) noexcept {
+    if (rt >= bus::kBroadcastRt || sa < bus::kFirstDataSubaddress || sa > bus::kLastDataSubaddress ||
+        words == nullptr || count < 1 || count > bus::kMaxDataWords) {
+        return Status::kInvalidArgument;
+    }
+    LatestData& d = latest_[rt][sa];
+    for (std::size_t i = 0; i < bus::kMaxDataWords; ++i) {
+        d.words[i] = i < count ? words[i] : bus::Word{0};
+    }
+    d.count = count;
+    d.frame = stats_.frames;
+    d.valid = true;
+    return Status::kOk;
+}
+
 Status BusController::get_latest(std::uint8_t rt, std::uint8_t sa, bus::Word* out, std::uint8_t capacity,
                                  std::uint8_t& count, std::uint32_t& frame) const noexcept {
     count = 0;

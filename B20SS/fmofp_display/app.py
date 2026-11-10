@@ -584,7 +584,7 @@ def eicas_terminal(port_base):
                            receives=(m.BcastFmsFlightData, m.BcastFmsStatus, m.BcastFcsGcasAlerts, m.BcastFcsPerfStatus,
                                      m.BcastEngEngineStatus, m.BcastEngFuelStatus, m.BcastRdrWxScan,
                                      m.EicasDefStatus, m.EicasSnsStatus, m.EicasPwrStatus, m.EicasHydStatus,
-                                     m.EicasEcsStatus),
+                                     m.EicasEcsStatus, m.EicasAvnStatus),
                            blocks=(b.BcastRdrFusedTracks, b.BcastDefRwrContacts))
 
 
@@ -641,6 +641,10 @@ class EicasWindow(QWidget):
         readings = self.systems.system_readings()
         if readings:
             self.eicas.set_system_readings(**readings)
+        # The BITS rows (v1.20): eicas.py has no setter for them and wrote "<id>: PASS" for whatever tests a
+        # BuiltInTestController listed, so the stand-in lists none and the rows are the avionics terminal's
+        # power-on results, set here; none while its status is stale.
+        self.eicas._bits_results = self.systems.bit_results()
         requested = self.terminal.take_mode_request()
         if requested is not None and requested.name in self._display_modes.__members__:
             self.eicas.set_mode(self._display_modes[requested.name])

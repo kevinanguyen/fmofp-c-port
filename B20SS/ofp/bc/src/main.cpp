@@ -17,6 +17,7 @@
 #include <cstring>
 
 #include <fmofp/bc/bus_controller.hpp>
+#include <fmofp/bc/bus_health.hpp>
 #include <fmofp/bc/icd_schedule.hpp>
 #include <fmofp/bc/schedule.hpp>
 #include <fmofp/bus/status.hpp>
@@ -275,7 +276,16 @@ int main(int argc, char** argv) {
                 o.bc.port_base, o.bc.monitor_enabled ? "monitor on" : "monitor off");
 
     unsigned long scripted_sent = 0;
+    fmofp::bc::BusHealthReporter bus_health;
     for (unsigned long frame = 0; o.frames == 0 || frame < o.frames; ++frame) {
+        // AVN_BUS_HEALTH (ICD v1.20): the controller's own picture of the
+        // terminals, refreshed at the top of every major frame for the
+        // avionics computer's 1 Hz slot. Not before the first major frame is
+        // done: until every terminal has been polled once there is nothing
+        // to report, and the slot carries epoch 0 ("no report").
+        if (bc.minor_frame() == 0 && bc.stats().frames != 0) {
+            (void)bus_health.report(bc);
+        }
         scripted_sent += queue_scripted(bc, frame);
         const Status f = bc.run_minor_frame();
         if (f != Status::kOk && f != Status::kTimeout && f != Status::kMalformed) {
