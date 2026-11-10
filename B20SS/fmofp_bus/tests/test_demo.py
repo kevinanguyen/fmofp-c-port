@@ -84,13 +84,15 @@ class DashboardTest(unittest.TestCase):
 @needs("FMOFP_BC", "FMOFP_FCS", "FMOFP_NAV", "FMOFP_FMS", "FMOFP_RADAR", "FMOFP_ENGINE")
 @unittest.skipUnless(importlib.util.find_spec("PyQt6"), "PyQt6 is needed for the display programs")
 class DemoRunTest(unittest.TestCase):
-    def test_the_whole_aircraft_runs_headless_for_eight_seconds(self):
+    def test_the_whole_aircraft_runs_headless_for_ten_seconds(self):
+        # Ten seconds, not eight: the last event asserted below fires at 7 s and reaches the dashboard's t=8 s
+        # line, which a slow CI runner did not get to print before an 8 s run ended (run 42728027159).
         build = os.path.dirname(os.path.dirname(os.environ["FMOFP_BC"]))
         log_dir = tempfile.mkdtemp(prefix="fmofp_demo_")
         env = binary_env()
         env["PYTHONIOENCODING"] = "utf-8"
         result = subprocess.run(
-            [sys.executable, "-m", "fmofp_demo", "--port-base", str(PORT_BASE), "--seconds", "8", "--headless",
+            [sys.executable, "-m", "fmofp_demo", "--port-base", str(PORT_BASE), "--seconds", "10", "--headless",
              "--build", build, "--log-dir", log_dir, "--seed", "4"],
             capture_output=True, text=True, timeout=240, env=env, cwd=B20SS)
         output = result.stdout + result.stderr
@@ -108,7 +110,7 @@ class DemoRunTest(unittest.TestCase):
         self.assertIn("N1 ", output)
         self.assertIn("WX SURVEILLANCE", output)
         self.assertIn("TFR TERRAIN_FOLLOWING", output)
-        self.assertIn(f"bc: frames={8 * SYNC_HZ}", output)
+        self.assertIn(f"bc: frames={10 * SYNC_HZ}", output)
         self.assertIn("bc exit 0", output)
         self.assertTrue(os.path.isfile(os.path.join(log_dir, "events.txt")))
 

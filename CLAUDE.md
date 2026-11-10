@@ -135,17 +135,22 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: none. No `wip/` branches. Last session: Alee's, 2026-11-09 (first
-  session on Alee's Windows machine: setup of section 5 done, `verify.sh` green, unit 16's CI
-  recorded; no code changed). Both contributors now have a working machine. Suggested next
-  unit: 17 avionics (RT 1), then 19 flight surfaces, 20 utilities, 28, 29 last, 30.
+- **Open work / claims**: unit 17 avionics is `IN PROGRESS (Alee, 2026-11-09)`; no `wip/` branches.
+  Last session: Kevin's, 2026-11-09 (the protocol check that recorded Alee's runs and widened the
+  demo test; before it Alee's first session on his machine, 2026-11-09: setup of section 5 done,
+  `verify.sh` green, unit 16's CI recorded, unit 17 claimed). Both contributors have a working
+  machine. Kevin's next unit: 19 flight surfaces or 20 utilities (not 17), then 28, 29 last, 30.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106 and the
   Linux 3.13 leg of 42435137866); the two `cpp` jobs are the ones that judge the port.
 - **Known flaky in our own `cpp` job**: the display e2e runs the bus under `--strict` with
   seven Python terminals; the slow Linux runner answered one poll late in run 42435137866
   (worst frame 48 ms, exit 1, the next run of the same code green). Its poll timeout is 40 ms
-  since unit 15; if it reds again, rerun the job before suspecting the code.
+  since unit 15; if it reds again, rerun the job before suspecting the code. The demo test
+  (`test_demo.DemoRunTest`) was red once the same way (run 42728027159: 17 overruns in 400 frames
+  on the runner, the 7 s radio event not yet on the last dashboard line of an 8 s run); it runs
+  ten seconds since 2026-11-09. Every terminal added makes the runner's real-time demo harder:
+  unit 30 should give CI a lighter whole-aircraft check or a longer window.
 
 ---
 
@@ -1085,6 +1090,19 @@ done before this file existed are condensed from the private session notes.
 - *Tests and numbers*: verify OK (icd cpp py load): ctest 2/2, cppcheck clean, Python 217 OK
   in 51 s, load 90 messages for 17 terminals, worst minor frame 8128 us, the same numbers as
   Kevin's machine. Meter unchanged, 23 / 29.5 = 78 %.
+
+### 2026-11-09 - protocol check; Alee's first runs recorded; the demo test runs ten seconds - by Kevin's agent
+- *What*: section 0.1 on Kevin's machine: tree clean, the pull brought Alee's two commits (`3e2dc89` his
+  machine's setup entry, `d5aa844` the claim of unit 17), this file re-read, upstream/main still `4c25f52`.
+  Unit 17 is Alee's (claimed 2026-11-09): Kevin's next unit is 19 or 20. One test changed: the demo test runs
+  ten seconds instead of eight.
+- *Why*: Alee's claim run 42728027159 (a documents-only commit) was red on `linux-gcc` in `test_demo`: the
+  dashboard's `COM 243.000` (the radio event at 7 s) appears from the t=8 s line, which the slow runner (17
+  overruns in 400 frames, worst frame 28 ms) did not print before the 8 s run ended; ten seconds leave the
+  line two chances. The Python 3.10 leg of the same run was red on Alee's flaky `test_weather_radar_live`.
+- *CI*: Alee's `3e2dc89` run 42727864521 all ten jobs green; `d5aa844` run 42728027159 eight green, the two
+  reds above. Unit 16's `a63556e` run 42507980864 all ten green (recorded by Alee).
+- *Numbers*: meter unchanged, 23 / 29.5 = 78 %.
 
 ---
 
