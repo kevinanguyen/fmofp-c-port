@@ -182,3 +182,51 @@ target_link_libraries(fmofp_surfaces PRIVATE ofp::surfaces ofp::rt_process ofp::
 
 add_executable(fmofp_surfaces_tool surfaces/tools/surfaces_tool.cpp)
 target_link_libraries(fmofp_surfaces_tool PRIVATE ofp::surfaces ofp::warnings)
+
+# Environmental control, RT 4: ECSControl's threshold checks, climate copy and
+# oxygen generator over the cabin readings the plant invents.
+add_library(ofp_ecs STATIC ecs/src/ecs_control.cpp)
+add_library(ofp::ecs ALIAS ofp_ecs)
+add_dependencies(ofp_ecs ofp_icd_generate)
+target_include_directories(ofp_ecs PUBLIC ecs/include)
+target_link_libraries(ofp_ecs PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_ecs ecs/src/main.cpp)
+target_link_libraries(fmofp_ecs PRIVATE ofp::ecs ofp::rt_process ofp::bc ofp::warnings)
+
+# Hydraulics, RT 19: HydraulicSystemController's pressure monitor and backup
+# switch over the pressures the plant invents.
+add_library(ofp_hydraulics STATIC hydraulics/src/hydraulic_controller.cpp)
+add_library(ofp::hydraulics ALIAS ofp_hydraulics)
+add_dependencies(ofp_hydraulics ofp_icd_generate)
+target_include_directories(ofp_hydraulics PUBLIC hydraulics/include)
+target_link_libraries(ofp_hydraulics PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_hydraulics hydraulics/src/main.cpp)
+target_link_libraries(fmofp_hydraulics PRIVATE ofp::hydraulics ofp::rt_process ofp::bc ofp::warnings)
+
+# Airframe systems, RT 20: AirframeSystemManager's sensor readings and landing
+# gear state, the gear driven by the FMS's command.
+add_library(ofp_airframe STATIC airframe/src/airframe_manager.cpp)
+add_library(ofp::airframe ALIAS ofp_airframe)
+add_dependencies(ofp_airframe ofp_icd_generate)
+target_include_directories(ofp_airframe PUBLIC airframe/include)
+target_link_libraries(ofp_airframe PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_airframe airframe/src/main.cpp)
+target_link_libraries(fmofp_airframe PRIVATE ofp::airframe ofp::rt_process ofp::bc ofp::warnings)
+
+# Flight data monitoring, RT 23: FlightDataMonitoring's recorder over the FMS
+# flight data heard by broadcast, and its storage cards.
+add_library(ofp_fdm STATIC fdm/src/flight_data_recorder.cpp)
+add_library(ofp::fdm ALIAS ofp_fdm)
+add_dependencies(ofp_fdm ofp_icd_generate)
+target_include_directories(ofp_fdm PUBLIC fdm/include)
+target_link_libraries(ofp_fdm PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_fdm fdm/src/main.cpp)
+target_link_libraries(fmofp_fdm PRIVATE ofp::fdm ofp::rt_process ofp::bc ofp::warnings)
+
+# The four utilities' logic on stdin/stdout for the oracle tests.
+add_executable(fmofp_utilities_tool utilities_tool/utilities_tool.cpp)
+target_link_libraries(fmofp_utilities_tool PRIVATE ofp::ecs ofp::hydraulics ofp::airframe ofp::fdm ofp::warnings)

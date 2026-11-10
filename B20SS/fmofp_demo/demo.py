@@ -7,7 +7,8 @@ It starts, in this order: the plant (the simulated aircraft with its weather,
 terrain, engines and RF environment, RT 27), the ported partitions (flight
 control RT 5, navigation RT 7, flight management RT 12, the radar computer RT 9,
 engine management RT 3, the mission computer RT 6, communications RT 2, defensive systems RT 22, sensor management RT 10,
-power management RT 8, the flight surfaces RT 21), the
+power management RT 8, the flight surfaces RT 21, environmental control RT 4, hydraulics RT 19, the airframe
+RT 20, flight data monitoring RT 23), the
 six display programs (the radar display RT 15, the PFD
 RT 11, the MFD RT 13, the EICAS RT 14, the TSD RT 16 and the SMS RT 17, each in its own window), and
 finally the bus
@@ -18,7 +19,8 @@ and heading from the FMS flight data, the ground collision avoidance state,
 the engines' N1 and the fuel, the radars' modes, the terrain clearance and the
 targeting tracks, the navigation fix, the mission's phase and route progress, the
 radio and satcom links, the countermeasures and the radar warning receiver, the sensors' health, the
-electrical system, the control surfaces, and which terminals are answering.
+electrical system, the control surfaces, the hydraulics, the cabin, the landing gear and the flight data
+recorder, and which terminals are answering.
 
 Unless --no-events is given, a short scripted flight runs: the radars are
 switched on (the targeting and AEWC radars search, the SAR images the strip
@@ -31,7 +33,9 @@ enemy unit appears on the TSD, the radio is tuned and a satellite acquired, a SA
 warning receiver (two flares go out by themselves, and again every 3 s while it lasts), the jammer
 goes active and chaff is dispensed, the LIDAR is switched off and on again, the generator is switched off
 and back on (the EICAS shows GEN 1 and GEN 2 FAIL while the main battery discharges), the flaps and the
-speedbrake go out and come back in, and the emergency power comes on. Each event is
+speedbrake go out and come back in, the backup hydraulic system is switched in, the oxygen generation rate is
+raised, the landing gear goes down and up, a recorder card is ejected, and the emergency power comes on. Each
+event is
 announced as it happens. The radar display window's own buttons keep working
 throughout: it is the radars' control panel.
 
@@ -48,7 +52,8 @@ from collections import namedtuple
 
 from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import (Affiliation, CommsCommand, DefensiveCommand, EcmMode, MissionCommand, MissionPhase,
-                                 PowerCommand, RadioMode, SensorCommand, SensorId, SurfaceCommand,
+                                 PowerCommand, RadioMode, SensorCommand, SensorId, SurfaceCommand, EcsCommand,
+                                 FdmCommand, GearPosition, HydraulicCommand,
                                  RwrBand, TargetKind, ThreatType, UnitKind, WaypointType, Weapon, AewcMode, EngineCommand, EngineSelect, FmsFlightMode, FuelTank, LockStatus, SarMode,
                                  Ssm,
                                  TargetingMode, TerminalState, TfrMode, TrackFilter, WeatherMode)
@@ -66,7 +71,8 @@ PLANT_RT = m.PlantSensors.RT
 PARTITIONS = (("fcs", m.FcsStatus.RT), ("nav", m.NavSolution.RT), ("fms", m.FmsStatus.RT),
               ("radar", m.RdrWxStatus.RT), ("engine", m.EngStatus.RT), ("mission", m.MsnStatus.RT),
               ("comms", m.ComStatus.RT), ("defensive", m.DefStatus.RT), ("sensor", m.SnsStatus.RT),
-              ("power", m.PwrStatus.RT), ("surfaces", m.FsfStatus.RT))
+              ("power", m.PwrStatus.RT), ("surfaces", m.FsfStatus.RT), ("ecs", m.EcsStatus.RT),
+              ("hydraulics", m.HydStatus.RT), ("airframe", m.AfrStatus.RT), ("fdm", m.FdmStatus.RT))
 # (fmofp_display argument, RT) of each display program.
 DISPLAYS = (("radar", m.DspRadarStatus.RT), ("pfd", m.DspPfdStatus.RT), ("mfd", m.DspMfdStatus.RT),
             ("eicas", m.DspEicasStatus.RT), ("tsd", m.DspTsdStatus.RT), ("sms", m.DspSmsStatus.RT))
@@ -75,7 +81,8 @@ NAMES = {PLANT_RT: "plant", m.FcsStatus.RT: "FCS", m.NavSolution.RT: "nav", m.Fm
          m.DspPfdStatus.RT: "PFD", m.DspMfdStatus.RT: "MFD", m.DspEicasStatus.RT: "EICAS",
          m.DspTsdStatus.RT: "TSD", m.DspSmsStatus.RT: "SMS", m.MsnStatus.RT: "mission",
          m.ComStatus.RT: "comms", m.DefStatus.RT: "defensive", m.SnsStatus.RT: "sensors", m.PwrStatus.RT: "power",
-         m.FsfStatus.RT: "surfaces"}
+         m.FsfStatus.RT: "surfaces", m.EcsStatus.RT: "ECS", m.HydStatus.RT: "hydraulics", m.AfrStatus.RT: "airframe",
+         m.FdmStatus.RT: "FDM"}
 
 Event = namedtuple("Event", "seconds what message")
 
@@ -171,6 +178,8 @@ def default_events():
               m.RdrTgtModeCmd(cmd_seq=202, requested_state=TerminalState.NORMAL,
                               requested_mode=TargetingMode.TARGET_TRACK, track_filter=TrackFilter.ALL,
                               lock_track_id=1)),
+        Event(56.0, "hydraulics: backup system switched in by hand (HYD BACKUP on the systems line)",
+              m.HydCmd(cmd_seq=201, command=HydraulicCommand.ACTIVATE_BACKUP)),
         Event(58.0, "sensors: LIDAR back on (NOMINAL)",
               m.SnsCmd(cmd_seq=202, command=SensorCommand.ACTIVATE, sensor=SensorId.LIDAR)),
         Event(60.0, "weather radar to MAPPING",
@@ -178,6 +187,8 @@ def default_events():
                              requested_mode=WeatherMode.MAPPING, range_km=200.0, tilt=0.0)),
         Event(61.0, "power: generator back to automatic (the surplus recharges the main battery)",
               m.PwrCmd(cmd_seq=202, command=PowerCommand.GENERATOR_AUTO)),
+        Event(62.0, "ECS: oxygen generation rate to 1.5 L/min (reported; the level climbs 0.1 a pass regardless)",
+              m.EcsCmd(cmd_seq=201, command=EcsCommand.SET_OXYGEN_RATE, value=1.5)),
         Event(65.0, "SAR to SPOTLIGHT at 0.3 m: the lake abeam, a ship under way (a picture every 3 s)",
               m.RdrSarModeCmd(cmd_seq=202, requested_state=TerminalState.NORMAL, requested_mode=SarMode.SPOTLIGHT,
                               resolution=0.3)),
@@ -188,10 +199,16 @@ def default_events():
         Event(70.0, "mission: target 1 assessed destroyed (it leaves the targets tab); phase EGRESS",
               m.MsnCmd(cmd_seq=211, command=MissionCommand.ASSESS_DAMAGE, id=1, destroyed=True)),
         Event(71.0, "mission: phase EGRESS", m.MsnCmd(cmd_seq=212, command=MissionCommand.ADVANCE_PHASE)),
+        Event(72.0, "FMS: landing gear down (the airframe terminal's gear goes DEPLOYED)",
+              m.FmsControlCmd(cmd_seq=202, gear_present=True, gear=GearPosition.DOWN)),
         Event(75.0, "both engines back to 70 %",
               m.EngCmd(cmd_seq=205, command=EngineCommand.SET_THRUST, engine=EngineSelect.ALL, thrust=70.0)),
+        Event(78.0, "FMS: landing gear up",
+              m.FmsControlCmd(cmd_seq=203, gear_present=True, gear=GearPosition.UP)),
         Event(80.0, "power: emergency power on (the emergency battery carries the critical load; EMERG on the PWR line)",
               m.PwrCmd(cmd_seq=203, command=PowerCommand.EMERGENCY_POWER_ON)),
+        Event(83.0, "FDM: the cockpit voice recorder's card ejected (CVR card out on the systems line)",
+              m.FdmCmd(cmd_seq=201, command=FdmCommand.EJECT_STORAGE, slot=2)),
         Event(85.0, "comms: send a data-link message (ACCEPTED only with a satellite; see the COM line)",
               m.ComCmd(cmd_seq=203, command=CommsCommand.DATALINK_SEND, message_id=1, priority=2)),
         Event(86.0, "comms: a radio transmission (FAILED while the field strength is under 20 %)",
@@ -501,6 +518,22 @@ class Dashboard:
                 if status.surface_cmd_status.name not in ("NONE", "ACCEPTED"):
                     text += f" cmd {status.surface_cmd_status.name}"
             parts.append(text)
+        hyd = self.latest.get(m.HydStatus)
+        ecs = self.latest.get(m.EcsStatus)
+        afr = self.latest.get(m.AfrStatus)
+        fdm = self.latest.get(m.FdmStatus)
+        bits = []
+        if hyd is not None and hyd.pressures_valid:
+            bits.append(f"HYD {hyd.primary_psi:.0f}/{hyd.backup_psi:.0f} psi {hyd.active_system.name} "
+                        f"{hyd.pressure_status.name}")
+        if ecs is not None and ecs.sensors_valid:
+            bits.append(f"ECS {ecs.temperature:.1f}C {ecs.pressure:.1f}kPa O2 {ecs.oxygen_level:.1f}%")
+        if afr is not None:
+            bits.append(f"gear {afr.gear_state.name}")
+        if fdm is not None:
+            bits.append(f"FDR {fdm.records:.0f} rec" + ("" if fdm.slot_2_present else " CVR card out"))
+        if bits:
+            parts.append(" ".join(bits))
         nav = self.latest.get(m.NavSolution)
         if nav is not None and nav.position_ssm == Ssm.NORMAL:
             parts.append(f"nav {nav.latitude:+.4f} {nav.longitude:+.4f} ({nav.sats_used} sats)")

@@ -287,7 +287,9 @@ TEST(IcdSchedule, EveryLiveTerminalIsPolledAndTheBusStaysUnderBudget) {
 
     // Only the listed terminals are scheduled.
     Schedule two;
-    const std::array<std::uint8_t, 2> pair{1, 4};  // terminals without messages of their own (RT 2 has, since v1.16)
+    // Terminals without messages of their own (RT 2 has since v1.16, RT 1 since v1.20, RT 4 since v1.22; 24 and 25
+    // are free addresses).
+    const std::array<std::uint8_t, 2> pair{24, 25};
     ASSERT_EQ(Status::kOk, fmofp::bc::add_icd_messages(two, pair.data(), pair.size()));
     ASSERT_EQ(Status::kOk, two.build());
     EXPECT_EQ(2U, two.message_count());

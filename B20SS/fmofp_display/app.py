@@ -583,18 +583,29 @@ def eicas_terminal(port_base):
     return TerminalProcess(EICAS_RT, port_base, m.DspEicasStatus, m.DspEicasModeCmd,
                            receives=(m.BcastFmsFlightData, m.BcastFmsStatus, m.BcastFcsGcasAlerts, m.BcastFcsPerfStatus,
                                      m.BcastEngEngineStatus, m.BcastEngFuelStatus, m.BcastRdrWxScan,
-                                     m.EicasDefStatus, m.EicasSnsStatus, m.EicasPwrStatus),
+                                     m.EicasDefStatus, m.EicasSnsStatus, m.EicasPwrStatus, m.EicasHydStatus,
+                                     m.EicasEcsStatus),
                            blocks=(b.BcastRdrFusedTracks, b.BcastDefRwrContacts))
 
 
 def make_eicas(systems_feed):
     """An EICASDisplay whose sources are the bus feeds: the FMS and the FMS control, the GCAS, the performance
     monitor, the engine control unit, the built-in test controller, the defensive, sensor and fusion services and
-    the weather radar it polls ten times a second all answer from the feed's stand-ins."""
+    the weather radar it polls ten times a second all answer from the feed's stand-ins. Its hydraulic rows A and
+    B belong to the hydraulics terminal (v1.22): the display's own g-load model of them, a stand-in from before
+    the terminal existed, is overwritten with the terminal's readings right after each poll."""
     bootstrap()
     install_system_sources(systems_feed)
     import FMOFP.Interfaces.userInterface.displays.eicas as eicas_module
-    eicas = eicas_module.EICASDisplay()
+
+    class BusEicas(eicas_module.EICASDisplay):
+        def _poll_data(self):
+            super()._poll_data()
+            readings = systems_feed.hydraulic_readings()
+            if readings:
+                self.set_system_readings(**readings)
+
+    eicas = BusEicas()
     eicas.start()
     return eicas
 
@@ -625,11 +636,11 @@ class EicasWindow(QWidget):
         readings = self.systems.engine_readings()
         if readings:
             self.eicas.set_engine_readings(**readings)
-        # The electrical rows the same way (v1.19): the power management terminal's status through
-        # set_system_readings(); the hydraulic and ECS rows wait for their terminals.
-        electrical = self.systems.system_readings()
-        if electrical:
-            self.eicas.set_system_readings(**electrical)
+        # The electrical (v1.19), hydraulic and ECS rows (v1.22) the same way: the power management, hydraulics
+        # and environmental control terminals' statuses through set_system_readings().
+        readings = self.systems.system_readings()
+        if readings:
+            self.eicas.set_system_readings(**readings)
         requested = self.terminal.take_mode_request()
         if requested is not None and requested.name in self._display_modes.__members__:
             self.eicas.set_mode(self._display_modes[requested.name])

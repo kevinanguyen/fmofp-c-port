@@ -12,7 +12,7 @@ Rules for the code are in [`CLAUDE.md`](CLAUDE.md).
 | `osal/` | The only code that talks to the OS: monotonic clock with absolute-deadline sleep, UDP on 127.0.0.1. One implementation each for Windows and POSIX | `ofp::osal` |
 | `icd/` | Builds the generated headers (`fmofp/icd/enums.hpp`, `messages.hpp`, `blocks.hpp`, `version.hpp`) from `../icd/fmofp_icd.xml`. Nothing here is checked in | `ofp::icd` |
 | `bc/` | The bus controller: the 20 ms schedule, the frame loop with sync and timing, the transaction engine, and the `fmofp_bc` process, which can also send commands to terminals at given frames from a script | `ofp::bc`, `fmofp_bc` |
-| `partitions/` | `common/`: the socket loop every partition runs around its terminal. `rt_stub/`: a stand-in terminal that answers `TERM_STATUS`. `fcs/`: flight control, the first ported partition (GCAS alerts, envelope monitoring, mode and surface commands). `nav/`: navigation (the GPS position solver, the GPS / dead-reckoning fusion), plus `fmofp_nav_tool`, which puts its arithmetic on stdin/stdout for the Python oracle tests. `fms/`: flight management (flight modes and their envelopes, attitude commands and maneuvers, autopilot targets, thrust and gear, the flight data the displays read, energy maneuverability). `radar/`: the radar computer with the weather radar, the terrain-following radar, the targeting radar and the AEWC radar ported, and the cross-radar track fusion: the sensor model that renders the plant's weather, the signal processing (VIL, rain rate, storm cells, precipitation areas, wind shear, turbulence), the 1.2 s scan and the products block; the clearance assessment, path optimiser and terrain warnings over the plant's terrain profile, the guidance and the elevation block; the track table over the plant's traffic with the signature analyser, the stealth detector, the lock and the track filter; the AEWC's own track table over the same traffic out to 400 km, with its radar equation, its sectors and their priorities and its electronic protection; and the fusion's epochs over both radars' tracks; plus `fmofp_radar_tool` for the oracle tests. `engine/`: engine management (the commanded thrust of each engine, the autothrottle and the asymmetry check; the tanks, fuel lines, transfer policy and fuel monitor; the assessment of the engines' measurements; the engine model itself runs in the plant), plus `fmofp_engine_tool`. `mission/`: the mission computer (the route and its progress, the designated targets, the order of battle, the phase), plus `fmofp_mission_tool`. `comms/`: communications (the radio, satcom and data-link state and controls over the plant's RF environment). `defensive/`: defensive systems (the radar warning receiver's contact table over the fused air tracks and the plant's ESM intercepts, the chaff and flare dispensers with the automatic salvo and its cooldown, the ECM mode), plus `fmofp_defensive_tool`. `sensor/`: sensor management (the six sensors' states and the health rule, the sensor data fusion's contact table over the plant's radar, LIDAR, infrared and ESM detections), plus `fmofp_sensor_tool`. `power/`: power management (the main, APU and emergency batteries charged or discharged by the plant's electrical balance, the avionics coolant loop with its fan controller, the cabin's HVAC, the generator hold and the component controls), plus `fmofp_power_tool`. `surfaces/`: the flight surfaces (the ten control surfaces moved toward their commands at their slew rates: the ailerons and elevators from the sensed roll and pitch, the slats from the angle of attack, the flaps, speedbrake, rudder and trim from `FSF_CMD`), plus `fmofp_surfaces_tool`. Each is a pure library plus a process | `ofp::rt_process`, `fmofp_rt_stub`, `ofp::fcs`, `fmofp_fcs`, `ofp::nav`, `fmofp_nav`, `fmofp_nav_tool`, `ofp::fms`, `fmofp_fms`, `ofp::radar`, `fmofp_radar`, `fmofp_radar_tool`, `ofp::engine`, `fmofp_engine`, `fmofp_engine_tool`, `ofp::mission`, `fmofp_mission`, `fmofp_mission_tool`, `ofp::comms`, `fmofp_comms`, `ofp::defensive`, `fmofp_defensive`, `fmofp_defensive_tool`, `ofp::sensor`, `fmofp_sensor`, `fmofp_sensor_tool`, `ofp::power`, `fmofp_power`, `fmofp_power_tool`, `ofp::surfaces`, `fmofp_surfaces`, `fmofp_surfaces_tool` |
+| `partitions/` | `common/`: the socket loop every partition runs around its terminal. `rt_stub/`: a stand-in terminal that answers `TERM_STATUS`. `fcs/`: flight control, the first ported partition (GCAS alerts, envelope monitoring, mode and surface commands). `nav/`: navigation (the GPS position solver, the GPS / dead-reckoning fusion), plus `fmofp_nav_tool`, which puts its arithmetic on stdin/stdout for the Python oracle tests. `fms/`: flight management (flight modes and their envelopes, attitude commands and maneuvers, autopilot targets, thrust and gear, the flight data the displays read, energy maneuverability). `radar/`: the radar computer with the weather radar, the terrain-following radar, the targeting radar and the AEWC radar ported, and the cross-radar track fusion: the sensor model that renders the plant's weather, the signal processing (VIL, rain rate, storm cells, precipitation areas, wind shear, turbulence), the 1.2 s scan and the products block; the clearance assessment, path optimiser and terrain warnings over the plant's terrain profile, the guidance and the elevation block; the track table over the plant's traffic with the signature analyser, the stealth detector, the lock and the track filter; the AEWC's own track table over the same traffic out to 400 km, with its radar equation, its sectors and their priorities and its electronic protection; and the fusion's epochs over both radars' tracks; plus `fmofp_radar_tool` for the oracle tests. `engine/`: engine management (the commanded thrust of each engine, the autothrottle and the asymmetry check; the tanks, fuel lines, transfer policy and fuel monitor; the assessment of the engines' measurements; the engine model itself runs in the plant), plus `fmofp_engine_tool`. `mission/`: the mission computer (the route and its progress, the designated targets, the order of battle, the phase), plus `fmofp_mission_tool`. `comms/`: communications (the radio, satcom and data-link state and controls over the plant's RF environment). `defensive/`: defensive systems (the radar warning receiver's contact table over the fused air tracks and the plant's ESM intercepts, the chaff and flare dispensers with the automatic salvo and its cooldown, the ECM mode), plus `fmofp_defensive_tool`. `sensor/`: sensor management (the six sensors' states and the health rule, the sensor data fusion's contact table over the plant's radar, LIDAR, infrared and ESM detections), plus `fmofp_sensor_tool`. `power/`: power management (the main, APU and emergency batteries charged or discharged by the plant's electrical balance, the avionics coolant loop with its fan controller, the cabin's HVAC, the generator hold and the component controls), plus `fmofp_power_tool`. `surfaces/`: the flight surfaces (the ten control surfaces moved toward their commands at their slew rates: the ailerons and elevators from the sensed roll and pitch, the slats from the angle of attack, the flaps, speedbrake, rudder and trim from `FSF_CMD`), plus `fmofp_surfaces_tool`. `ecs/`, `hydraulics/`, `airframe/`, `fdm/`: the four small utilities (the cabin's three checks, climate copy and oxygen generator; the hydraulic pressure monitor and backup switch; the airframe readings and the landing gear state the FMS commands; the flight data recorder over the FMS flight data heard by broadcast, with its storage cards), plus `utilities_tool/` (`fmofp_utilities_tool`, the four on stdin for the oracle tests). Each is a pure library plus a process | `ofp::rt_process`, `fmofp_rt_stub`, `ofp::fcs`, `fmofp_fcs`, `ofp::nav`, `fmofp_nav`, `fmofp_nav_tool`, `ofp::fms`, `fmofp_fms`, `ofp::radar`, `fmofp_radar`, `fmofp_radar_tool`, `ofp::engine`, `fmofp_engine`, `fmofp_engine_tool`, `ofp::mission`, `fmofp_mission`, `fmofp_mission_tool`, `ofp::comms`, `fmofp_comms`, `ofp::defensive`, `fmofp_defensive`, `fmofp_defensive_tool`, `ofp::sensor`, `fmofp_sensor`, `fmofp_sensor_tool`, `ofp::power`, `fmofp_power`, `fmofp_power_tool`, `ofp::surfaces`, `fmofp_surfaces`, `fmofp_surfaces_tool`, `ofp::ecs`, `fmofp_ecs`, `ofp::hydraulics`, `fmofp_hydraulics`, `ofp::airframe`, `fmofp_airframe`, `ofp::fdm`, `fmofp_fdm`, `fmofp_utilities_tool` |
 | `tests/` | GoogleTest unit tests for the hand-written code, including the Phase 1 gate run in-process | `ofp_tests` |
 | `cmake/` | The compiler flags every target gets | `ofp::warnings`, `ofp::flight` |
 
@@ -74,7 +74,8 @@ window reads a mirror.
 Flight control, navigation, flight management, the five radars (weather,
 terrain-following, synthetic aperture, targeting and AEWC) with the track fusion,
 engine management, the mission computer, communications, the defensive systems, sensor management,
-power management and the flight surfaces on the bus, fed by
+power management, the flight surfaces, environmental control, hydraulics, the airframe systems and flight
+data monitoring on the bus, fed by
 the Python plant model (the simulated aircraft, its weather, its terrain, its two
 engines, the air traffic around it, the ground beneath it, the RF environment it
 flies through and its electrical system, RT 27). From `B20SS/`:
@@ -92,7 +93,11 @@ ofp/build/<preset>/partitions/fmofp_defensive --port-base 53000
 ofp/build/<preset>/partitions/fmofp_sensor --port-base 53000
 ofp/build/<preset>/partitions/fmofp_power --port-base 53000
 ofp/build/<preset>/partitions/fmofp_surfaces --port-base 53000
-ofp/build/<preset>/bc/fmofp_bc --rt 27 --rt 5 --rt 7 --rt 12 --rt 9 --rt 3 --rt 6 --rt 2 --rt 22 --rt 10 --rt 8 --rt 21 --port-base 53000 --report
+ofp/build/<preset>/partitions/fmofp_ecs --port-base 53000
+ofp/build/<preset>/partitions/fmofp_hydraulics --port-base 53000
+ofp/build/<preset>/partitions/fmofp_airframe --port-base 53000
+ofp/build/<preset>/partitions/fmofp_fdm --port-base 53000
+ofp/build/<preset>/bc/fmofp_bc --rt 27 --rt 5 --rt 7 --rt 12 --rt 9 --rt 3 --rt 6 --rt 2 --rt 22 --rt 10 --rt 8 --rt 21 --rt 4 --rt 19 --rt 20 --rt 23 --port-base 53000 --report
 ```
 
 The controller polls the plant's `PLANT_SENSORS` 50 times a second and relays it
@@ -160,7 +165,18 @@ toward their commands at their slew rates: the ailerons from the roll, the eleva
 the pitch, the slats from the angle of attack, and the flaps, speedbrake, rudder and trim
 from `FSF_CMD` (RT 21, SA 12); `FSF_POSITIONS` says where they are, `FSF_STATUS` the flap
 detent and the trim. Nothing consumes them yet (the monitor and the demo's dashboard read
-them from the controller's table).
+them from the controller's table). The four small utility terminals (v1.22) receive the
+plant's cabin readings (`PLANT_CABIN`, relayed as `ECS_CABIN`, twice a second), hydraulic
+pressures (`PLANT_HYDRAULICS` → `HYD_PRESSURES`) and airframe sensors (`PLANT_AIRFRAME` →
+`AFR_SENSORS`), once a second; the environmental control terminal (RT 4) runs its three
+checks, its oxygen generator and its climate copy on each reading and takes `ECS_CMD` (RT 4,
+SA 12); the hydraulics terminal (RT 19) judges the active system's pressure and switches to
+the backup on CRITICAL or on `HYD_CMD` (RT 19, SA 12); the airframe terminal (RT 20) reports
+its readings and moves its gear state when the FMS's gear command changes
+(`FMS_CONTROL_STATUS`, relayed as `AFR_FMS_CONTROL`) or on `AFR_CMD` (RT 20, SA 13); the flight
+data monitoring terminal (RT 23) records the FMS flight data it hears by broadcast twice a
+second and ejects a card on `FDM_CMD` (RT 23, SA 11). `HYD_STATUS` and `ECS_STATUS` reach the
+EICAS by relay, where they fill the hydraulic and cabin rows.
 
 To command a partition, give the controller a script: one command per line,
 `frame rt sa word word ...` with the data words in hex, sent in that minor
@@ -300,6 +316,14 @@ pass for pass (the sync from the sensed attitude, the slew-rate steps with a var
 detents and clamps of the manual controls) and records the Python's quirks; `test_surfaces_e2e.py`
 runs the plant with its attitude held and the surfaces partition under the real controller with
 the flaps, speedbrake, rudder and trim commanded, and reads the positions from the monitor.
+`test_utilities_oracle.py` runs the frozen `ecsControl.py`, `hydrControl.py`, `airframeControl.py` and
+`fdmControl.py` beside `fmofp_utilities_tool` (the ECS's checks, oxygen and climate pass for pass with its
+logger captured, the hydraulics config and backup switch, the gear state machine and sensor table, the
+recorder's tables and card ejection) and records their quirks; `test_utilities_e2e.py` runs the plant, the
+four partitions, the FCS and the FMS under the real controller with the hydraulic pressure and the cabin
+held, the gear commanded through the FMS and by hand, the backup system switched in and a card ejected,
+and reads the result at the EICAS's bus half; `test_plant_utilities.py` checks the plant's three new
+worlds.
 `test_display_e2e.py` runs the six display terminals headless beside the
 whole set of partitions and checks that the radars' products and the FMS's
 flight data arrive at the displays by broadcast, that the flight computer's

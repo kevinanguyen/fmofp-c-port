@@ -21,6 +21,11 @@ The binaries are named by environment variables (CI sets them):
     FMOFP_POWER_TOOL partitions/fmofp_power_tool
     FMOFP_SURFACES  partitions/fmofp_surfaces
     FMOFP_SURFACES_TOOL partitions/fmofp_surfaces_tool
+    FMOFP_ECS       partitions/fmofp_ecs
+    FMOFP_HYDRAULICS partitions/fmofp_hydraulics
+    FMOFP_AIRFRAME  partitions/fmofp_airframe
+    FMOFP_FDM       partitions/fmofp_fdm
+    FMOFP_UTILITIES_TOOL partitions/fmofp_utilities_tool
 """
 
 import os

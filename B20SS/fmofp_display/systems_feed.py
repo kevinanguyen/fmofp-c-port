@@ -52,6 +52,16 @@ voltage, the auxiliary 28 V bus (shown as the essential bus) and the generator's
 state (both GEN rows), which the window hands to eicas.set_system_readings() each
 tick as it does the engine readings; power_data() is PowerManagementSystem.get_data()'s
 snapshot for whatever reads it (the status line today).
+
+From v1.22 the EICAS's hydraulic rows SYS A and SYS B come from the hydraulics
+terminal (RT 19): HYD_STATUS, relayed as EICAS_HYD_STATUS, gives the primary and
+backup systems' pressures (SYS C has no system behind it in hydrConfig.xml and stays
+unknown), and its ECS rows from the environmental control terminal (RT 4):
+ECS_STATUS, relayed as EICAS_ECS_STATUS, gives the cabin temperature and the cabin
+pressure, shown as a pressure altitude (OXY PSI stays unknown: the Python's oxygen
+model is a concentration, not a bottle pressure). Both go in through
+set_system_readings(); hydraulics_data() and ecs_data() are the two controllers'
+get_status() dictionaries.
 """
 
 import math
@@ -63,6 +73,14 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import Ssm
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.terminal import STALE_AFTER_S
+
+HYDRAULIC_SYSTEM_NAMES = {"PRIMARY": "Main hydraulic system", "BACKUP": "Backup hydraulic system"}  # hydrConfig.xml
+
+
+def pressure_altitude_ft(cabin_pressure_kpa):
+    """The ISA pressure altitude of a cabin pressure: the CAB ALT the EICAS shows for the ECS's pressure reading."""
+    ratio = max(0.0, cabin_pressure_kpa) / 101.325
+    return 145366.45 * (1.0 - ratio ** 0.190284)
 
 # performaneMonitoring.PerformanceMonitor.LIMITS, in the order of FCS_PERF_STATUS's exceedance bits:
 # (bit, the parameter name the Python reported, the limit).
@@ -290,6 +308,8 @@ class SystemsFeed:
         self.defensive = SimpleNamespace(get_data=self.defensive_data, get_rwr_contacts=self.rwr_contacts)
         self.sensors = SimpleNamespace(get_data=self.sensor_data)
         self.power = SimpleNamespace(get_data=self.power_data)
+        self.hydraulics = SimpleNamespace(get_status=self.hydraulics_data)
+        self.ecs = SimpleNamespace(get_status=self.ecs_data)
         self.fusion = SimpleNamespace(get_threat_tracks=self.threat_tracks, get_fused_tracks=self.fused_tracks)
 
     def get_alerts(self):
@@ -465,17 +485,66 @@ class SystemsFeed:
                 "apu_running": p.apu_running, "thermal_status": p.thermal_status.name}
 
     def system_readings(self):
-        """What eicas.set_system_readings() takes from the power management terminal (v1.19): the main bus voltage
-        (main_bus_v), the auxiliary 28 V bus as the essential bus (ess_bus_v) and the one generator's state as both
-        generator rows (gen1_ok, gen2_ok: online while its output is above zero), from the relayed PWR_STATUS while
-        it is fresh and has a reading (ICD README section 2). The hydraulic and ECS readings wait for their
-        terminals; set_system_readings marks each key valid, so they age out like everything else."""
+        """What eicas.set_system_readings() takes from the terminals: the power management terminal's (v1.19: the main
+        bus voltage as main_bus_v, the auxiliary 28 V bus as the essential bus ess_bus_v, the one generator's state as
+        both generator rows gen1_ok and gen2_ok, online while its output is above zero), the hydraulics terminal's
+        (v1.22: sys_a_psi the primary system, sys_b_psi the backup; no sys_c_psi) and the environmental control
+        terminal's (v1.22: cabin_temp_c, and cabin_alt_ft as the pressure altitude of the cabin pressure), each from
+        its relayed status while it is fresh and has a reading (ICD README section 2). set_system_readings marks each
+        key valid, so they age out like everything else."""
+        readings = {}
         message = self.terminal.fresh(m.EicasPwrStatus, self.stale_after_s)
-        if message is None or not message.payload.electrical_valid:
+        if message is not None and message.payload.electrical_valid:
+            p = message.payload
+            readings.update({"main_bus_v": p.main_bus_voltage, "ess_bus_v": p.aux_bus_voltage,
+                             "gen1_ok": p.generator_online, "gen2_ok": p.generator_online})
+        readings.update(self.hydraulic_readings())
+        readings.update(self.ecs_readings())
+        return readings
+
+    def hydraulic_readings(self):
+        """The hydraulic rows: SYS A the primary system's pressure, SYS B the backup's, from the relayed HYD_STATUS
+        while it is fresh and has a reading. The EICAS models A and B from the load factor in its own poll; the
+        window re-applies these right after each poll (app.make_eicas)."""
+        message = self.terminal.fresh(m.EicasHydStatus, self.stale_after_s)
+        if message is None or not message.payload.pressures_valid:
+            return {}
+        return {"sys_a_psi": message.payload.primary_psi, "sys_b_psi": message.payload.backup_psi}
+
+    def ecs_readings(self):
+        """The ECS rows: CAB TEMP the cabin temperature, CAB ALT the pressure altitude of the cabin pressure, from the
+        relayed ECS_STATUS while it is fresh and has a reading. OXY PSI has no source: the Python's OxygenControl
+        models a concentration, not a bottle pressure."""
+        message = self.terminal.fresh(m.EicasEcsStatus, self.stale_after_s)
+        if message is None or not message.payload.sensors_valid:
+            return {}
+        return {"cabin_temp_c": message.payload.temperature,
+                "cabin_alt_ft": pressure_altitude_ft(message.payload.pressure)}
+
+    def hydraulics_data(self):
+        """HydraulicSystemController.get_status(), from the relayed HYD_STATUS: the active system's description (as
+        hydrConfig.xml names it), the pressure status and both pressures; empty while the terminal is silent."""
+        message = self.terminal.fresh(m.EicasHydStatus, self.stale_after_s)
+        if message is None:
             return {}
         p = message.payload
-        return {"main_bus_v": p.main_bus_voltage, "ess_bus_v": p.aux_bus_voltage, "gen1_ok": p.generator_online,
-                "gen2_ok": p.generator_online}
+        return {"active_system": HYDRAULIC_SYSTEM_NAMES[p.active_system.name],
+                "pressure_status": p.pressure_status.name, "primary_psi": p.primary_psi,
+                "backup_psi": p.backup_psi, "pressures_valid": p.pressures_valid}
+
+    def ecs_data(self):
+        """ECSControl.get_status(), from the relayed ECS_STATUS: the readings, the climate and oxygen sub-components'
+        state, and what the three checks found; empty while the terminal is silent or has no reading, as the
+        Python's getters answered None without a sensor source."""
+        message = self.terminal.fresh(m.EicasEcsStatus, self.stale_after_s)
+        if message is None or not message.payload.sensors_valid:
+            return {}
+        p = message.payload
+        return {"temperature_c": p.temperature, "pressure_kpa": p.pressure, "air_quality_pct": p.air_quality,
+                "climate": {"temperature": p.climate_temperature, "humidity": p.humidity},
+                "oxygen": {"oxygen_level": p.oxygen_level, "generation_rate": p.oxygen_rate},
+                "temperature_adjusting": p.temperature_adjusting, "pressure_adjusting": p.pressure_adjusting,
+                "purification_active": p.purification_active}
 
     def fused_tracks(self):
         """RadarDataFusion.get_fused_tracks(): the tracks of the last fused tracks block the bus delivered whole, while
@@ -603,6 +672,14 @@ class SystemsFeed:
             if power["emergency_mode_active"]:
                 text += " EMERG"
             parts.append(text)
+        hydraulics = self.hydraulics_data()
+        if hydraulics and hydraulics["pressures_valid"]:
+            parts.append(f"HYD {hydraulics['primary_psi']:.0f}/{hydraulics['backup_psi']:.0f} psi "
+                         f"{hydraulics['active_system'].split()[0].upper()} {hydraulics['pressure_status']}")
+        ecs = self.ecs_data()
+        if ecs:
+            parts.append(f"ECS {ecs['temperature_c']:.1f}C {ecs['pressure_kpa']:.1f}kPa "
+                         f"O2 {ecs['oxygen']['oxygen_level']:.1f}%")
         position = self.mission_data().get("current_position")
         if position is not None:
             parts.append(f"pos {position['lat']:.4f} {position['lon']:.4f}")

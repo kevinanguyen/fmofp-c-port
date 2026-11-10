@@ -98,41 +98,44 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone: unit 19 flight surfaces, ICD v1.21 (2026-11-10, section 7; its CI
-  run is to be recorded). Before it: `a63556e` unit 16 power management, ICD v1.19 (2026-11-08;
-  CI run 42507980864 all ten jobs green), `c4057ed` (unit
+  `git log -1`. Last milestone: unit 20 small utilities, ICD v1.22 (2026-11-10, section 7; its CI
+  run is to be recorded). Before it: `337820b` unit 19 flight surfaces, ICD v1.21 (2026-11-10, CI run
+  42885140093, section 7), `a63556e` unit 16 power management, ICD v1.19 (2026-11-08; CI run
+  42507980864 all ten jobs green), `c4057ed` (unit
   15 sensor management, ICD v1.18; CI run 42439181347 all ten jobs green), `d718e09` (unit 18
   defensive systems, ICD v1.17; CI run 42435137866: eight green, `linux-gcc` red on one
   unanswered poll in the display e2e on the slow runner, the same code green on the next run,
   the Linux 3.13 Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename
   and Alee), `8d67afd` (this file and `B20SS/verify.sh`), `d82173f` (merge of upstream/main
   `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.21 (`B20SS/icd/fmofp_icd.xml`; v1.20 is unit 17's, on Alee's branch): 26 terminals,
-  126 message definitions (172 after per-terminal expansion), 43 message relays (15 broadcast), 24 block streams
+- **ICD** v1.22 (`B20SS/icd/fmofp_icd.xml`; v1.20 is unit 17's, on Alee's branch): 26 terminals,
+  147 message definitions (193 after per-terminal expansion), 49 message relays (15 broadcast), 24 block streams
   (12 layouts, 12 relayed copies), 9 mode codes, 89/89 legacy types mapped.
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
   systems (RT 22), sensor management (RT 10), power management (RT 8), flight surfaces
-  (RT 21); the bus controller `fmofp_bc`; tools `fmofp_nav_tool`, `fmofp_radar_tool`,
-  `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool`, `fmofp_sensor_tool`,
-  `fmofp_power_tool`, `fmofp_surfaces_tool` (stdin oracles for the Python tests).
+  (RT 21), environmental control (RT 4), hydraulics (RT 19), airframe systems (RT 20), flight
+  data monitoring (RT 23); the bus controller `fmofp_bc`; tools `fmofp_nav_tool`,
+  `fmofp_radar_tool`, `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool`,
+  `fmofp_sensor_tool`, `fmofp_power_tool`, `fmofp_surfaces_tool`, `fmofp_utilities_tool` (stdin
+  oracles for the Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
   random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
   ground scene, the RF environment, the ESM intercepts, the sensor scans, the electrical
-  readings); six display terminals `py -m fmofp_display radar|pfd|mfd|eicas|tsd|sms`
+  readings, the cabin, the hydraulic pressures, the airframe gauges); six display terminals `py -m fmofp_display radar|pfd|mfd|eicas|tsd|sms`
   (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display class fed from the bus through
   `fmofp_display/*_feed.py`; the one-command demo `py -m fmofp_demo`; the bus library
   `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: 18 terminals, 93 scheduled messages, worst minor frame 8348 us of the 10000 us
-  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns, 18/18 terminals
+- **Load**: 22 terminals, 104 scheduled messages, worst minor frame 8492 us of the 10000 us
+  budget. Thirty seconds of headless demo: 1500 frames, 0 overruns, 22/22 terminals
   answering.
-- **Tests**: Python 221 OK (`fmofp_bus/tests`, about 47 s on Windows); C++ ctest 2/2
+- **Tests**: Python 239 OK (`fmofp_bus/tests`, about 48 s on Windows); C++ ctest 2/2
   (hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
   workflows/ci.yml` job `cpp`, linux-gcc + linux-asan, and Alee's eight Python legs).
-- **Meter**: 23.5 of 29.5 units = **80 %** (section 2). Pace measured over the log: about
-  5 units per full working day, so a little over a day more to 100 % (6 units open, one of them
-  Alee's unit 17 in progress); the intern-ticket authoring phase comes after and is not in the
+- **Meter**: 24.5 of 29.5 units = **83 %** (section 2). Pace measured over the log: about
+  5 units per full working day, so about a day more to 100 % (5 units open: 17 in progress at
+  Alee's, then 28, 29, 30); the intern-ticket authoring phase comes after and is not in the
   number.
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
@@ -144,15 +147,17 @@ person may continue it in their next session; when it is green it is rebased ont
   partition and tool, the oracle and e2e tests. Not done: the display tests, the full Python
   suite and the headless demo since the wiring, the ICD and ofp READMEs, this file. Next step for
   whoever continues it: rebase on `port/cpp`, finish those, `verify.sh` green, one commit on
-  `port/cpp`, delete the branch. Unit 19 landed on `port/cpp` as ICD v1.21 while unit 17 (v1.20)
-  is open (section 8): unit 17's rebase will conflict where both units appended at the same
-  anchors (the ICD's enums, messages and relays tails and version line, the generated
+  `port/cpp`, delete the branch. Units 19 (ICD v1.21) and 20 (v1.22) landed on `port/cpp` while
+  unit 17 (v1.20) is open (section 8): unit 17's rebase will conflict where the units appended at
+  the same anchors (the ICD's enums, messages and relays tails and version line, the generated
   `fmofp_bus/icd/*` and `ICD_TABLES.md`, the counts in `test_messages.py` and
   `icd_messages_test.cpp`, `verify.sh`, both CI files, `_support.py`, the demo's PARTITIONS and
-  NAMES, the display e2e's and demo test's lists, both CMake lists, the ICD README's tables):
-  keep both additions, regenerate, and the counts become 131 messages, 44 relays, 19 terminals.
-  Last session: Kevin's, 2026-11-10 (unit 19). Kevin's next unit: 20 utilities (ICD v1.22),
-  then 28, 29 last, 30.
+  NAMES, the display e2e's and demo test's lists, both CMake lists, the ICD README's tables, the
+  gate tests' stub addresses in `bus_controller_test.cpp` and `schedule_test.cpp`): keep both
+  additions, regenerate, and the counts become 152 messages, 50 relays, 23 terminals; the stubs
+  are at RT 24 and 25 here (his branch has 24 and 4; RT 4 is the ECS since v1.22: keep 24 and 25).
+  Last session: Kevin's, 2026-11-10 (units 19 and 20). Kevin's next unit: 28 scenario engine +
+  CLI (ICD v1.23), then 29 last, 30.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866 and the Windows 3.13 leg of 42729856922); the two `cpp` jobs are the ones
@@ -163,8 +168,9 @@ person may continue it in their next session; when it is green it is rebased ont
   since unit 15; if it reds again, rerun the job before suspecting the code. The demo test
   (`test_demo.DemoRunTest`) was red once the same way (run 42728027159: 17 overruns in 400 frames
   on the runner, the 7 s radio event not yet on the last dashboard line of an 8 s run); it runs
-  ten seconds since 2026-11-09. Every terminal added makes the runner's real-time demo harder:
-  unit 30 should give CI a lighter whole-aircraft check or a longer window.
+  ten seconds since 2026-11-09. Every terminal added makes the runner's real-time demo harder
+  (22 terminals since unit 20; 0 overruns in 1500 frames on Kevin's machine, worst frame 17.8 ms
+  at start-up): unit 30 should give CI a lighter whole-aircraft check or a longer window.
 
 ---
 
@@ -195,7 +201,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 17 | Avionics: LRU health + BIT + fitness + SW configuration (RT 1) | 1 | IN PROGRESS (Alee, 2026-11-09) |
 | 18 | Defensive systems (RT 22) | 0.5 | DONE 2026-11-07 |
 | 19 | Flight surfaces (RT 21) | 0.5 | DONE 2026-11-10 |
-| 20 | Small utilities: ECS (RT 4), hydraulics (RT 19), airframe (RT 20), flight data monitoring (RT 23) | 1 | IN PROGRESS (Kevin, 2026-11-10) |
+| 20 | Small utilities: ECS (RT 4), hydraulics (RT 19), airframe (RT 20), flight data monitoring (RT 23) | 1 | DONE 2026-11-10 |
 | 21 | Radar display + PFD on the bus | 1.5 | DONE 2026-10-25 |
 | 22 | MFD on the bus | 1 | DONE 2026-10-25 |
 | 23 | Broadcast relays | 0.5 | DONE 2026-10-25 |
@@ -207,7 +213,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | open |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | open |
 
-**Done: 23.5 / 29.5 = 80 %.** Open: 6 units.
+**Done: 24.5 / 29.5 = 83 %.** Open: 5 units.
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -300,33 +306,14 @@ leaves `FCS_SURFACE_STATUS` alone; closing the loop is backlog (ICD README secti
 
 ### 2.20 Small utilities, 1 (ECS RT 4, hydraulics RT 19, airframe RT 20, flight data monitoring RT 23)
 
-Four thin terminals, one unit. Each is a small class with `init/step/status`, a status
-message, and a plant source wherever the Python invented its readings. The EICAS gets its
-remaining UNKNOWN rows from them (hydraulics C, ECS; electrical is unit 16) through
-`set_system_readings` in `EicasWindow.tick()`.
-
-- **ECS** `Systems/enviornmentalControlSystem/ecsControl.py` (199; 2 Hz; readings are
-  hard-coded unless `set_sensor_readings` is called; `adjust_temperature/pressure/
-  air_quality` nudge toward the targets of `ecsConfig.xml` (27 lines); `climate/
-  climateControl.py` 41 and `oxygenGenerationsys/oxygenControl.py` 42 are stubs). Cabin
-  environment to the plant (`PLANT_CABIN`), the regulation to RT 4, `ECS_STATUS` to the EICAS.
-- **Hydraulics** `Systems/hydraulics/hydrControl.py` (187; 1 Hz; `monitor_pressure` over
-  systems A/B/C against `hydrConfig.xml` (35 lines: nominal and minimum pressures),
-  `activate_backup`, `health_report`). Pressures to the plant (`PLANT_HYDRAULICS`), the
-  low-pressure and backup logic to RT 19, `HYD_STATUS` to the EICAS (whose A/B rows come
-  from a g-load model today, C is unknown: the terminal's values replace the model).
-- **Airframe** `Systems/airframeSystemManagement/airframeControl.py` (176; 1 Hz;
-  `monitor_airframe` compares sensor readings with `asmConfig.xml` (38 lines) limits;
-  `control_landing_gear(command)`, which the Python calls with "deploy" on every tick: a
-  known defect; the port follows the FMS gear command in `FMS_CONTROL_STATUS` instead and
-  says so in the ICD README section 2). Loads and temperatures to the plant, the limit
-  checks and the gear state to RT 20, `AFR_STATUS`.
-- **Flight data monitoring** `Systems/flightDataMonitoring/fdmControl.py` (148; a 2 Hz
-  `_record_loop`: `collect_data()` snapshots other subsystems into the recorder,
-  `eject_storage(slot)`; `fdmsConfig.xml` 53 lines lists the recorded parameters). On the bus
-  RT 23 listens to the broadcasts it records (FMS flight data, engine status, GCAS alerts)
-  into a fixed ring buffer and publishes `FDM_STATUS` (record count, slot state); a dump
-  through the monitor or a command for the CLI (unit 28). No display reads it.
+DONE 2026-11-10 (section 7, ICD v1.22). The plan that stood here overstated the Python: none of the four
+classes had a sensor source (the plant invents the cabin, the two hydraulic systems' pressures and the three
+airframe gauges, `fmofp_plant/utilities.py`), the hydraulics had one system and a backup (not A/B/C) and compared
+a constant 2800 psi for equality with its thresholds (judged at-or-under here), asmConfig.xml has no limits (the
+readings are reported, not judged), the gear's "deploy every tick" was already gone from the frozen tree (the
+FMS's gear command drives it now, when it changes), and the recorder logged 123 for every parameter (it records
+the FDR's three config parameters from the FMS flight data). The EICAS's SYS A/B and CAB TEMP / CAB ALT rows
+fill; SYS C and OXY PSI have no system behind them and stay unknown (ICD README section 2).
 
 ### 2.28 Scenario engine + debug CLI on the bus, 1.5
 
@@ -612,7 +599,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (221 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (239 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -716,6 +703,19 @@ Python tests and displays
   before the later one.
 - Sign conventions bite: FlightSurfaceService puts the LEFT aileron at minus the aileron command, so a right
   roll (positive) gives it the positive command.
+- The bus gate tests' stub terminals must sit at addresses with no messages: RT 24 and 25 since unit 20 (RT 4
+  became the ECS; RT 1 is Alee's avionics). Free: 24-26, 28-30.
+- A frozen display class with its own stand-in model (the EICAS's g-load hydraulics) and a terminal feeding the
+  same rows fight at their two timers: subclass the display in the window's factory and re-apply the terminal's
+  readings right after its poll (`app.make_eicas`), rather than edit the frozen file.
+- An oracle tool that drives a class's method directly (not the frame) needs the method to store what the frame
+  would have stored first (`EcsControl::monitor` keeps the readings its `data` line prints).
+- An `inspect.getsource` quirk assertion must strip comment lines: the frozen airframe loop names
+  `control_landing_gear` only in a comment.
+- The plant's 1 Hz readings step first at frame 50 and are relayed within the second: a terminal that reads them
+  is NORMAL by frame 110, not 60 (window the first e2e checks on 110-150).
+- A double-word ICD field (`word="6-7" bits="31-0"`) must be `type="sint"` with an lsb; `FDM_STATUS.last_frame`
+  counts 31 bits of frames (1.4 years).
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -1178,6 +1178,52 @@ done before this file existed are condensed from the private session notes.
   messages for 18 terminals, worst minor frame 8348 us (was 8128 for 17); headless demo 30 s: 1500 frames,
   0 overruns, 18/18 answering; meter 23.5 / 29.5 = 80 %.
 
+### 2026-11-10 - unit 20 small utilities (RT 4, 19, 20, 23) - ICD v1.22 - by Kevin's agent
+- *What*: four partitions: `ofp/partitions/ecs` (`EcsControl`: ECSControl's 2 Hz monitor_ecs over a cabin
+  reading: the three threshold checks that only logged, as flags; the oxygen generator's +0.1 % a pass to 23; the
+  climate's copy of the temperature; the sub-components' manual controls), `ofp/partitions/hydraulics`
+  (`HydraulicController`: monitor_pressure over hydrConfig.xml's thresholds, at-or-under where the Python
+  compared a constant 2800 for equality; the backup switch on CRITICAL, for good, and by hand),
+  `ofp/partitions/airframe` (`AirframeManager`: asmConfig.xml's three sensors reported unjudged, there being no
+  limits in the config; the gear state from the FMS's gear command when it changes and from AFR_CMD),
+  `ofp/partitions/fdm` (`FlightDataRecorder`: the FDR's three parameters (frame, altitude, airspeed) from
+  BCAST_FMS_FLIGHT_DATA into a ring of 512 every 25 frames; the two cards and eject_storage); one shared stdin
+  tool `fmofp_utilities_tool`. The readings moved to the plant (`fmofp_plant/utilities.py`: `PLANT_CABIN` 2 Hz,
+  `PLANT_HYDRAULICS` and `PLANT_AIRFRAME` 1 Hz; slow walks, gauges following g and altitude, all holdable). ICD
+  v1.22: 21 messages, 6 relays, 7 enums; `HYD_STATUS` -> `EICAS_HYD_STATUS` (14/6), `ECS_STATUS` ->
+  `EICAS_ECS_STATUS` (14/7); RT 23 a listener of 31/25; `FMS_CONTROL_STATUS`'s second relay (`AFR_FMS_CONTROL`).
+  The EICAS's SYS A/B rows (the primary and backup pressures; C stays unknown) and CAB TEMP / CAB ALT rows (the
+  pressure altitude of the cabin pressure; OXY PSI stays unknown) fill through `set_system_readings`; the
+  display's own g-load model of A/B is overridden right after each poll (`app.make_eicas` subclasses the
+  display). Demo: a systems line (HYD / ECS / gear / FDR) and five events (backup hydraulics at 56 s, oxygen rate
+  at 62 s, gear down at 72 s and up at 78 s through the FMS, the CVR card ejected at 83 s). The gate tests' stub
+  terminals moved to RT 24 and 25.
+- *How*: `test_utilities_oracle.py` runs the four frozen classes beside the tool (the ECS pass for pass with its
+  logger captured for the three checks; the hydraulics config and backup; the gear state machine and sensor
+  table; the recorder's tables and ejection) and four quirk tests; `test_utilities_e2e.py` (port base 56500)
+  runs the plant (hydraulic pressure and cabin held), the four partitions, the FCS and the FMS under the real
+  controller with the gear commanded through the FMS and by hand, the backup switched in, a card ejected twice,
+  and reads the EICAS's bus half; `test_plant_utilities.py`; feed, render, display e2e, demo and message tests
+  extended; 20 gtests.
+- *Warnings / lessons*: the section 2.20 plan overstated the Python: no A/B/C hydraulics (one system and a
+  backup), no limits in asmConfig.xml, the gear "deploy every tick" already gone from the frozen tree (a comment
+  remains), the FDM's "other parameters" a comment. The EICAS's own g-load hydraulics model would have fought the
+  terminal's readings at two timers: the window's factory subclasses the display and re-applies the readings
+  after each poll (section 6). cppcheck's shadow rule hit twice (`command` and `backup_psi` as parameters). A
+  double-word ICD field must be signed. The 1 Hz readings reach a terminal by frame 110 at the earliest
+  (section 6). The real-time demo with 22 terminals: 0 overruns here; CI's runner is the open question
+  (section 1).
+- *Files*: `ofp/partitions/{ecs,hydraulics,airframe,fdm}/{include,src}`, `ofp/partitions/utilities_tool/`,
+  `ofp/tests/{ecs_control,hydraulic_controller,airframe_manager,flight_data_recorder}_test.cpp`,
+  `ofp/tests/{bus_controller,schedule}_test.cpp` (stub addresses), `fmofp_plant/utilities.py`,
+  `fmofp_plant/plant.py`, `fmofp_display/systems_feed.py`, `fmofp_display/app.py`, `fmofp_demo/demo.py`,
+  `icd/fmofp_icd.xml` + README + generated files, `ofp/README.md`, `verify.sh`, both CI files, `_support.py`,
+  the tests.
+- *CI*: unit 19's `337820b` run 42885140093 all ten jobs green; the claim `6b5e5d6` run 42887030618 green.
+- *Tests and numbers*: Python 239 OK (was 221), ctest 2/2 (304 gtests, was 284), cppcheck clean; load 104
+  messages for 22 terminals, worst minor frame 8492 us (was 8348 for 18); headless demo 30 s: 1500 frames,
+  0 overruns, 22/22 answering; meter 24.5 / 29.5 = 83 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1241,3 +1287,13 @@ done before this file existed are condensed from the private session notes.
   consumer in the Python or the displays); closing that loop is backlog (ICD README section 12). A producer may
   now be relayed to six consumers (four until v1.21). The trim stays bookkeeping, the 50 Hz SQLite persist is
   dropped. Recorded in the ICD README section 2.
+- 2026-11-10, Kevin ("ok go unit 20") and his agent: unit 20 as designed in section 2.20, corrected where the
+  Python differed from the plan: the three readings are the plant's (the Python had none); the ECS's checks stay
+  flags that regulate nothing and its config stays unread; the hydraulic thresholds are judged at-or-under (the
+  Python's equality with a constant made the monitor unusable), one system and its backup are SYS A and B and
+  SYS C stays unknown; the airframe judges nothing and its gear follows the FMS's command when it changes (and
+  AFR_CMD by hand); the recorder records the FDR's three config parameters from the FMS flight data into a ring
+  of 512, the voice recorder stays idle, a card is out once ejected (the Python kept no card state) and
+  ejecting stops nothing; CAB ALT is the cabin pressure's altitude and OXY PSI stays unknown. The EICAS's own
+  g-load hydraulics model is overridden by the terminal's readings in the display process, not by editing the
+  frozen display. Recorded in the ICD README section 2.

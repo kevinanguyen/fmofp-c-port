@@ -11,7 +11,8 @@ from fmofp_bus.icd.enums import (AewcMode, Affiliation, ChangeType, ClearanceLev
                                  SatcomState, ShearSeverity, Ssm, TargetClass, TargetKind, TargetStatus,
                                  TargetingMode, TargetingState, TerminalState, TfrMode, Threat, TurbulenceCategory,
                                  UnitKind, UnitStatus, WaypointType, Weapon, WeaponsState, WeatherMode)
-from fmofp_bus.icd.enums import EcmMode, RwrBand, RwrSource, SensorHealth, ThermalStatus, ThreatType
+from fmofp_bus.icd.enums import (EcmMode, HydraulicSystem, PressureStatus, RwrBand, RwrSource, SensorHealth,
+                                 ThermalStatus, ThreatType)
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import (BROADCAST_SOURCES, SYMBOL_CLASS, RadarFeed, aewc_item, cell_velocity_nm_s,
                                       polar_to_nm, sar_corners_nm, sar_pgm, targeting_item, weather_items)
@@ -217,6 +218,21 @@ def sample_pwr_status(generator_kw=231.4, online=True, main_bus_v=115.3, aux_bus
         power_balance=generator_kw - 205.0, main_bus_voltage=main_bus_v, aux_bus_voltage=aux_bus_v,
         generator_frequency=400.2, power_factor=0.97, coolant_temp=20.3, cabin_temp=22.0, fan_pct=10.0,
         heat_load=1230.0))
+
+
+def sample_hyd_status(primary=2900.0, backup=2950.0, active=HydraulicSystem.PRIMARY, status=PressureStatus.OK):
+    """An EICAS_HYD_STATUS: both systems near nominal, the primary active."""
+    return m.EicasHydStatus(payload=m.HydStatus(state=TerminalState.NORMAL, active_system=active, pressures_valid=True,
+                                                pressure_status=status, healthy=True, primary_psi=primary,
+                                                backup_psi=backup))
+
+
+def sample_ecs_status(temperature=22.4, pressure=101.0, air_quality=97.5, oxygen=21.3):
+    """An EICAS_ECS_STATUS: a cabin in limits, the oxygen generator three passes in."""
+    return m.EicasEcsStatus(payload=m.EcsStatus(state=TerminalState.NORMAL, sensors_valid=True, healthy=True,
+                                                temperature=temperature, pressure=pressure, air_quality=air_quality,
+                                                climate_temperature=temperature, humidity=50.0, oxygen_level=oxygen,
+                                                oxygen_rate=1.0, passes=3))
 
 
 class WeatherItemsTest(unittest.TestCase):
@@ -1019,6 +1035,54 @@ class PowerFeedTest(unittest.TestCase):
         waiting.payload.electrical_valid = False
         self.terminal.put(waiting)
         self.assertEqual(({}, {}), (self.feed.system_readings(), self.feed.power.get_data()))
+
+
+class UtilitiesFeedTest(unittest.TestCase):
+    """What the EICAS window hands eicas.set_system_readings() from the hydraulics and environmental control terminals,
+    and the two controllers' get_status() dictionaries (v1.22)."""
+
+    def setUp(self):
+        self.terminal = FakeTerminal()
+        self.feed = SystemsFeed(self.terminal, clock=lambda: 1000.0)
+
+    def test_without_the_terminals_the_rows_stay_unknown(self):
+        self.assertEqual({}, self.feed.system_readings())
+        self.assertEqual(({}, {}), (self.feed.hydraulics.get_status(), self.feed.ecs.get_status()))
+        self.assertNotIn("HYD", self.feed.status_text())
+
+    def test_the_statuses_become_the_rows_and_the_dictionaries(self):
+        self.terminal.put(sample_hyd_status())
+        self.terminal.put(sample_ecs_status())
+        readings = self.feed.system_readings()
+        self.assertEqual({"sys_a_psi", "sys_b_psi", "cabin_temp_c", "cabin_alt_ft"}, set(readings))
+        self.assertEqual((2900.0, 2950.0, 22.4), (readings["sys_a_psi"], readings["sys_b_psi"], readings["cabin_temp_c"]))
+        self.assertAlmostEqual(88.8, readings["cabin_alt_ft"], delta=1.0)  # the pressure altitude of 101.0 kPa
+        hyd = self.feed.hydraulics.get_status()
+        self.assertEqual(("Main hydraulic system", "OK", True),
+                         (hyd["active_system"], hyd["pressure_status"], hyd["pressures_valid"]))
+        ecs = self.feed.ecs.get_status()
+        self.assertEqual((22.4, 101.0, 97.5), (ecs["temperature_c"], ecs["pressure_kpa"], ecs["air_quality_pct"]))
+        self.assertEqual({"temperature": 22.4, "humidity": 50.0}, ecs["climate"])
+        self.assertEqual({"oxygen_level": 21.3, "generation_rate": 1.0}, ecs["oxygen"])
+        self.assertFalse(ecs["temperature_adjusting"] or ecs["pressure_adjusting"] or ecs["purification_active"])
+        self.assertIn("HYD 2900/2950 psi MAIN OK", self.feed.status_text())
+        self.assertIn("ECS 22.4C 101.0kPa O2 21.3%", self.feed.status_text())
+        # The backup active with a reduced primary; the cabin without a reading.
+        self.terminal.put(sample_hyd_status(primary=2450.0, active=HydraulicSystem.BACKUP, status=PressureStatus.OK))
+        hyd = self.feed.hydraulics.get_status()
+        self.assertEqual(("Backup hydraulic system", 2450.0), (hyd["active_system"], hyd["primary_psi"]))
+        self.assertIn("HYD 2450/2950 psi BACKUP OK", self.feed.status_text())
+        waiting = sample_ecs_status()
+        waiting.payload.sensors_valid = False
+        self.terminal.put(waiting)
+        self.assertEqual({}, self.feed.ecs.get_status())
+        self.assertNotIn("cabin_temp_c", self.feed.system_readings())
+
+    def test_stale_data_is_left_out(self):
+        self.terminal.put(sample_hyd_status(), age=5.0)
+        self.terminal.put(sample_ecs_status(), age=5.0)
+        self.assertEqual({}, self.feed.system_readings())
+        self.assertEqual({}, self.feed.hydraulics.get_status())
 
 
 class CommsFeedTest(unittest.TestCase):

@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.21 (DRAFT, 2026-11-10). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.22 (DRAFT, 2026-11-10). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -10,7 +10,7 @@
 | 1 | `avionics` | Avionics - LRU health, built-in test, FM fitness, software configuration | existing | Systems/avionics/hardwareHealth, Systems/builtInTestSystems, Systems/fmFitness, Systems/configurationManagement | BIT merged here (Alee, 2026-10-10). FM fitness and SW configuration are here too: Alee said to fold them into another terminal, and both are health/maintenance functions |
 | 2 | `comms` | Communications - radio, satcom, data link | existing | Systems/comms/messaging_service.py | Ported in v1.16 (fmofp_comms). The radio, satcom and data-link state of CommsService; what they measure (the field strength, the satellite, the link's traffic and errors) is the plant's RF environment (PLANT_RF, relayed as COM_RF). COM_CMD carries the service's manual controls; COM_LINK_STATUS goes to the MFD's communications page by relay |
 | 3 | `enginemanagement` | Engine management - thrust, autothrottle, fuel | existing | Systems/engineManagement: thrustManagement/thrustManagement.py, fuelManagement/fuelControl.py and fuelMonitor.py | Ported in v1.8 (fmofp_engine). The engine model of ecu/engineControlUnit.py is simulation and runs in the plant (PLANT_ENGINE); this terminal commands the engines (ENG_THRUST_CMD) from the FMS thrust lever, ENG_CMD and its autothrottle, and reports what it measures. It hears the FMS flight data by broadcast (RT 31 SA 25) for the autothrottle's airspeed |
-| 4 | `enviornmentalcontrolsystem` | Environmental control system | existing | Systems/enviornmentalControlSystem | id keeps the repo's spelling |
+| 4 | `enviornmentalcontrolsystem` | Environmental control system - the cabin's temperature, pressure, air quality, climate and oxygen | existing | Systems/enviornmentalControlSystem/ecsControl.py, climate/climateControl.py, oxygenGenerationsys/oxygenControl.py | id keeps the repo's spelling. Ported in v1.22 (fmofp_ecs). ECSControl's 2 Hz monitor over the cabin readings the Python never had (set_sensor_readings had no caller: the plant invents them, PLANT_CABIN relayed as ECS_CABIN): the three threshold checks that only logged, the climate sub-component that copies each temperature reading, the oxygen generator that adds 0.1 % a pass up to 23 %. ECS_CMD carries the sub-components' manual controls. ECS_STATUS reaches the EICAS by relay (EICAS_ECS_STATUS): its CAB TEMP and CAB ALT rows (README section 2) |
 | 5 | `flightcontrolsys` | Flight control - FCC, GCAS, performance monitor | existing | Systems/flightControlSys | Ported in v1.1 (fmofp_fcs). From v1.8 it hears the engine computer's ENG_ENGINE_STATUS by broadcast (RT 31 SA 18), which gives FCS_PERF_STATUS its fuel efficiency |
 | 6 | `missionplanning` | Mission computer - phase, route, targets, order of battle | existing | Systems/missionPlanning: missionService.py, missionControl.py (MissionControl), routeManagement/handleRoute.py, targeting/targeting.py, orderOfBattle/orderOfBattle.py | Ported in v1.16 (fmofp_mission). It hears the FMS flight data by broadcast (31/25) for the route's progress, takes MSN_CMD (the scenario engine's waypoints and phases, and the targeting and order-of-battle calls nothing in the Python made), and publishes MSN_STATUS and the MSN_PLAN block, broadcast to the MFD and the TSD. The MissionPlanningSystem class of missionControl.py, a second route in flat degrees that the service fed and never read, is not carried |
 | 7 | `nav` | Navigation - GPS position solver and GPS/dead-reckoning fusion | existing | Systems/nav: gps/globalPositionSystem.py (GPSReceiver, the solver) and dataFusion/fuseData.py | Ported in v1.2. The INS of Systems/nav/ins was a noise generator whose output nothing used; it is not carried (README section 2) |
@@ -20,17 +20,17 @@
 | 11 | `pfd` | Primary flight display | changed | Interfaces/userInterface/displays/pfd.py | Was the single 'Display System' terminal; one process per display means each display needs its own address. On the bus from v1.5 (fmofp_display pfd): it hears the FMS's flight data, status and attitude status by broadcast (RT 31 SA 25-27, v1.7; copies of its own on SA 1-3 until then) |
 | 12 | `flightmanagementsystem` | Flight management system | existing | Systems/flightManagementSys: flightManagementSystem.py and fmsControl.py | Ported in v1.2. Its attitude comes from the FCS over the bus, as the Python copied it from its own flight control object |
 | 13 | `mfd` | Multi-function display | new | Interfaces/userInterface/displays/mfd.py | On the bus from v1.6 (fmofp_display mfd): its radar page mirrors the radars' pictures from the broadcasts the radar display hears too (RT 31 SA 1-4, 6-9), its systems page reads the FCS's GCAS alerts and exceedances (31/5, 31/10), its mission page the FMS flight data (31/25) and, from v1.8, its systems and engine pages the engine computer's engine and fuel status (31/18, 31/19); v1.6 gave it copies of its own on SA 1-11, v1.7 the broadcasts. Its radar commands moved to the radar display terminal in v1.5; it commands nothing. From v1.11 its targeting page draws the targeting radar's tracks (31/24, 31/20-21). From v1.15 the targeting, AEWC and SAR pictures, which only it draws, come by relay into its own receive subaddresses 20-21, 22-23 and 26-27 instead of broadcasts (one consumer, one transfer either way; README section 8) |
-| 14 | `eicas` | Engine indicating and crew alerting display | new | Interfaces/userInterface/displays/eicas.py | On the bus from v1.9 (fmofp_display eicas): it hears the engine computer's engine and fuel status (31/18-19), the flight computer's GCAS alerts and exceedances (31/5, 31/10), the FMS's flight data and status (31/25-26) and the weather radar's scan summary (31/2) by broadcast, and commands nothing. Its hydraulic, electrical and environmental rows read unknown until those terminals exist. From v1.17 it hears the defensive systems status by relay into its own SA 1 (EICAS_DEF_STATUS) and the radar warning contacts by broadcast (31/16-17); from v1.18 the sensor management status by relay into its own SA 3 (EICAS_SNS_STATUS); from v1.19 the power management status by relay into its own SA 4 (EICAS_PWR_STATUS), which fills its electrical rows |
+| 14 | `eicas` | Engine indicating and crew alerting display | new | Interfaces/userInterface/displays/eicas.py | On the bus from v1.9 (fmofp_display eicas): it hears the engine computer's engine and fuel status (31/18-19), the flight computer's GCAS alerts and exceedances (31/5, 31/10), the FMS's flight data and status (31/25-26) and the weather radar's scan summary (31/2) by broadcast, and commands nothing. Its hydraulic, electrical and environmental rows read unknown until those terminals exist. From v1.17 it hears the defensive systems status by relay into its own SA 1 (EICAS_DEF_STATUS) and the radar warning contacts by broadcast (31/16-17); from v1.18 the sensor management status by relay into its own SA 3 (EICAS_SNS_STATUS); from v1.19 the power management status by relay into its own SA 4 (EICAS_PWR_STATUS), which fills its electrical rows; from v1.22 the hydraulics and environmental control statuses by relay into its own SA 6 and 7 (EICAS_HYD_STATUS, EICAS_ECS_STATUS), which fill its hydraulic rows A and B and its cabin rows |
 | 15 | `radar_display` | Radar display - the radars' pictures and their control panel | new | Interfaces/userInterface/displays/radar | On the bus from v1.5 (fmofp_display radar): it hears the weather and terrain-following radars' status, scan summary and guidance by broadcast (RT 31 SA 1-4) and their products as broadcast blocks (31 SA 6-9; copies of its own on the same numbers until v1.7), and commands the radars (SA 20-24); from v1.11 it hears the targeting radar's status too (31/24) and commands that radar |
 | 16 | `tsd` | Tactical situation display | new | Interfaces/userInterface/displays/tsd.py | On the bus from v1.11 (fmofp_display tsd): it hears the fused air tracks (31/22-23) and the FMS's flight data, status and attitude status (31/25-27) by broadcast, the energy maneuverability by relay into its own SA 1 (TSD_FMS_ENERGY; broadcast at 31/28 until v1.15), and commands nothing. Its waypoints and order of battle came with the mission computer (v1.16, 31/28, 31/13-14) and its radar warning contacts with the defensive systems terminal (v1.17, 31/16-17) |
 | 17 | `sms` | Stores management display | new | Interfaces/userInterface/displays/sms.py | On the bus from v1.14 (fmofp_display sms): it hears the FMS status by broadcast (31/26) for the flight mode and the tactical systems its master arm, ECM cell and signature strip follow, and commands nothing. Its weapon stations are the display's own table, as in the Python, which modelled no armament system (README section 2); a stores management computer is backlog (section 12) |
 | 18 | `hud` | Head-up display | new | Interfaces/userInterface (HUDContainer) |  |
-| 19 | `hydraulics` | Hydraulics | new | Systems/hydraulics |  |
-| 20 | `airframe` | Airframe systems | new | Systems/airframeSystemManagement |  |
+| 19 | `hydraulics` | Hydraulics - the primary and backup systems' pressure monitor | existing | Systems/hydraulics/hydrControl.py | Ported in v1.22 (fmofp_hydraulics). HydraulicSystemController's 1 Hz monitor_pressure over the pressures the Python read as a constant 2800 psi (the plant invents them, PLANT_HYDRAULICS relayed as HYD_PRESSURES): hydrConfig.xml's warning (2500) and critical (2000) thresholds, compared at-or-under here where the Python compared for equality (README section 2), the switch to the backup system on CRITICAL, for good. HYD_CMD makes the switch by hand. HYD_STATUS reaches the EICAS by relay (EICAS_HYD_STATUS): its SYS A and SYS B rows; SYS C has no system behind it |
+| 20 | `airframe` | Airframe systems - the structural sensors and the landing gear | existing | Systems/airframeSystemManagement/airframeControl.py | Ported in v1.22 (fmofp_airframe). AirframeSystemManager's 1 Hz monitor over asmConfig.xml's three sensors (two strain gauges and a leading-edge temperature; the config lists no limits, so the readings are reported, not judged) that the Python had no source for (the plant invents them, PLANT_AIRFRAME relayed as AFR_SENSORS), and control_landing_gear, which the FMS's gear command drives (FMS_CONTROL_STATUS relayed as AFR_FMS_CONTROL) and AFR_CMD by hand. Nothing consumes AFR_STATUS yet |
 | 21 | `flightsurfaces` | Flight surfaces - the ten control surfaces and their motion | existing | Systems/flightSurfaces/flightSurfaceService.py | Ported in v1.21 (fmofp_surfaces). FlightSurfaceService's ten surfaces (two ailerons, two elevators, the rudder, two flaps, two slats, the speedbrake), each moved toward its command at its slew rate within its limits every minor frame (the Python's 50 Hz loop), under the service's own commands: the ailerons and elevators follow the sensed roll and pitch and the slats the angle of attack (_sync_from_fcc, which read the flight control computer's data dictionary, the sensed flight state the plant publishes: PLANT_SENSORS relayed as FSF_SENSORS), and the flaps, speedbrake, rudder and trim follow FSF_CMD (set_flaps, set_speedbrake, set_rudder, set_trim). FSF_POSITIONS carries the measured positions, FSF_STATUS the flap detent, the trim and the health. It does not follow the flight control computer's FCS_SURFACE_CMD, which the Python's service never read either (README section 2) |
 | 22 | `defensive` | Defensive systems - RWR, chaff, flare, ECM | new | Systems/defensiveSys/defensiveService.py | Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17) |
-| 23 | `flightdatamonitoring` | Flight data monitoring | new | Systems/flightDataMonitoring |  |
-| 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD) |
+| 23 | `flightdatamonitoring` | Flight data monitoring - the flight data recorder and its storage | existing | Systems/flightDataMonitoring/fdmControl.py | Ported in v1.22 (fmofp_fdm). FlightDataMonitoring's 2 Hz recording loop: fdmsConfig.xml's flight data recorder takes the time, altitude and airspeed from the FMS flight data it hears by broadcast (31/25) into a ring of 512 records (the Python logged the number 123 for every parameter), the cockpit voice recorder has nothing to record on the bus, and FDM_CMD ejects a storage card (which, as in the Python, stops nothing). Nothing consumes FDM_STATUS yet; the dump is unit 28's |
+| 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD). From v1.22 it also invents the cabin environment ECSControl had no sensors for (PLANT_CABIN, twice a second), the hydraulic pressures HydraulicSystemController read as a constant (PLANT_HYDRAULICS, once a second) and the airframe sensor readings AirframeSystemManager had no source for (PLANT_AIRFRAME, once a second) |
 | 31 | `broadcast` | Broadcast address - every terminal that accepts a subaddress hears it | reserved |  | Not a terminal: MIL-STD-1553B address 31. A message or block here is the far end of a relay, stored by the terminals its listeners attribute names, each of which accepts that subaddress for broadcast (README section 8); nothing else stores it and nobody answers it. Added in v1.7 |
 
 RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
@@ -52,6 +52,10 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`ENG_THRUST_CMD`](#eng_thrust_cmd) | 3 | 14 | T | 3 | 10 | Thrust command to the engines | DRAFT |
 | [`ENG_ENGINE_STATUS`](#eng_engine_status) | 3 | 15 | T | 20 | 5 | Engine status | DRAFT |
 | [`ENG_FUEL_STATUS`](#eng_fuel_status) | 3 | 16 | T | 7 | 1 | Fuel status | DRAFT |
+| [`ECS_MODE_CMD`](#ecs_mode_cmd) | 4 | 10 | R | 1 | aperiodic | Environmental control mode command | DRAFT |
+| [`ECS_STATUS`](#ecs_status) | 4 | 10 | T | 10 | 5 | Environmental control status | DRAFT |
+| [`ECS_CABIN`](#ecs_cabin) | 4 | 11 | R | 4 | 5 | Cabin environment, as received by the environmental control terminal | DRAFT |
+| [`ECS_CMD`](#ecs_cmd) | 4 | 12 | R | 2 | aperiodic | Environmental control command | DRAFT |
 | [`FCS_MODE_CMD`](#fcs_mode_cmd) | 5 | 10 | R | 1 | aperiodic | Flight control mode command | DRAFT |
 | [`FCS_STATUS`](#fcs_status) | 5 | 10 | T | 2 | 5 | Flight control status | DRAFT |
 | [`FCS_SURFACE_CMD`](#fcs_surface_cmd) | 5 | 11 | R | 2 | aperiodic | Control surface command | DRAFT |
@@ -114,6 +118,8 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`EICAS_DEF_STATUS`](#eicas_def_status) | 14 | 1 | R | 6 | 5 | Defensive systems status, for the EICAS | DRAFT |
 | [`EICAS_SNS_STATUS`](#eicas_sns_status) | 14 | 3 | R | 5 | 5 | Sensor management status, for the EICAS | DRAFT |
 | [`EICAS_PWR_STATUS`](#eicas_pwr_status) | 14 | 4 | R | 16 | 5 | Power management status, for the EICAS | DRAFT |
+| [`EICAS_HYD_STATUS`](#eicas_hyd_status) | 14 | 6 | R | 4 | 5 | Hydraulics status, for the EICAS | DRAFT |
+| [`EICAS_ECS_STATUS`](#eicas_ecs_status) | 14 | 7 | R | 10 | 5 | Environmental control status, for the EICAS | DRAFT |
 | [`DSP_EICAS_MODE_CMD`](#dsp_eicas_mode_cmd) | 14 | 13 | R | 1 | aperiodic | EICAS mode command | DRAFT |
 | [`DSP_EICAS_STATUS`](#dsp_eicas_status) | 14 | 13 | T | 2 | 1 | EICAS status | DRAFT |
 | [`DSP_RADAR_MODE_CMD`](#dsp_radar_mode_cmd) | 15 | 14 | R | 1 | aperiodic | Weather radar display mode command | DRAFT |
@@ -130,6 +136,15 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`DSP_SMS_STATUS`](#dsp_sms_status) | 17 | 16 | T | 2 | 1 | Stores management display status | DRAFT |
 | [`DSP_HUD_MODE_CMD`](#dsp_hud_mode_cmd) | 18 | 17 | R | 1 | aperiodic | Head-up display mode command | DRAFT |
 | [`DSP_HUD_STATUS`](#dsp_hud_status) | 18 | 17 | T | 2 | 1 | Head-up display status | DRAFT |
+| [`HYD_MODE_CMD`](#hyd_mode_cmd) | 19 | 10 | R | 1 | aperiodic | Hydraulics mode command | DRAFT |
+| [`HYD_STATUS`](#hyd_status) | 19 | 10 | T | 4 | 5 | Hydraulics status | DRAFT |
+| [`HYD_PRESSURES`](#hyd_pressures) | 19 | 11 | R | 3 | 1 | Hydraulic pressures, as received by the hydraulics terminal | DRAFT |
+| [`HYD_CMD`](#hyd_cmd) | 19 | 12 | R | 1 | aperiodic | Hydraulics command | DRAFT |
+| [`AFR_MODE_CMD`](#afr_mode_cmd) | 20 | 10 | R | 1 | aperiodic | Airframe systems mode command | DRAFT |
+| [`AFR_STATUS`](#afr_status) | 20 | 10 | T | 5 | 1 | Airframe systems status | DRAFT |
+| [`AFR_SENSORS`](#afr_sensors) | 20 | 11 | R | 4 | 1 | Airframe sensor readings, as received by the airframe terminal | DRAFT |
+| [`AFR_FMS_CONTROL`](#afr_fms_control) | 20 | 12 | R | 3 | 5 | FMS thrust and gear status, as received by the airframe terminal | DRAFT |
+| [`AFR_CMD`](#afr_cmd) | 20 | 13 | R | 1 | aperiodic | Airframe command | DRAFT |
 | [`FSF_MODE_CMD`](#fsf_mode_cmd) | 21 | 10 | R | 1 | aperiodic | Flight surfaces mode command | DRAFT |
 | [`FSF_STATUS`](#fsf_status) | 21 | 10 | T | 6 | 5 | Flight surfaces status | DRAFT |
 | [`FSF_SENSORS`](#fsf_sensors) | 21 | 11 | R | 11 | 50 | Sensed flight state, for the flight surfaces | DRAFT |
@@ -139,6 +154,9 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`DEF_STATUS`](#def_status) | 22 | 10 | T | 6 | 5 | Defensive systems status | DRAFT |
 | [`DEF_ESM`](#def_esm) | 22 | 11 | R | 26 | 5 | ESM signal intercepts, from the plant | DRAFT |
 | [`DEF_CMD`](#def_cmd) | 22 | 12 | R | 5 | aperiodic | Defensive systems command | DRAFT |
+| [`FDM_MODE_CMD`](#fdm_mode_cmd) | 23 | 10 | R | 1 | aperiodic | Flight data monitoring mode command | DRAFT |
+| [`FDM_STATUS`](#fdm_status) | 23 | 10 | T | 8 | 1 | Flight data monitoring status | DRAFT |
+| [`FDM_CMD`](#fdm_cmd) | 23 | 11 | R | 1 | aperiodic | Flight data monitoring command | DRAFT |
 | [`PLANT_SENSORS`](#plant_sensors) | 27 | 1 | T | 11 | 50 | Sensed flight state from the plant | DRAFT |
 | [`PLANT_GPS`](#plant_gps) | 27 | 2 | T | 25 | 1 | GPS pseudoranges from the plant | DRAFT |
 | [`PLANT_WEATHER`](#plant_weather) | 27 | 3 | T | 32 | 1 | Weather truth from the plant | DRAFT |
@@ -148,6 +166,9 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`PLANT_ESM`](#plant_esm) | 27 | 13 | T | 26 | 5 | ESM signal intercepts, from the plant | DRAFT |
 | [`PLANT_ELECTRICAL`](#plant_electrical) | 27 | 16 | T | 7 | 1 | Electrical readings from the plant | DRAFT |
 | [`PLANT_GEN_CMD`](#plant_gen_cmd) | 27 | 17 | R | 2 | 5 | Generator command as received by the plant | DRAFT |
+| [`PLANT_CABIN`](#plant_cabin) | 27 | 18 | T | 4 | 5 | Cabin environment from the plant | DRAFT |
+| [`PLANT_HYDRAULICS`](#plant_hydraulics) | 27 | 19 | T | 3 | 1 | Hydraulic pressures from the plant | DRAFT |
+| [`PLANT_AIRFRAME`](#plant_airframe) | 27 | 20 | T | 4 | 1 | Airframe sensor readings from the plant | DRAFT |
 | [`BCAST_RDR_WX_STATUS`](#bcast_rdr_wx_status) | 31 | 1 | R | 2 | 5 | Weather radar status, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_WX_SCAN`](#bcast_rdr_wx_scan) | 31 | 2 | R | 10 | 5 | Weather radar scan summary, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_TFR_STATUS`](#bcast_rdr_tfr_status) | 31 | 3 | R | 2 | 5 | Terrain-following radar status, broadcast to the displays | DRAFT |
@@ -228,7 +249,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`RDR_TFR_ELEVATION`](#rdr_tfr_elevation) | `BCAST_RDR_TFR_ELEVATION` (broadcast, heard by RT 13, 15) | block: 4 + 32 per frame | 25 |
 | [`FCS_GCAS_ALERTS`](#fcs_gcas_alerts) | [`BCAST_FCS_GCAS_ALERTS`](#bcast_fcs_gcas_alerts) (broadcast, heard by RT 13, 14) | 4 | 5 |
 | [`FCS_PERF_STATUS`](#fcs_perf_status) | [`BCAST_FCS_PERF_STATUS`](#bcast_fcs_perf_status) (broadcast, heard by RT 13, 14) | 4 | 1 |
-| [`FMS_FLIGHT_DATA`](#fms_flight_data) | [`BCAST_FMS_FLIGHT_DATA`](#bcast_fms_flight_data) (broadcast, heard by RT 3, 6, 9, 11, 13, 14, 16) | 21 | 10 |
+| [`FMS_FLIGHT_DATA`](#fms_flight_data) | [`BCAST_FMS_FLIGHT_DATA`](#bcast_fms_flight_data) (broadcast, heard by RT 3, 6, 9, 11, 13, 14, 16, 23) | 21 | 10 |
 | [`FMS_STATUS`](#fms_status) | [`BCAST_FMS_STATUS`](#bcast_fms_status) (broadcast, heard by RT 11, 14, 16, 17) | 3 | 5 |
 | [`FMS_ATTITUDE_STATUS`](#fms_attitude_status) | [`BCAST_FMS_ATTITUDE_STATUS`](#bcast_fms_attitude_status) (broadcast, heard by RT 11, 16) | 8 | 10 |
 | [`FMS_CONTROL_STATUS`](#fms_control_status) | [`ENG_FMS_CONTROL`](#eng_fms_control) | 3 | 5 |
@@ -260,6 +281,12 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`PWR_GEN_CMD`](#pwr_gen_cmd) | [`PLANT_GEN_CMD`](#plant_gen_cmd) | 2 | 5 |
 | [`PWR_STATUS`](#pwr_status) | [`EICAS_PWR_STATUS`](#eicas_pwr_status) | 16 | 5 |
 | [`PLANT_SENSORS`](#plant_sensors) | [`FSF_SENSORS`](#fsf_sensors) | 11 | 50 |
+| [`PLANT_CABIN`](#plant_cabin) | [`ECS_CABIN`](#ecs_cabin) | 4 | 5 |
+| [`PLANT_HYDRAULICS`](#plant_hydraulics) | [`HYD_PRESSURES`](#hyd_pressures) | 3 | 1 |
+| [`PLANT_AIRFRAME`](#plant_airframe) | [`AFR_SENSORS`](#afr_sensors) | 4 | 1 |
+| [`FMS_CONTROL_STATUS`](#fms_control_status) | [`AFR_FMS_CONTROL`](#afr_fms_control) | 3 | 5 |
+| [`HYD_STATUS`](#hyd_status) | [`EICAS_HYD_STATUS`](#eicas_hyd_status) | 4 | 5 |
+| [`ECS_STATUS`](#ecs_status) | [`EICAS_ECS_STATUS`](#eicas_ecs_status) | 10 | 5 |
 
 ## Mode codes
 
@@ -1037,6 +1064,74 @@ FlightSurfaceService.set_trim's axis: the keys of its trim dictionary
 | 0 | PITCH |  |  |
 | 1 | ROLL |  |  |
 | 2 | YAW |  |  |
+
+### `ecs_command` (4 bits)
+
+What ECS_CMD asks of the environmental control terminal: the manual controls of ECSControl's sub-components, which nothing in the Python called (OxygenControl.adjust_generation_rate, ClimateControl.adjust_humidity and adjust_temperature)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | SET_OXYGEN_RATE |  |  |
+| 2 | SET_HUMIDITY |  |  |
+| 3 | SET_CLIMATE_TEMPERATURE |  |  |
+
+### `hydraulic_system` (2 bits)
+
+HydraulicSystemController.active_system: hydrConfig.xml's primary system (id 1) or backup system (id 2)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | PRIMARY |  |  |
+| 1 | BACKUP |  |  |
+
+### `pressure_status` (2 bits)
+
+monitor_pressure's status: OK, WARNING at or under the warning threshold, CRITICAL at or under the critical one
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | OK |  |  |
+| 1 | WARNING |  |  |
+| 2 | CRITICAL |  |  |
+
+### `hydraulic_command` (4 bits)
+
+What HYD_CMD asks of the hydraulics terminal
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | ACTIVATE_BACKUP |  |  |
+
+### `gear_state` (2 bits)
+
+AirframeSystemManager.gear_state: UNKNOWN until a command, then the commanded state (the class senses no real position)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | UNKNOWN |  |  |
+| 1 | DEPLOYED |  |  |
+| 2 | RETRACTED |  |  |
+
+### `airframe_command` (4 bits)
+
+What AFR_CMD asks of the airframe terminal: control_landing_gear('deploy' / 'retract')
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | GEAR_DEPLOY |  |  |
+| 2 | GEAR_RETRACT |  |  |
+
+### `fdm_command` (4 bits)
+
+What FDM_CMD asks of the flight data monitoring terminal: eject_storage(slot)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | EJECT_STORAGE |  |  |
 
 ## Messages
 
@@ -3011,6 +3106,284 @@ FlightSurfaceService.get_data()['surfaces']: where each of the ten surfaces is, 
 | 9 | 15-0 | `slat_l` | uint | LSB 1/100 deg, range 0 to 20 | Surface('slat_l', rate 5, 0-20): 20 while the angle of attack is above 8 degrees, else 0 |
 | 10 | 15-0 | `slat_r` | uint | LSB 1/100 deg, range 0 to 20 | Surface('slat_r', rate 5, 0-20): the same command |
 | 11 | 15-0 | `speedbrake` | uint | LSB 1/100 deg, range 0 to 60 | Surface('speedbrake', rate 30, 0-60): 0.6 x the commanded percent |
+
+### PLANT_CABIN
+
+**Cabin environment from the plant** — RT 27 · SA 18 · transmit (terminal to bus) · 4 words · 5 Hz
+
+What the environmental control system's sensors would measure (v1.22, fmofp_plant.utilities): ECSControl had no sensor source (its readings stayed None until set_sensor_readings, which nothing called), so the plant invents the cabin: the temperature, the pressure and the clean-air fraction as slow random walks around 22 C, 101.3 kPa and 98 %, stepped twice a second (the Python's 2 Hz loop) and polled five times. epoch says when a reading is new; 0 says there is no reading (a plant without the cabin model), which the terminal ignores.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-8 | `epoch` | uint | raw counts | 1-255, moving on with every new reading; 0 says there is no reading |
+| 0 | 7-0 | `spare_0` | spare |  |  |
+| 1 | 15-0 | `temperature` | sint | LSB 1/100 C, range -327.68 to 327.67 | Cabin temperature (ECSControl.get_temperature) |
+| 2 | 15-0 | `pressure` | uint | LSB 1/100 kPa, range 0 to 655.35 | Cabin pressure (get_pressure) |
+| 3 | 15-0 | `air_quality` | uint | LSB 1/100 %, range 0 to 100 | Clean-air percentage (get_air_quality) |
+
+### PLANT_HYDRAULICS
+
+**Hydraulic pressures from the plant** — RT 27 · SA 19 · transmit (terminal to bus) · 3 words · 1 Hz
+
+What the hydraulic systems' pressure transducers would measure (v1.22): monitor_pressure read a constant 2800 psi, so the plant invents the primary and the backup system's pressures as slow random walks around 2900 psi (the primary, under load) and 2950 (the backup), once a second (the Python's loop). epoch says when a reading is new; 0 says there is none.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-8 | `epoch` | uint | raw counts | 1-255; 0 says there is no reading |
+| 0 | 7-0 | `spare_0` | spare |  |  |
+| 1 | 15-0 | `primary_psi` | uint | LSB 1 psi, range 0 to 65535 | The primary system (hydrConfig.xml id 1) |
+| 2 | 15-0 | `backup_psi` | uint | LSB 1 psi, range 0 to 65535 | The backup system (id 2) |
+
+### PLANT_AIRFRAME
+
+**Airframe sensor readings from the plant** — RT 27 · SA 20 · transmit (terminal to bus) · 4 words · 1 Hz
+
+What asmConfig.xml's three sensors would measure (v1.22): AirframeSystemManager had no sensor source (set_sensor_reading, which nothing called), so the plant invents them: the wing root and fuselage strain gauges follow the load factor (180 and 110 microstrain per g) with a little noise, the leading-edge temperature follows the altitude (15 C at sea level, 2 C less per 1000 ft) with a little noise, once a second. epoch says when a reading is new; 0 says there is none.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-8 | `epoch` | uint | raw counts | 1-255; 0 says there is no reading |
+| 0 | 7-0 | `spare_0` | spare |  |  |
+| 1 | 15-0 | `wing_root_strain` | uint | LSB 1 ue, range 0 to 65535 | Sensor 1 (strain, wing root), microstrain |
+| 2 | 15-0 | `fuselage_strain` | uint | LSB 1 ue, range 0 to 65535 | Sensor 2 (strain, fuselage), microstrain |
+| 3 | 15-0 | `leading_edge_temp` | sint | LSB 1/100 C, range -327.68 to 327.67 | Sensor 3 (temperature, leading edges) |
+
+### ECS_STATUS
+
+**Environmental control status** — RT 4 · SA 10 · transmit (terminal to bus) · 10 words · 5 Hz
+
+The terminal's state and command handling as the other subsystems report them, plus ECSControl.get_status(): the cabin temperature, pressure and air quality as last read (PLANT_CABIN relayed as ECS_CABIN), the climate sub-component's temperature (which monitor_ecs sets to each reading) and humidity (50 % until SET_HUMIDITY), the oxygen generator's level (21 % at start, up 0.1 a pass, capped at 23) and rate (1 L/min until SET_OXYGEN_RATE; it changes nothing: generate_oxygen adds 0.1 regardless), and what monitor_ecs's three checks found on the last reading: the temperature more than 0.5 C from the 22 C target, the pressure more than 0.5 kPa from 101.3, the air quality under 95 % (the Python logged "Adjusting ..." and "Activating air purification"; nothing moved, and ecsConfig.xml's limits were never read). sensors_valid is 1 while readings arrive: 0 before the first and after three periods without one (75 frames), when the checks and the generator stand still, as monitor_ecs returned early without sensor data. passes counts the passes with a reading.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last ECS_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last ECS_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13-12 | `spare_1` | spare |  |  |
+| 1 | 11-8 | `ecs_cmd_status` | enum | enum `cmd_status` | Outcome of the last ECS_CMD |
+| 1 | 7 | `sensors_valid` | bool |  | 1 = ECS_CABIN arrived within the last 75 frames |
+| 1 | 6 | `temperature_adjusting` | bool |  | adjust_temperature: \|temperature - 22\| > 0.5 on the last reading |
+| 1 | 5 | `pressure_adjusting` | bool |  | adjust_pressure: \|pressure - 101.3\| > 0.5 |
+| 1 | 4 | `purification_active` | bool |  | adjust_air_quality: air quality under 95 % |
+| 1 | 3-1 | `spare_2` | spare |  |  |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0) |
+| 2 | 15-0 | `temperature` | sint | LSB 1/100 C, range -327.68 to 327.67 | The last reading |
+| 3 | 15-0 | `pressure` | uint | LSB 1/100 kPa, range 0 to 655.35 |  |
+| 4 | 15-0 | `air_quality` | uint | LSB 1/100 %, range 0 to 100 |  |
+| 5 | 15-0 | `climate_temperature` | sint | LSB 1/100 C, range -327.68 to 327.67 | ClimateControl.current_temperature: 22 at start, then each reading (or SET_CLIMATE_TEMPERATURE until the next reading) |
+| 6 | 15-0 | `humidity` | uint | LSB 1/100 %, range 0 to 655.35 | ClimateControl.current_humidity: 50 until SET_HUMIDITY, as given |
+| 7 | 15-0 | `oxygen_level` | uint | LSB 1/100 %, range 0 to 100 | OxygenControl.oxygen_level: 21 at start, +0.1 a pass with a reading, capped at 23 |
+| 8 | 15-0 | `oxygen_rate` | sint | LSB 1/100 L/min, range -327.68 to 327.67 | OxygenControl.oxygen_generation_rate: 1 until SET_OXYGEN_RATE, as given |
+| 9 | 15-0 | `passes` | uint | LSB 1, range 0 to 65535 | monitor_ecs passes with a reading (the generator's steps), saturating |
+
+### ECS_MODE_CMD
+
+**Environmental control mode command** — RT 4 · SA 10 · receive (bus to terminal) · 1 words · aperiodic
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### ECS_CABIN
+
+**Cabin environment, as received by the environmental control terminal** — RT 4 · SA 11 · receive (bus to terminal) · 4 words · 5 Hz
+
+PLANT_CABIN relayed: the readings set_sensor_readings would have supplied. A new epoch runs monitor_ecs once.
+
+Same layout as [`PLANT_CABIN`](#plant_cabin).
+
+### ECS_CMD
+
+**Environmental control command** — RT 4 · SA 12 · receive (bus to terminal) · 2 words · aperiodic
+
+The manual controls of ECSControl's sub-components, which nothing in the Python called (README section 2): SET_OXYGEN_RATE is OxygenControl.adjust_generation_rate(value L/min), reported and otherwise without effect; SET_HUMIDITY is ClimateControl.adjust_humidity(value %); SET_CLIMATE_TEMPERATURE is ClimateControl.adjust_temperature(value C), which the next pass with a reading overwrites with the cabin temperature, as monitor_ecs did. Values are stored as given, as the Python stored them. The outcome is ECS_STATUS.ecs_cmd_status (REJECTED_INVALID for NONE).
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `ecs_command` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+| 1 | 15-0 | `value` | sint | LSB 1/100, range -327.68 to 327.67 | SET_OXYGEN_RATE: L/min; SET_HUMIDITY: %; SET_CLIMATE_TEMPERATURE: C; ignored otherwise |
+
+### HYD_STATUS
+
+**Hydraulics status** — RT 19 · SA 10 · transmit (terminal to bus) · 4 words · 5 Hz
+
+The terminal's state and command handling, plus HydraulicSystemController.get_status(): the active system (PRIMARY until a CRITICAL pressure or HYD_CMD ACTIVATE_BACKUP switches to BACKUP, for good: the Python never switched back), monitor_pressure's status on the active system's last pressure against hydrConfig.xml's thresholds (nominal 3000, warning 2500, critical 2000 psi: WARNING at or under 2500, CRITICAL at or under 2000; the Python compared a constant 2800 for equality with them, README section 2), and both pressures as last read (PLANT_HYDRAULICS relayed as HYD_PRESSURES). pressures_valid is 1 while readings arrive (three periods: 150 frames); the status is OK until the first.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last HYD_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last HYD_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13-12 | `active_system` | enum | enum `hydraulic_system` | HydraulicSystemController.active_system |
+| 1 | 11-8 | `hyd_cmd_status` | enum | enum `cmd_status` | Outcome of the last HYD_CMD |
+| 1 | 7 | `pressures_valid` | bool |  | 1 = HYD_PRESSURES arrived within the last 150 frames |
+| 1 | 6-5 | `pressure_status` | enum | enum `pressure_status` | monitor_pressure's status on the active system's last pressure |
+| 1 | 4-1 | `spare_1` | spare |  |  |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0) |
+| 2 | 15-0 | `primary_psi` | uint | LSB 1 psi, range 0 to 65535 | The last reading |
+| 3 | 15-0 | `backup_psi` | uint | LSB 1 psi, range 0 to 65535 |  |
+
+### HYD_MODE_CMD
+
+**Hydraulics mode command** — RT 19 · SA 10 · receive (bus to terminal) · 1 words · aperiodic
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### HYD_PRESSURES
+
+**Hydraulic pressures, as received by the hydraulics terminal** — RT 19 · SA 11 · receive (bus to terminal) · 3 words · 1 Hz
+
+PLANT_HYDRAULICS relayed: the pressure monitor_pressure read. A new epoch runs it once.
+
+Same layout as [`PLANT_HYDRAULICS`](#plant_hydraulics).
+
+### HYD_CMD
+
+**Hydraulics command** — RT 19 · SA 12 · receive (bus to terminal) · 1 words · aperiodic
+
+ACTIVATE_BACKUP is HydraulicSystemController.activate_backup(), which nothing in the Python called by hand (monitor_pressure called it on a CRITICAL pressure): the backup system becomes the active one, for good (ACCEPTED when it already is). The outcome is HYD_STATUS.hyd_cmd_status (REJECTED_INVALID for NONE).
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `hydraulic_command` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### AFR_STATUS
+
+**Airframe systems status** — RT 20 · SA 10 · transmit (terminal to bus) · 5 words · 1 Hz
+
+The terminal's state and command handling, plus AirframeSystemManager.get_status() and what monitor_airframe logged: asmConfig.xml's three sensors as last read (PLANT_AIRFRAME relayed as AFR_SENSORS; the config lists no limits, so nothing is judged: the readings are reported), and the landing gear state (UNKNOWN until a command, then the commanded state: the class senses no position). The FMS's gear command reaches it as AFR_FMS_CONTROL and moves it when it changes; AFR_CMD moves it by hand. sensors_valid is 1 while readings arrive (three periods: 150 frames).
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last AFR_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last AFR_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13-12 | `gear_state` | enum | enum `gear_state` | AirframeSystemManager.gear_state |
+| 1 | 11-8 | `afr_cmd_status` | enum | enum `cmd_status` | Outcome of the last AFR_CMD |
+| 1 | 7 | `sensors_valid` | bool |  | 1 = AFR_SENSORS arrived within the last 150 frames |
+| 1 | 6-1 | `spare_1` | spare |  |  |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0) |
+| 2 | 15-0 | `wing_root_strain` | uint | LSB 1 ue, range 0 to 65535 | Sensor 1, the last reading |
+| 3 | 15-0 | `fuselage_strain` | uint | LSB 1 ue, range 0 to 65535 | Sensor 2 |
+| 4 | 15-0 | `leading_edge_temp` | sint | LSB 1/100 C, range -327.68 to 327.67 | Sensor 3 |
+
+### AFR_MODE_CMD
+
+**Airframe systems mode command** — RT 20 · SA 10 · receive (bus to terminal) · 1 words · aperiodic
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### AFR_SENSORS
+
+**Airframe sensor readings, as received by the airframe terminal** — RT 20 · SA 11 · receive (bus to terminal) · 4 words · 1 Hz
+
+PLANT_AIRFRAME relayed: the readings set_sensor_reading would have supplied, one per sensor of asmConfig.xml (1 the wing root strain gauge, 2 the fuselage strain gauge, 3 the leading-edge temperature).
+
+Same layout as [`PLANT_AIRFRAME`](#plant_airframe).
+
+### AFR_FMS_CONTROL
+
+**FMS thrust and gear status, as received by the airframe terminal** — RT 20 · SA 12 · receive (bus to terminal) · 3 words · 5 Hz
+
+FMS_CONTROL_STATUS relayed (its second relay, after the engine computer's): the gear field is the command control_landing_gear takes when it changes (DOWN = deploy, UP = retract). In the Python nothing ever commanded the gear but the monitor loop itself, which once asked for "deploy" every second (README section 2).
+
+Same layout as [`FMS_CONTROL_STATUS`](#fms_control_status).
+
+### AFR_CMD
+
+**Airframe command** — RT 20 · SA 13 · receive (bus to terminal) · 1 words · aperiodic
+
+GEAR_DEPLOY and GEAR_RETRACT are AirframeSystemManager.control_landing_gear("deploy" / "retract"): idempotent, ACCEPTED either way; it stands until the FMS's gear command next changes. The outcome is AFR_STATUS.afr_cmd_status (REJECTED_INVALID for NONE).
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `airframe_command` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### FDM_STATUS
+
+**Flight data monitoring status** — RT 23 · SA 10 · transmit (terminal to bus) · 8 words · 1 Hz
+
+The terminal's state and command handling, plus FlightDataMonitoring.get_status() and the recorder's state. fdmsConfig.xml lists two recorders (1, the flight data recorder, whose parameters are the UTC time, the altitude and the airspeed; 2, the cockpit voice recorder, whose parameter is audio) and two storage cards (slot 1, the FDR's 16 GB card; slot 2, the CVR's 8 GB card). Twice a second (the Python's loop) the flight data recorder takes the FMS flight data heard by broadcast (BCAST_FMS_FLIGHT_DATA) into a ring of 512 records: the time as the terminal's frame count, the altitude, the airspeed (the Python logged the number 123 for every parameter, README section 2). The voice recorder has nothing to record on the bus. records counts the records taken (saturating), held how many the ring holds (the last 512), flight_data_valid is 1 while the flight data arrives (three periods: 15 frames; without it no record is taken), slot_1_present and slot_2_present are 1 until EJECT_STORAGE, which stops nothing, as in the Python.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last FDM_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last FDM_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13-12 | `spare_1` | spare |  |  |
+| 1 | 11-8 | `fdm_cmd_status` | enum | enum `cmd_status` | Outcome of the last FDM_CMD |
+| 1 | 7 | `flight_data_valid` | bool |  | 1 = BCAST_FMS_FLIGHT_DATA arrived within the last 15 frames |
+| 1 | 6 | `slot_1_present` | bool |  | 1 = the FDR card is in slot 1 |
+| 1 | 5 | `slot_2_present` | bool |  | 1 = the CVR card is in slot 2 |
+| 1 | 4-1 | `spare_2` | spare |  |  |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0) |
+| 2 | 15-0 | `records` | uint | LSB 1, range 0 to 65535 | Records taken since start, saturating |
+| 3 | 15-0 | `held` | uint | LSB 1, range 0 to 512 | Records in the ring |
+| 4 | 15-0 | `last_altitude` | uint | LSB 1 ft, range 0 to 65535 | The last record's altitude |
+| 5 | 15-0 | `last_airspeed` | uint | LSB 1/10 kt, range 0 to 1500 | The last record's airspeed |
+| 6-7 | 31-0 | `last_frame` | sint | LSB 1, range 0 to 2147483647 | The last record's time: the terminal's frame count (50 a second) |
+
+### FDM_MODE_CMD
+
+**Flight data monitoring mode command** — RT 23 · SA 10 · receive (bus to terminal) · 1 words · aperiodic
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### FDM_CMD
+
+**Flight data monitoring command** — RT 23 · SA 11 · receive (bus to terminal) · 1 words · aperiodic
+
+EJECT_STORAGE is FlightDataMonitoring.eject_storage(slot): the card in slot 1 or 2 is ejected (FAILED when the slot holds none, the Python's "No storage card in slot" warning; REJECTED_INVALID for another slot number or NONE). Ejecting stops no recording, as in the Python (README section 2). The outcome is FDM_STATUS.fdm_cmd_status.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `fdm_command` |  |
+| 0 | 11-8 | `slot` | uint | raw counts | EJECT_STORAGE: 1 (the FDR card) or 2 (the CVR card) |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### EICAS_HYD_STATUS
+
+**Hydraulics status, for the EICAS** — RT 14 · SA 6 · receive (bus to terminal) · 4 words · 5 Hz
+
+HYD_STATUS relayed to the EICAS, its one consumer (section 8): the HYDRAULIC rows SYS A (the primary system) and SYS B (the backup); SYS C has no system behind it in hydrConfig.xml and stays unknown (README section 2).
+
+Same layout as [`HYD_STATUS`](#hyd_status).
+
+### EICAS_ECS_STATUS
+
+**Environmental control status, for the EICAS** — RT 14 · SA 7 · receive (bus to terminal) · 10 words · 5 Hz
+
+ECS_STATUS relayed to the EICAS, its one consumer: the ECS rows CAB TEMP (the cabin temperature) and CAB ALT (the pressure altitude of the cabin pressure, computed by the feed); OXY PSI stays unknown, since the Python's OxygenControl models a concentration, not a bottle pressure (README section 2).
+
+Same layout as [`ECS_STATUS`](#ecs_status).
 
 ## Block payloads
 

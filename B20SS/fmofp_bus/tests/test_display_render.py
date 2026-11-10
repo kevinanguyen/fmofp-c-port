@@ -24,7 +24,8 @@ from fmofp_bus.icd.enums import (AewcMode, SarMode, ClearanceLevel, Countermeasu
 from fmofp_bus.tests.test_display_feeds import (FakeTerminal, flight_payload, sample_aewc, sample_elevation, sample_fused, sample_sar_image,
                                                 sample_link, sample_mission_status, sample_plan, sample_products,
                                                 sample_tracks, sample_def_status, sample_rwr_contacts,
-                                                sample_sns_status, sample_pwr_status)
+                                                sample_sns_status, sample_pwr_status, sample_hyd_status,
+                                                sample_ecs_status)
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import RadarFeed
 from fmofp_display.systems_feed import SystemsFeed
@@ -374,6 +375,8 @@ class DisplayWindowsTest(unittest.TestCase):
             terminal.put(sample_sns_status())
             terminal.put_block(b.BcastRdrFusedTracks, sample_fused(), 5)
             terminal.put(sample_pwr_status())
+            terminal.put(sample_hyd_status())
+            terminal.put(sample_ecs_status())
             window.tick()        # the oil and fuel readings go in through set_engine_readings()
             eicas._poll_data()   # the 10 Hz poll reads the getters
             window.tick()
@@ -385,7 +388,7 @@ class DisplayWindowsTest(unittest.TestCase):
             self.assertEqual(100.0, eicas._engine["thrust_pct"], "COMBAT's engine power, as the Python showed")
             for field in ("oil_psi", "oil_temp_c", "vib", "total_kg", "balance_kg", "sys_a_psi"):
                 self.assertTrue(eicas.has_valid(field), field)
-            self.assertFalse(eicas.has_valid("sys_c_psi"), "no hydraulics terminal yet")
+            self.assertFalse(eicas.has_valid("sys_c_psi"), "no third system in hydrConfig.xml")
             self.assertEqual((39000.0, -1000.0), (eicas._fuel["total_kg"], eicas._fuel["balance_kg"]))
             texts = [a["text"] for a in eicas._alerts]
             self.assertIn("FUEL  IMBALANCE", texts)
@@ -415,7 +418,14 @@ class DisplayWindowsTest(unittest.TestCase):
                                                        eicas._electrical["gen1_ok"], eicas._electrical["gen2_ok"]))
             self.assertNotIn("ELEC  GEN 1 UNKNOWN", texts)
             self.assertNotIn("ELEC  BUS VOLTS UNKNOWN", texts)
-            self.assertIn("HYD C  PRESSURE UNKNOWN", texts, "hydraulics still wait for their terminal")
+            # The hydraulics and environmental control terminals (v1.22): SYS A and B are the terminal's readings (the
+            # display's g-load model, run in the poll above, is overwritten right after it), the cabin rows fill.
+            self.assertEqual((2900.0, 2950.0), (eicas._hydraulic["sys_a_psi"], eicas._hydraulic["sys_b_psi"]))
+            self.assertTrue(eicas.has_valid("cabin_temp_c") and eicas.has_valid("cabin_alt_ft"))
+            self.assertFalse(eicas.has_valid("oxy_psi"), "a concentration in the Python, not a bottle pressure")
+            self.assertEqual(22.4, eicas._ecs_state["cabin_temp_c"])
+            self.assertTrue(80.0 < eicas._ecs_state["cabin_alt_ft"] < 100.0, eicas._ecs_state)
+            self.assertIn("HYD C  PRESSURE UNKNOWN", texts, "no third hydraulic system")
             self.assertIn("4 warnings 5 cautions", window.status.text())
             self.assertIn("ENG N1 82.0%", window.status.text())
         finally:
