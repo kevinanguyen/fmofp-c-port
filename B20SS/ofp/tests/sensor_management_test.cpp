@@ -309,4 +309,61 @@ TEST(SensorManagementTest, TheGateAndTheBandTableMatchTheFusion) {
     EXPECT_EQ(RwrBand::UNKNOWN, classify_band(std::nan("")));
 }
 
+// The ESM intercepts and the terminal's own housekeeping (added with unit 30's coverage floor): a set of five
+// signals becomes five contacts, each of the plant's five slots read; the self test; a mode command that may
+// not be asked for; the names the tool prints.
+TEST(SensorManagementTest, AnEsmSetOfFiveTheSelfTestAndTheModeCommand) {
+    SensorManagement sm;
+    ASSERT_EQ(Status::kOk, sm.init());
+    PlantEsm esm{};
+    esm.epoch = 1;
+    esm.count = 5;
+    esm.frequency_1 = 1.0e9;
+    esm.bearing_1 = 10.0;
+    esm.frequency_2 = 3.0e9;
+    esm.bearing_2 = 60.0;
+    esm.frequency_3 = 9.0e9;
+    esm.bearing_3 = 120.0;
+    esm.frequency_4 = 15.0e9;
+    esm.bearing_4 = 200.0;
+    esm.frequency_5 = 35.0e9;
+    esm.bearing_5 = 300.0;
+    sm.step(nullptr, &esm, 10);
+    EXPECT_TRUE(sm.status().esm_valid);
+    EXPECT_EQ(5U, sm.status().contact_count) << "five bearings more than the gate apart: five contacts";
+    sm.step(nullptr, &esm, 20);
+    EXPECT_EQ(5U, sm.status().contact_count) << "the same epoch is the same set";
+
+    sm.start_self_test();
+    EXPECT_TRUE(sm.bit().in_progress);
+    sm.step(nullptr, nullptr, 21);
+    EXPECT_TRUE(sm.bit().in_progress);
+    sm.step(nullptr, nullptr, 21 + fmofp::sensor::kSelfTestFrames);
+    EXPECT_FALSE(sm.bit().in_progress);
+
+    SnsModeCmd mode{};
+    mode.cmd_seq = 1;
+    mode.requested_state = TerminalState::FAILURE;
+    sm.command_mode(mode);
+    EXPECT_TRUE(sm.status().cmd_rejected);
+    mode.requested_state = TerminalState::STANDBY;  // the same sequence number: not a new command
+    sm.command_mode(mode);
+    EXPECT_NE(TerminalState::STANDBY, sm.state());
+
+    EXPECT_STREQ("ESM", fmofp::sensor::to_string(Source::ESM));
+    EXPECT_STREQ("RADAR", fmofp::sensor::to_string(Source::RADAR));
+    EXPECT_STREQ("LIDAR", fmofp::sensor::to_string(Source::LIDAR));
+    EXPECT_STREQ("IR", fmofp::sensor::to_string(Source::IR));
+    EXPECT_STREQ("FUSED", fmofp::sensor::to_string(Source::FUSED));
+    EXPECT_STREQ("EMITTER", fmofp::sensor::to_string(ContactClass::EMITTER));
+    EXPECT_STREQ("AIR", fmofp::sensor::to_string(ContactClass::AIR));
+    EXPECT_STREQ("GROUND", fmofp::sensor::to_string(ContactClass::GROUND));
+    EXPECT_STREQ("SURFACE", fmofp::sensor::to_string(ContactClass::SURFACE));
+    EXPECT_STREQ("UNKNOWN", fmofp::sensor::to_string(ContactClass::UNKNOWN));
+
+    sm.reset();
+    EXPECT_EQ(TerminalState::INITIALIZING, sm.state());
+    EXPECT_EQ(0U, sm.status().contact_count);
+}
+
 }  // namespace

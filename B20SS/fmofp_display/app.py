@@ -11,6 +11,7 @@ import functools
 import importlib
 import importlib.machinery
 import importlib.util
+import logging
 import os
 import sys
 import time
@@ -47,6 +48,17 @@ def bootstrap():
     os.chdir(B20SS)
     if str(B20SS) not in sys.path:
         sys.path.insert(0, str(B20SS))
+
+
+def quiet_fmofp_logging():
+    """Drops INFO and DEBUG records in this process, whatever level the FMOFP logger sets itself.
+
+    The frozen display code logs every item it draws at INFO (the MFD's radar data coordinator wrote 520 KB in
+    a thirty-second demo, 2 MB in three minutes) and FMOFP's SysLogger puts the root logger at DEBUG when it is
+    first imported, so a level set here beforehand would be undone. logging.disable is the process-wide
+    threshold above every logger's own. Warnings and errors still reach the log. `--verbose` leaves it out.
+    """
+    logging.disable(logging.INFO)
 
 
 def radar_terminal(port_base):
@@ -773,7 +785,11 @@ def main(argv=None):
     parser.add_argument("display", choices=["radar", "pfd", "mfd", "eicas", "tsd", "sms"])
     parser.add_argument("--port-base", type=int, default=51000)
     parser.add_argument("--seconds", type=float, default=0.0, help="close after this long (0 = until the window is closed)")
+    parser.add_argument("--verbose", action="store_true",
+                        help="keep the FMOFP display code's INFO and DEBUG log lines (dropped by default)")
     args = parser.parse_args(argv)
+    if not args.verbose:
+        quiet_fmofp_logging()
     bootstrap()
     app = QApplication(sys.argv[:1])
     terminals = {"radar": radar_terminal, "pfd": pfd_terminal, "mfd": mfd_terminal, "eicas": eicas_terminal,

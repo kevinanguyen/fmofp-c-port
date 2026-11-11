@@ -144,11 +144,14 @@ person may continue it in their next session; when it is green it is rebased ont
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 298 OK (`fmofp_bus/tests`, about 65 s on Kevin's machine, 80 s on Alee's); C++
-  ctest 2/2 (320 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
+- **Tests**: Python 303 OK (`fmofp_bus/tests`, about 65 s on Kevin's machine, 67 s on Alee's); C++
+  ctest 2/2 (325 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
-  bash B20SS/verify.sh cpp py load`); CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan and, since
-  unit 30, linux-gcc-release; and Alee's eight Python legs).
+  bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
+  partition) at 86 % or more against a floor of 80 % (`cmake --build --preset coverage`); `test_timing.py` holds
+  every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
+  9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
+  unit 30 part 2, coverage; and Alee's eight Python legs).
 - **Meter**: 27 of 29.5 units = **92 %** (section 2). Pace measured over the log: about
   5 units per full working day, so about half a day more to 100 % (2 units open: 29, 30); the
   intern-ticket authoring phase comes after and is not in the number.
@@ -156,13 +159,15 @@ person may continue it in their next session; when it is green it is rebased ont
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
 - **Open work / claims**: unit 30 hardening is `IN PROGRESS (Alee, 2026-11-11)`, on `port/cpp` in parts, each
-  green (no `wip/` branch). Part 1 landed 2026-11-11 (section 7): the demo's overruns traced and cut (the block
-  CRC in C, the optimised build preset the demo prefers, the controller's timing report, test port bases that
-  step off Windows' reserved ranges). Left in unit 30 (section 2.30): the timing test, gcovr thresholds in CI, the
-  MISRA-subset lint, the display processes' loggers at WARNING, the intern documents. Then unit 29, last (it cuts
-  the upstream line, section 2.29; both humans decide what `py FMOFP/Main.py` becomes). Last session: Kevin's,
-  2026-11-11 (the check after part 1 landed: the gate green here on both builds, the optimised build's demo
-  measured); before it Alee's part 1 the same day.
+  green (no `wip/` branch). Part 1 (`fb32655`, CI green, checked on Kevin's machine the same day: three demo runs
+  on the optimised build with 0 overruns, section 7): the demo's overruns. Part 2
+  (2026-11-11, section 7): the display processes' logs, the timing test, the coverage floors, the architecture
+  page. **Left in unit 30, each waiting on a human** (section 2.30): the MISRA-subset lint needs clang-tidy, which
+  is not installed on Alee's machine (cppcheck's misra addon cannot read C++); the debugging guide needs gdb
+  installed there to be tested as written; the ticket format is the humans' to decide (nothing in the repository
+  to follow). Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
+  `py FMOFP/Main.py` becomes). Last session: Alee's, 2026-11-11 (part 2); before it Kevin's check of part 1 and
+  Alee's part 1 the same day.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866, the Windows 3.13 leg of 42729856922 and the Linux 3.14 leg of 42931963850); the two
@@ -357,6 +362,18 @@ SAR image's 6 ms decode and 2.4 ms pickle moved out of the display terminal's he
 (forward the raw words, decode on read); `PLANT_SENSORS` as one broadcast; the plant's own worst answers (4-21
 ms, a Python process). The timing test of this unit should pin: the release build's per-terminal worst answer
 in a free-running whole-aircraft run, and the schedule's estimate.
+
+Part 2 done 2026-11-11 (section 7): the display programs drop the display code's INFO and DEBUG lines
+(`logging.disable(logging.INFO)` in `fmofp_display.app.main`, `--verbose` keeps them: the MFD's log for the
+thirty-second demo went from 520 KB to 6 KB); `test_timing.py` (the partitions and the plant free running under
+the controller with the demo's first sixteen seconds of events: each partition's mean answer, the schedule's
+estimate); the `coverage` target holds every module to a floor of 80 % of its lines
+(`ofp/cmake/coverage_check.py`) and CI runs it; `ofp/docs/ARCHITECTURE.md`. Still open: the MISRA-subset lint
+(clang-tidy with a `.clang-tidy` chosen from the rules of `ofp/CLAUDE.md`: no recursion, no heap, no unchecked
+narrowing; cppcheck's `misra.py` is MISRA C and reports `nullptr` as an unknown variable on this code),
+`ofp/docs/DEBUGGING.md` (build, run and step one partition under gdb: write it with gdb at hand, every command
+run), the ticket format (`ofp/docs/TICKETS.md`, once the humans say what a ticket must carry), and the release
+build as the gate's second leg in `verify.sh` if the humans want it there (today it is a command, section 5.4).
 
 ---
 
@@ -596,9 +613,12 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (298 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (303 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
+
+Coverage (unit 30): `cmake --preset coverage && cmake --build --preset coverage` from `B20SS/ofp/` runs the unit
+tests instrumented and prints one line per module with its floor (80 %); it fails when a module is under.
 
 The optimised build (unit 30): `cmake --preset windows-ucrt64-release && cmake --build --preset
 windows-ucrt64-release` from `B20SS/ofp/` (`linux-gcc-release` on Linux), into `build/<preset>-release/`; the
@@ -619,7 +639,7 @@ From `B20SS/`: `py -m fmofp_demo` starts the plant, every C++ partition, the six
 windows and the bus controller, prints one dashboard line per second and drives the scripted
 events; Ctrl-C stops everything. Options: `--seconds S`, `--headless`, `--no-displays`,
 `--no-events`, `--hold heading=0,speed=450`, `--seed N`, `--port-base N`, `--build DIR`.
-Logs in `B20SS/logs/demo/` (ignored by git). `B20SS/ofp/README.md` has the per-process
+Logs in `B20SS/logs/demo/` (ignored by git; the display programs log warnings and errors only, `py -m fmofp_display mfd --verbose` for everything). `B20SS/ofp/README.md` has the per-process
 command lines, `fmofp_bc --schedule --rt ...` prints the schedule and its load, and
 `fmofp_bc --report` the per-terminal statistics and, when it stops, where the frames' time went (unit 30: `bc: timing: overruns_late_start` and, per terminal, `mean_response_us`, `worst_response_us`, `overruns_slowest`; the demo's `logs/demo/bc.log` has them).
 
@@ -766,6 +786,17 @@ Python tests and displays
   (`time.perf_counter` around the suspect, in a scratch script) before changing the ICD to lighten the load.
 - An optimised build can warn where `-O0` does not and can change floating-point results: `-Werror` and the
   oracle tests are the check, so run the Python suite against the release build after touching the C++.
+- cppcheck's MISRA addon (`--addon=misra`, found only by its full path under MSYS2) is MISRA C: on this C++ it
+  reports `misra-config` for `nullptr` and every template parameter and checks nothing. A MISRA-style lint of the
+  C++ is clang-tidy's job.
+- gcovr stops on GCC bug 68080 (a counter read while a test's terminal thread runs comes out negative):
+  `--gcov-ignore-parse-errors=negative_hits.warn_once_per_file`, in the `coverage` target since unit 30.
+- FMOFP's `SysLogger` sets the root logger to DEBUG when first imported, so a level set before it is undone;
+  `logging.disable(logging.INFO)` is the process-wide threshold above every logger's own.
+- A coverage floor per module finds what a total hides: at 92.6 % overall the flight data recorder was at
+  77 % and the partitions' shared socket loop at 73 % (their mode command, self test and error paths untested).
+- A timing assertion on a desktop holds a mean, not a worst case: one answer is as slow as the machine's worst
+  moment (17 ms from a partition whose mean was 0.19 ms, in a run where nothing was wrong).
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -1484,6 +1515,46 @@ done before this file existed are condensed from the private session notes.
   before any step of ours ran), its Lint job green.
 - *Numbers*: meter unchanged, 27 / 29.5 = 92 % (unit 30 in progress).
 
+### 2026-11-11 - unit 30 hardening, part 2: logs, the timing test, coverage floors, the architecture page - by Alee's agent
+- *What*: (1) `fmofp_display.app.quiet_fmofp_logging()`, called by the display programs' `main` unless `--verbose`:
+  the frozen display code's INFO and DEBUG lines are dropped in those processes (the MFD's radar data coordinator
+  logged every item it drew). (2) `fmofp_bus/tests/test_timing.py` (port base 64500): the sixteen partitions and
+  the plant under the real controller, free running, with the demo's events of its first sixteen seconds (all five
+  radars on, the mission, the radio); from the controller's `--report` it holds each partition's mean answer under
+  4000 us and the schedule's estimate under 9500 us of the 10000, and checks every terminal answered every poll.
+  (3) The `coverage` target: gcovr over the bus, the OSAL, the controller and every partition's logic (the mains,
+  the stdin tools, the stub and the generated code left out), then `ofp/cmake/coverage_check.py` holds each module
+  to `OFP_COVERAGE_FLOOR` (80 %) of its lines, `OFP_COVERAGE_FLOORS` for a module with a stated reason; a `coverage`
+  test preset; CI runs it (both CI files). The target's filter list had stopped at the engine: eleven partitions
+  were not in the report. (4) Unit tests where the floor found none: `rt_process_test.cpp` (the shared socket loop:
+  a bad address, junk bytes, a frame of the wrong kind, a command for another terminal), and the mode command, the
+  self test and the way back from DEGRADED of the flight data recorder, the hydraulics and the sensor terminal
+  (with an ESM set of five, which no unit test had fed). (5) `ofp/docs/ARCHITECTURE.md`, the intern's first page.
+- *Numbers*: the MFD's log for a thirty-second demo 520 KB -> 6 KB (54 warnings kept), the radar display's 71 KB ->
+  26 KB. Timing test, mean answer in us, debug / optimised build: radar 161 / 79, FCS 129 / 63, recorder 609 / 75,
+  the others 75-208 / 50-187; plant 168 / 124; the run takes 4-7 s. Coverage: 92.6 % of lines before the new tests
+  with `partitions/fdm` at 77.1 % and `partitions/common` at 73.3 %; after, 93.8 % (7936 of 8461 lines, 79 % of
+  branches), the lowest modules `partitions/ecs` 86.8 %, `partitions/common` 89.1 %, `osal` 89.2 %; sensor 81.0 ->
+  97.3 %, hydraulics 82.2 -> 96.3 %, recorder 100 %.
+- *Warnings / lessons*: cppcheck's MISRA addon cannot read C++ (section 6): the lint was not done, clang-tidy is
+  not installed here and is a few hundred MB with clang; left for a human's yes. gcovr needed
+  `--gcov-ignore-parse-errors` for GCC bug 68080. The ticket format was not written: nothing in the repository
+  says what a ticket carries (the SSTR tickets are not in it), and inventing one is the humans' call. The debugging
+  guide was not written: gdb is not installed here and a guide of untested commands is worse than none.
+- *CI*: part 1's and the claim's runs are recorded in Kevin's entry above. One addition to it: the claim's run
+  43045647662 was red on every Linux job, the six Python legs' "Install system dependencies" as well as the two
+  `cpp` jobs' "Install toolchain" (the public Actions API lists them): the runner's apt, not the commit. This
+  part's run is to be recorded (the first `coverage` job on the runner's gcov: if a module reads under 80 % there
+  and not here, the count differs by GCC version; the lowest module here has seven points of margin).
+- *Files*: `fmofp_display/app.py`, `fmofp_bus/tests/{test_timing.py, test_display_render.py}`,
+  `ofp/CMakeLists.txt`, `ofp/CMakePresets.json`, `ofp/cmake/coverage_check.py`, `ofp/tests/{rt_process_test.cpp,
+  flight_data_recorder_test.cpp, hydraulic_controller_test.cpp, sensor_management_test.cpp, CMakeLists.txt}`,
+  `ofp/docs/ARCHITECTURE.md`, `ofp/README.md`, both CI files, this file.
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load) on the debug build and `cpp py load` on the optimised one:
+  Python 303 OK (was 298: `test_timing.py` 4, one in `test_display_render.py`), ctest 2/2 on both (325
+  gtests, was 320), cppcheck clean, load unchanged (107 messages for 23 terminals, 8612 us); `cmake --build
+  --preset coverage` OK. Meter unchanged, 27 / 29.5 = 92 % (unit 30 is in progress).
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1584,3 +1655,9 @@ done before this file existed are condensed from the private session notes.
   print with `--report` only; the optimised build is a preset beside the debug one, not a replacement (the gate
   and gdb keep `-O0`), and the demo prefers it when built; the tests' port bases step below their usual place when
   Windows has reserved it; no ICD change, so the next ICD version is still v1.24.
+- 2026-11-11, Alee ("Yes, continue unit 30") and Alee's agent: part 2's choices. The coverage floor is 80 % of
+  lines for every flight code module, measured by the unit tests alone (the mains and the stdin tools are the
+  Python tests' and are left out); a module below it gets unit tests, not a lower floor, unless a reason is
+  written beside `OFP_COVERAGE_FLOORS`. The timing test holds means, not worst cases. The display programs are
+  quiet by default. Not decided, waiting on the humans: installing clang-tidy and gdb on Alee's machine (the lint,
+  the debugging guide), and what an intern ticket must carry (the ticket format).

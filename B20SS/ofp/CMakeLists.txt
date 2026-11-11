@@ -71,23 +71,37 @@ endif()
 # Runs the tests first, so it needs every test executable built.
 find_program(OFP_GCOVR gcovr)
 if(OFP_COVERAGE AND OFP_GCOVR AND OFP_BUILD_TESTS)
+    # The flight code: the bus, the OSAL, the controller and every partition's logic. Left out: each process's
+    # main.cpp, the stdin tools and the stub terminal, which the Python end-to-end and oracle tests exercise
+    # (gcov does not see those runs), and the generated ICD code, which has its own generated round-trip tests.
+    # cmake/coverage_check.py then holds every module (bus, osal, bc, partitions/<name>) to a floor of its own
+    # lines (unit 30): OFP_COVERAGE_FLOOR for all, OFP_COVERAGE_FLOORS ("module=percent;...") for the few with a
+    # stated reason to sit lower.
+    set(OFP_COVERAGE_FLOOR 80 CACHE STRING "Line coverage every flight code module must reach, percent")
+    set(OFP_COVERAGE_FLOORS "" CACHE STRING "Per-module floors, module=percent;module=percent")
+    set(OFP_COVERAGE_FLOOR_ARGS "")
+    foreach(module_floor IN LISTS OFP_COVERAGE_FLOORS)
+        list(APPEND OFP_COVERAGE_FLOOR_ARGS --floor-for ${module_floor})
+    endforeach()
     add_custom_target(coverage
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
         COMMAND ${OFP_GCOVR} --root ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}
             --filter ${CMAKE_CURRENT_SOURCE_DIR}/bus
             --filter ${CMAKE_CURRENT_SOURCE_DIR}/osal
-            --filter ${CMAKE_CURRENT_SOURCE_DIR}/bc/src
-            --filter ${CMAKE_CURRENT_SOURCE_DIR}/bc/include
-            --filter ${CMAKE_CURRENT_SOURCE_DIR}/partitions/common
-            --filter ${CMAKE_CURRENT_SOURCE_DIR}/partitions/fcs
-            --filter ${CMAKE_CURRENT_SOURCE_DIR}/partitions/nav
-            --filter ${CMAKE_CURRENT_SOURCE_DIR}/partitions/fms
-            --filter ${CMAKE_CURRENT_SOURCE_DIR}/partitions/radar
-            --filter ${CMAKE_CURRENT_SOURCE_DIR}/partitions/engine
-            --filter ${CMAKE_BINARY_DIR}/icd/generated/include
+            --filter ${CMAKE_CURRENT_SOURCE_DIR}/bc
+            --filter ${CMAKE_CURRENT_SOURCE_DIR}/partitions
+            --exclude ".*/main\\.cpp"
+            --exclude ".*/tools/.*"
+            --exclude ".*/utilities_tool/.*"
+            --exclude ".*/rt_stub/.*"
+            # GCC bug 68080: a counter read while a test's terminal thread runs can come out negative.
+            --gcov-ignore-parse-errors=negative_hits.warn_once_per_file
             --print-summary --txt
+            --json-summary ${CMAKE_BINARY_DIR}/coverage_summary.json
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/coverage_check.py
+            ${CMAKE_BINARY_DIR}/coverage_summary.json --floor ${OFP_COVERAGE_FLOOR} ${OFP_COVERAGE_FLOOR_ARGS}
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Line and branch coverage of the flight code"
+        COMMENT "Line and branch coverage of the flight code, module by module"
         VERBATIM)
     add_dependencies(coverage ofp_tests ofp_icd_roundtrip_test)
 endif()

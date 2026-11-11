@@ -432,8 +432,20 @@ optimisation changed no computed word. CI builds and unit-tests it (`linux-gcc-r
 
 ```bash
 cmake --build build/<preset> --target cppcheck     # static analysis, fails on any finding
-cmake --preset coverage && cmake --build --preset coverage   # tests + gcovr summary
+cmake --preset coverage && cmake --build --preset coverage   # tests + gcovr report + the floor per module
 ```
+
+The coverage build runs the unit tests in an instrumented build and then holds each
+module of flight code (`bus`, `osal`, `bc`, every `partitions/<name>`) to a floor of
+covered lines: 80 %, `cmake/coverage_check.py`. It prints one line per module and fails
+when one is under, so a partition cannot land with its logic untested behind a good
+overall number. The process mains, the stdin tools and the generated ICD code are not
+counted: the Python end-to-end and oracle tests run the first two (gcov does not see
+those runs), and the generated code has generated tests. A module with a reason to sit
+lower gets its own floor: `-DOFP_COVERAGE_FLOORS="partitions/x=70"`, with the reason in
+`CMakeLists.txt`. CI runs it (`coverage`).
+
+The intern's reading list is `docs/`: start with `docs/ARCHITECTURE.md`.
 
 ## Generated code
 

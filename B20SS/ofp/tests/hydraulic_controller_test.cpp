@@ -115,4 +115,43 @@ TEST(HydraulicController, AFrameRunsOnePassPerNewReadingAndFollowsTheFreshness) 
     EXPECT_EQ(TerminalState::DEGRADED, back.state);
 }
 
+// The terminal's own housekeeping (added with unit 30's coverage floor): a mode command that may not be asked
+// for, a repeated one, the self test, the way back from DEGRADED.
+TEST(HydraulicController, ModeCommandsTheSelfTestAndRecovery) {
+    HydraulicController hyd;
+    ASSERT_EQ(Status::kOk, hyd.init());
+    const PlantHydraulics first = reading(1, 2900.0, 2950.0);
+    hyd.step(&first, 1);
+    ASSERT_EQ(TerminalState::NORMAL, hyd.state());
+
+    HydModeCmd mode{};
+    mode.cmd_seq = 1;
+    mode.requested_state = TerminalState::FAILURE;
+    hyd.command_mode(mode);
+    EXPECT_TRUE(hyd.status().cmd_rejected);
+    EXPECT_EQ(TerminalState::NORMAL, hyd.state());
+    mode.requested_state = TerminalState::STANDBY;  // the same sequence number: not a new command
+    hyd.command_mode(mode);
+    EXPECT_EQ(TerminalState::NORMAL, hyd.state());
+    mode.cmd_seq = 2;
+    mode.requested_state = TerminalState::NORMAL;
+    hyd.command_mode(mode);
+    EXPECT_FALSE(hyd.status().cmd_rejected);
+    EXPECT_EQ(2U, hyd.status().last_cmd_seq);
+
+    hyd.start_self_test();
+    EXPECT_TRUE(hyd.bit().in_progress);
+    hyd.step(nullptr, 2);
+    EXPECT_TRUE(hyd.bit().in_progress);
+    hyd.step(nullptr, 2 + kSelfTestFrames);
+    EXPECT_FALSE(hyd.bit().in_progress);
+
+    hyd.step(nullptr, 1 + kPressureStaleFrames);
+    EXPECT_EQ(TerminalState::DEGRADED, hyd.state());
+    const PlantHydraulics again = reading(2, 2900.0, 2950.0);
+    hyd.step(&again, 2 + kPressureStaleFrames);
+    EXPECT_EQ(TerminalState::NORMAL, hyd.state());
+    EXPECT_TRUE(hyd.status().pressures_valid);
+}
+
 }  // namespace

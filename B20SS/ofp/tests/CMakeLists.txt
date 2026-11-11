@@ -35,6 +35,7 @@ add_executable(ofp_tests
     hydraulic_controller_test.cpp
     airframe_manager_test.cpp
     flight_data_recorder_test.cpp
+    rt_process_test.cpp
     avionics_test.cpp
     icd_messages_test.cpp)
 add_dependencies(ofp_tests ofp_icd_generate)

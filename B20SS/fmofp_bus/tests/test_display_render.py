@@ -6,6 +6,7 @@ rendered to an image and must light up more than their standby pictures, with
 no paint error.
 """
 
+import logging
 import os
 import unittest
 
@@ -70,6 +71,21 @@ class DisplayWindowsTest(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
         cls.app_module = app
         cls.coordinator = get_radar_display_data_coordinator()
+
+    def test_a_display_program_drops_the_display_codes_info_lines(self):
+        """quiet_fmofp_logging (unit 30): the frozen display code logs every item it draws at INFO, 2 MB in three
+        minutes for the MFD. The FMOFP logger is imported by now (setUpClass) and has put the root logger at DEBUG;
+        the process-wide threshold is above it all the same, and warnings still pass."""
+        root = logging.getLogger()
+        self.assertTrue(root.isEnabledFor(logging.INFO), "FMOFP's logger leaves INFO on")
+        try:
+            self.app_module.quiet_fmofp_logging()
+            self.assertFalse(root.isEnabledFor(logging.INFO))
+            self.assertFalse(logging.getLogger("system").isEnabledFor(logging.DEBUG))
+            self.assertTrue(root.isEnabledFor(logging.WARNING))
+        finally:
+            logging.disable(logging.NOTSET)
+        self.assertTrue(root.isEnabledFor(logging.INFO), "the test process itself is left as it was")
 
     def test_the_radar_window_draws_both_radars_from_the_bus_data(self):
         terminal = StubTerminal()

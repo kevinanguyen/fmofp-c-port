@@ -3,8 +3,10 @@
 // while the flight data is fresh, the commands, the outputs.
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 
 #include <fmofp/fdm/flight_data_recorder.hpp>
 
@@ -137,6 +139,66 @@ TEST(FlightDataRecorder, AFrameRecordsEveryTwentyFiveWhileTheFlightDataIsFresh) 
     EXPECT_NEAR(420.5, back.last_airspeed, 0.05);
     EXPECT_EQ(100.0, back.last_frame);
     EXPECT_TRUE(back.slot_1_present && back.slot_2_present);
+}
+
+// The terminal's own housekeeping, as every partition has it (added with unit 30's coverage floor): the mode
+// command, the self test, the way back from DEGRADED, a repeated command, a record that is not a number.
+TEST(FlightDataRecorder, ModeCommandsTheSelfTestAndRecovery) {
+    FlightDataRecorder fdm;
+    ASSERT_EQ(Status::kOk, fdm.init());
+    const FmsFlightData f = flight(9000.0, 300.0);
+    fdm.step(&f, 1);
+    ASSERT_EQ(TerminalState::NORMAL, fdm.state());
+
+    FdmModeCmd mode{};
+    mode.cmd_seq = 1;
+    mode.requested_state = TerminalState::FAILURE;  // not a state a command may ask for
+    fdm.command_mode(mode);
+    EXPECT_TRUE(fdm.status().cmd_rejected);
+    EXPECT_EQ(1U, fdm.status().last_cmd_seq);
+    EXPECT_EQ(TerminalState::NORMAL, fdm.state());
+    mode.cmd_seq = 2;
+    mode.requested_state = TerminalState::MAINTENANCE;
+    fdm.command_mode(mode);
+    EXPECT_FALSE(fdm.status().cmd_rejected);
+    EXPECT_EQ(TerminalState::MAINTENANCE, fdm.state());
+    mode.requested_state = TerminalState::STANDBY;  // the same sequence number again: not a new command
+    fdm.command_mode(mode);
+    EXPECT_EQ(TerminalState::MAINTENANCE, fdm.state());
+    mode.cmd_seq = 3;
+    mode.requested_state = TerminalState::NORMAL;
+    fdm.command_mode(mode);
+    ASSERT_EQ(TerminalState::NORMAL, fdm.state());
+
+    fdm.start_self_test();
+    EXPECT_TRUE(fdm.bit().in_progress);
+    fdm.step(&f, 2);
+    EXPECT_TRUE(fdm.bit().in_progress);
+    fdm.step(&f, 2 + kSelfTestFrames);
+    EXPECT_FALSE(fdm.bit().in_progress);
+    EXPECT_FALSE(fdm.bit().failed);
+
+    // The flight data stops and comes back: DEGRADED, then NORMAL again.
+    const std::uint32_t quiet = 2 + kSelfTestFrames + kFlightDataStaleFrames;
+    fdm.step(nullptr, quiet);
+    EXPECT_EQ(TerminalState::DEGRADED, fdm.state());
+    fdm.step(&f, quiet + 1);
+    EXPECT_EQ(TerminalState::NORMAL, fdm.state());
+
+    // A repeated eject is one command; a record that is not a number is not kept.
+    fdm.command(eject(7, 1), quiet + 2);
+    EXPECT_FALSE(fdm.slot_present(1));
+    const std::uint32_t before = fdm.records();
+    fdm.command(eject(7, 2), quiet + 3);
+    EXPECT_TRUE(fdm.slot_present(2)) << "sequence 7 was already taken";
+    fdm.record(quiet + 4, std::numeric_limits<double>::quiet_NaN(), 300.0);
+    fdm.record(quiet + 4, 9000.0, std::numeric_limits<double>::infinity());
+    EXPECT_EQ(before, fdm.records());
+
+    fdm.reset();
+    EXPECT_EQ(TerminalState::INITIALIZING, fdm.state());
+    EXPECT_TRUE(fdm.slot_present(1));
+    EXPECT_EQ(0U, fdm.records());
 }
 
 }  // namespace

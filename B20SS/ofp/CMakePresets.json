@@ -64,6 +64,7 @@
     { "name": "linux-gcc", "configurePreset": "linux-gcc", "output": { "outputOnFailure": true } },
     { "name": "linux-asan", "configurePreset": "linux-asan", "output": { "outputOnFailure": true } },
     { "name": "windows-ucrt64-release", "configurePreset": "windows-ucrt64-release", "output": { "outputOnFailure": true } },
-    { "name": "linux-gcc-release", "configurePreset": "linux-gcc-release", "output": { "outputOnFailure": true } }
+    { "name": "linux-gcc-release", "configurePreset": "linux-gcc-release", "output": { "outputOnFailure": true } },
+    { "name": "coverage", "configurePreset": "coverage", "output": { "outputOnFailure": true } }
   ]
 }

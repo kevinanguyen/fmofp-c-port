@@ -173,7 +173,9 @@ jobs:
       matrix:
         # linux-gcc-release (unit 30): the optimised build the demo flies must compile under -Werror at -O2 and
         # pass the same unit tests; the Python suite runs against the debug build only.
-        preset: [linux-gcc, linux-asan, linux-gcc-release]
+        # coverage (unit 30): the unit tests again in an instrumented build, then every flight code module held to
+        # its floor of covered lines (ofp/cmake/coverage_check.py); its build preset runs both.
+        preset: [linux-gcc, linux-asan, linux-gcc-release, coverage]
 
     steps:
       - uses: actions/checkout@v5
