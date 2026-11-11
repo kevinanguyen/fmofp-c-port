@@ -98,21 +98,22 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone: `6497634` unit 17 avionics, ICD v1.20 (2026-11-10, section 7; landed
-  after v1.22; CI run 42925246480 all ten jobs green). Before it: `888eafe` unit 20 small utilities, ICD v1.22
-  (2026-11-10, section 7; CI run 42900090742 green), `337820b` unit 19 flight surfaces, ICD v1.21 (2026-11-10, CI run
-  42885140093, section 7), `a63556e` unit 16 power management, ICD v1.19 (2026-11-08; CI run
-  42507980864 all ten jobs green), `c4057ed` (unit
-  15 sensor management, ICD v1.18; CI run 42439181347 all ten jobs green), `d718e09` (unit 18
-  defensive systems, ICD v1.17; CI run 42435137866: eight green, `linux-gcc` red on one
-  unanswered poll in the display e2e on the slow runner, the same code green on the next run,
-  the Linux 3.13 Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename
-  and Alee), `8d67afd` (this file and `B20SS/verify.sh`), `d82173f` (merge of upstream/main
-  `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.22 (`B20SS/icd/fmofp_icd.xml`; v1.20, unit 17's, is in it since 2026-11-10: the version line
-  stays the newest number; the next unit takes v1.23): 26 terminals,
-  152 message definitions (198 after per-terminal expansion), 50 message relays (15 broadcast), 24 block streams
-  (12 layouts, 12 relayed copies), 9 mode codes, 89/89 legacy types mapped.
+  `git log -1`. Last milestone: unit 28 scenario engine + debug CLI, ICD v1.23 (2026-11-10, section 7; the commit
+  is `git log -1`, its CI run is to be recorded next session). Before it: `6497634` unit 17 avionics, ICD v1.20
+  (2026-11-10, section 7; landed after v1.22; CI run 42925246480 all ten jobs green), `888eafe` unit 20 small
+  utilities, ICD v1.22 (2026-11-10, section 7; CI run 42900090742 green), `337820b` unit 19 flight surfaces, ICD
+  v1.21 (2026-11-10, CI run 42885140093, section 7), `a63556e` unit 16 power management, ICD v1.19 (2026-11-08; CI
+  run 42507980864 all ten jobs green), `c4057ed` (unit 15 sensor management, ICD v1.18; CI run 42439181347 all ten
+  jobs green), `d718e09` (unit 18 defensive systems, ICD v1.17; CI run 42435137866: eight green, `linux-gcc` red on
+  one unanswered poll in the display e2e on the slow runner, the same code green on the next run, the Linux 3.13
+  Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename and Alee), `8d67afd` (this file and
+  `B20SS/verify.sh`), `d82173f` (merge of upstream/main `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
+- **ICD** v1.23 (`B20SS/icd/fmofp_icd.xml`; the next unit takes v1.24): 26 terminals, 154 message definitions
+  (200 after per-terminal expansion), 50 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
+  copies), 9 mode codes, 89/89 legacy types mapped. The bus controller has a **command port** at `port_base + 34`
+  since v1.23 (ICD README section 7): a client queues a receive transaction and is acknowledged with the
+  controller's frame count; `fmofp_bus/command_port.py` is the Python client, `fmofp_bus/bus_view.py` the monitor
+  reader both clients use.
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
@@ -120,43 +121,45 @@ person may continue it in their next session; when it is green it is rebased ont
   (RT 21), environmental control (RT 4), hydraulics (RT 19), airframe systems (RT 20), flight
   data monitoring (RT 23), avionics (RT 1: LRU health, built-in tests, fitness, software
   configuration); the bus controller `fmofp_bc`, which also writes `AVN_BUS_HEALTH` for RT 1 once
-  a second; tools `fmofp_nav_tool`,
-  `fmofp_radar_tool`, `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool`,
+  a second and takes the clients' commands on its command port (`--no-command-port` closes it); tools
+  `fmofp_nav_tool`, `fmofp_radar_tool`, `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool`,
   `fmofp_sensor_tool`, `fmofp_power_tool`, `fmofp_surfaces_tool`, `fmofp_utilities_tool`,
   `fmofp_avionics_tool` (stdin oracles for the Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
   random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
   ground scene, the RF environment, the ESM intercepts, the sensor scans, the electrical
-  readings, the cabin, the hydraulic pressures, the airframe gauges); six display terminals `py -m fmofp_display radar|pfd|mfd|eicas|tsd|sms`
-  (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display class fed from the bus through
-  `fmofp_display/*_feed.py`; the one-command demo `py -m fmofp_demo`; the bus library
-  `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: 23 terminals, 107 scheduled messages, worst minor frame 8612 us of the 10000 us
-  budget. Thirty seconds of headless demo on Kevin's machine with 22 terminals (before unit 17): 1500
-  frames, 0 overruns, 22/22 answering. On Alee's machine with 23: 23/23 answering on every line, 0
-  overruns with `--no-events` (worst frame 16 ms), but 21-36 overruns in 1500 frames with the scripted
-  events on; the same machine overruns 9-24 times on `888eafe` without the avionics terminal (section 7,
-  2026-11-10): it does not hold the real-time demo under the events' load either way. On Kevin's machine
-  with 23 terminals (2026-11-10, after the landing): 1500 frames, 2 overruns with the events on (worst
-  frame 24.5 ms; 0 overruns with 22 terminals the same day), 0 overruns without (worst 13.6 ms), 23/23
-  answering: the reference machine is at the edge too. Unit 28 adds no terminal; the timing work is unit
-  30's first job (section 2.30).
-- **Tests**: Python 261 OK (`fmofp_bus/tests`, about 53 s on Windows); C++ ctest 2/2
-  (319 hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
+  readings, the cabin, the hydraulic pressures, the airframe gauges; since v1.23 it takes the scenario engine's
+  injections, an aircraft into its traffic and a storm cell into its sky); six display terminals
+  `py -m fmofp_display radar|pfd|mfd|eicas|tsd|sms` (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display
+  class fed from the bus through `fmofp_display/*_feed.py`; the one-command demo `py -m fmofp_demo`; **the scenario
+  engine** `py -m fmofp_scenario FILE [--speed S]` (`fmofp_scenario/`: the frozen `Interfaces/scenarios/*.xml` fired
+  as bus commands through the command port, timed by the bus frame) and **the debug CLI** `py -m fmofp_cli [-c CMD]`
+  (`fmofp_cli/`: `terminals`, `status`, `msg` from the monitor, `send ID field=value` of any ICD command, the
+  `scenario` commands); the bus library `fmofp_bus` with generated `fmofp_bus/icd/`.
+- **Load**: unchanged by unit 28 (its two plant messages are aperiodic): 23 terminals, 107 scheduled messages, worst
+  minor frame 8612 us of the 10000 us budget. Thirty seconds of headless demo on Kevin's machine with 22 terminals
+  (before unit 17): 1500 frames, 0 overruns, 22/22 answering. On Alee's machine with 23: 23/23 answering on every
+  line, 0 overruns with `--no-events` (worst frame 16 ms), but 21-36 overruns in 1500 frames with the scripted events
+  on; the same machine overruns 9-24 times on `888eafe` without the avionics terminal (section 7, 2026-11-10): it does
+  not hold the real-time demo under the events' load either way. On Kevin's machine with 23 terminals (2026-11-10,
+  after unit 17 landed): 1500 frames, 2 overruns with the events on (worst frame 24.5 ms; 0 overruns with 22
+  terminals the same day), 0 overruns without (worst 13.6 ms), 23/23 answering; after unit 28 (the same day, the
+  command port open): 1500 frames, 3 overruns (worst frame 26.3 ms) on the idle machine and 13 in a run started right after the gate (worst 24.7 ms), 23/23 answering in both, the command port idle (received=0). The reference machine is at the edge: the timing work is unit 30's first job
+  (section 2.30).
+- **Tests**: Python 291 OK (`fmofp_bus/tests`, about 65 s on Windows); C++ ctest 2/2
+  (320 hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
   workflows/ci.yml` job `cpp`, linux-gcc + linux-asan, and Alee's eight Python legs).
-- **Meter**: 25.5 of 29.5 units = **86 %** (section 2). Pace measured over the log: about
-  5 units per full working day, so under a day more to 100 % (4 units open: 28, 29, 30); the
+- **Meter**: 27 of 29.5 units = **92 %** (section 2). Pace measured over the log: about
+  5 units per full working day, so about half a day more to 100 % (2 units open: 29, 30); the
   intern-ticket authoring phase comes after and is not in the number.
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: none. No `wip/` branches (`wip/unit17-avionics` was rebased onto `888eafe`,
-  landed as one commit and deleted, 2026-11-10). Last session: Kevin's, 2026-11-10 (the check after unit 17
-  landed: gate green here, the 23-terminal demo measured); before it Alee's, 2026-11-10 (unit 17 finished).
-  Kevin's next unit by his own note: 28 scenario engine + CLI (ICD v1.23), then 29 last, 30. For unit
-  28: the scenario engine's failure injection is `AVN_CMD FORCE_FAULT` / `CLEAR_FAULT` /
-  `CLEAR_ALL_FAULTS` with `fmofp_bus.avionics.key_fields(<system>)` (section 2.17), and the demo's
-  overruns on Alee's machine (the Load line above) want a look before more terminals are added.
+- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-10 (unit 28 built and landed);
+  before it Kevin's check after unit 17 landed and Alee's unit 17 (both 2026-11-10). Next by Kevin's own note: unit
+  30 (hardening; its first job is the real-time demo's overruns with 23 terminals, section 2.30), then unit 29 last
+  (it cuts the upstream line, section 2.29; both humans decide what `py FMOFP/Main.py` becomes). The CI run of
+  unit 28's commit is to be recorded in section 7 next session, as is `821a857`'s (run 42931018335) and `eb2cb92`'s.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866 and the Windows 3.13 leg of 42729856922); the two `cpp` jobs are the ones
@@ -168,8 +171,9 @@ person may continue it in their next session; when it is green it is rebased ont
   (`test_demo.DemoRunTest`) was red once the same way (run 42728027159: 17 overruns in 400 frames
   on the runner, the 7 s radio event not yet on the last dashboard line of an 8 s run); it runs
   ten seconds since 2026-11-09. Every terminal added makes the runner's real-time demo harder
-  (22 terminals since unit 20; 0 overruns in 1500 frames on Kevin's machine, worst frame 17.8 ms
-  at start-up): unit 30 should give CI a lighter whole-aircraft check or a longer window.
+  (23 terminals since unit 17; unit 28 added none): unit 30 should give CI a lighter whole-aircraft check or a
+  longer window. Unit 28's scenario e2e runs the controller free-running with four Python terminals under
+  `--strict`, like the other e2e tests; its two scenarios take about 10 s together.
 
 ---
 
@@ -208,11 +212,11 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 25 | TSD on the bus | 0.5 | DONE 2026-11-01 |
 | 26 | SMS on the bus | 0.5 | DONE 2026-11-02 |
 | 27 | HUD on the bus | 0.5 | STRUCK 2026-11-02 (the Python HUD is an empty placeholder; removed from the total) |
-| 28 | Scenario engine + debug CLI on the bus | 1.5 | IN PROGRESS (Kevin, 2026-11-10) |
+| 28 | Scenario engine + debug CLI on the bus | 1.5 | DONE 2026-11-10 |
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | open |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | open |
 
-**Done: 25.5 / 29.5 = 86 %.** Open: 4 units.
+**Done: 27 / 29.5 = 92 %.** Open: 2 units (29, 30).
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -293,25 +297,19 @@ fill; SYS C and OXY PSI have no system behind them and stay unknown (ICD README 
 
 ### 2.28 Scenario engine + debug CLI on the bus, 1.5
 
-- **Python to read in full**: `Interfaces/scenarios/scenarioEngine.py` (395; loads
-  `trainingScenario.xml` (126) or `failureScenario.xml` (106), sorts events by `time_s`, a
-  daemon thread dispatches them; injectors `_inject_radar_contact` (writes a radar's
-  `current_targets`), `_inject_failure` (an LRU forced fault), `_inject_weather` (a cell into
-  the weather state manager), `_inject_threat` (RWR), `_inject_waypoint`, `_inject_phase`,
-  `message` (log only)) and `Utils/debug/userCLI.py` (1031; a click REPL on four threads:
-  `status`, `send`, `msg`, `test`, `test_1553b`, `scenario`, `help`).
-- **Shape of the port**: both stay Python and become bus clients, like the plant and the
-  displays. The scenario engine reads the same XML and sends bus commands at the right frame:
-  waypoints and phases as `MSN_CMD`, radar contacts, weather cells and threats as
-  injections into the plant (new plant *receive* messages, `PLANT_INJECT_*`, since the world
-  lives there), failures as the avionics command of unit 17. The CLI becomes a REPL over the
-  monitor port (status = decode the latest TERM_STATUS and status messages) and a command
-  path. Both need one new thing in the bus controller: a command socket through which a
-  Python client queues an aperiodic transaction (`fmofp_bc --script FILE` already queues
-  commands by frame; generalise it to a port and add a `fmofp_bus` client). Design it first,
-  write it in the ICD README section 7, then build. Both scenario files must run end to end
-  over the bus in a test. The demo's scripted events (`fmofp_demo/demo.py`) are the model for
-  the engine's output.
+DONE 2026-11-10 (section 7, ICD v1.23). The plan that stood here became the ICD README's v1.23 paragraph, its
+section 2 rows and its section 7 command-port paragraph. As planned: both stay Python and are clients of the bus; the
+bus controller got a command port (`port_base + 34`, frame types 4 and 5) through which a client queues an aperiodic
+receive transaction and is acknowledged with the controller's frame count; the engine reads the frozen XML as
+`scenarioEngine._parse` did and fires waypoints and phases as `MSN_CMD`, threats as `DEF_CMD INJECT_THREAT`, failures
+as `AVN_CMD` with `key_fields`, and radar contacts and weather cells as injections into the plant
+(`PLANT_INJECT_CONTACT` into the traffic, `PLANT_INJECT_WEATHER` into the sky, where the radars find them); both
+scenario files run end to end over the bus in `test_scenario_e2e.py`. The CLI is a prompt over the monitor port and
+the command port (`terminals`, `status`, `msgs`, `msg`, `send ID field=value`, `scenario`). Changed from the plan:
+the engine's clock is the bus frame, not wall time (a `--speed` factor runs a scenario fast for a test); `--script`
+stayed and the command port was added beside it rather than replacing it; the demo did not change (it keeps its
+scripted events; `py -m fmofp_scenario` runs beside it). Backlog (ICD README section 12): the recorder's dump to the
+CLI, the plant's all-zero TERM_STATUS.
 
 ### 2.29 Retire the old Python messaging stack and the radar bridge, 1
 
@@ -582,7 +580,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (239 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (291 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -603,6 +601,11 @@ events; Ctrl-C stops everything. Options: `--seconds S`, `--headless`, `--no-dis
 Logs in `B20SS/logs/demo/` (ignored by git). `B20SS/ofp/README.md` has the per-process
 command lines, `fmofp_bc --schedule --rt ...` prints the schedule and its load, and
 `fmofp_bc --report` the per-terminal statistics.
+
+With the aircraft running, from `B20SS/`: `py -m fmofp_scenario FMOFP/Interfaces/scenarios/trainingScenario.xml
+[--speed 10] [--port-base N]` runs a frozen scenario against it through the bus controller's command port, one
+line per event; `py -m fmofp_cli [--port-base N] [-c CMD]` is the debug prompt (`help` lists its commands:
+`terminals`, `status RT`, `msg ID`, `send ID field=value ...`, `scenario load|start|stop|status`).
 
 ### 5.6 Where things are
 
@@ -714,6 +717,17 @@ Python tests and displays
   is NORMAL by frame 110, not 60 (window the first e2e checks on 110-150).
 - A double-word ICD field (`word="6-7" bits="31-0"`) must be `type="sint"` with an lsb; `FDM_STATUS.last_frame`
   counts 31 bits of frames (1.4 years).
+- A `threading.Thread` subclass must not name an attribute `_stop`: `Thread._stop()` is a method and `join()` calls it
+  (`BusView`; one failed run in unit 28).
+- A partition kept alive across two controller runs sees the frame count restart at 0: its frame-based cooldowns and
+  expiries freeze (`frame < last_dispense_` in the defensive terminal reads as cooling). An e2e test that runs the
+  controller twice restarts the partitions between runs (`test_scenario_e2e.py`).
+- The controller polls a plant message for its relay whether or not the consumer is on the bus (`status plant` in the
+  CLI shows every plant message with RT 27 alone). The plant's own TERM_STATUS is zeros: it fills none.
+- The ICD's `<enums>` tail is `avionics_command` since unit 17 landed: anchor a patch script on `</enums>`, not on the
+  last value of the last enum you wrote.
+- The command port answers when the controller polls it, once a frame: a client's `send` returns after up to one frame
+  (20 ms real time); an engine step with several due events takes one frame per event.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -1307,6 +1321,61 @@ done before this file existed are condensed from the private session notes.
   Alee).
 - *Numbers*: meter unchanged, 25.5 / 29.5 = 86 %.
 
+### 2026-11-10 - unit 28 scenario engine + debug CLI on the bus - ICD v1.23 - by Kevin's agent
+- *What*: the bus controller's **command port** (`ofp/bc/command_port.{hpp,cpp}`: a UDP port at `port_base + 34`
+  drained once a frame, at most 16 datagrams, the aperiodic queue's depth; a frame of type 4 carries the command
+  word the client wants sent, a receive to RT 1-30 SA 1-30 with the data count, and the data words; the controller
+  queues the transaction (`queue_receive`) and answers a type-5 frame with the command word, a status code and its
+  frame count; `--no-command-port` leaves it closed; frame types 4 and 5 in both transports). `fmofp_bus/
+  command_port.py` (`CommandClient`: `send(message, rt=None)` numbers `cmd_seq` from 201 per destination,
+  `send_words`, `send_command_word`; `Acknowledgement`) and `fmofp_bus/bus_view.py` (`BusView`: a monitor thread with
+  the frame count from the syncs, the latest decoded message of every kind, each terminal's TERM_STATUS and last
+  answer; the terminal names). **The scenario engine** `fmofp_scenario/` (`scenario.py`: the XML parsed as
+  `scenarioEngine._parse` did and sorted by time; `engine.py`: `Translator` turns each event into the ICD command its
+  injector amounted to, `ScenarioEngine` fires by bus frame at a speed factor, `run(view)` until complete or the bus
+  stalls; `__main__.py`: `py -m fmofp_scenario FILE --speed S`, one line per event with the acknowledgement). **The
+  debug CLI** `fmofp_cli/` (`cli.py`: `DebugCli` with `frame`, `terminals`, `status`, `msgs`, `msg`, `send ID
+  field=value` (fields typed from the dataclass defaults, enums by name or number, `rt=N` for TERM_CMD), `scenario
+  load|events|start|stop|status`; `__main__.py`: the prompt and `-c`). ICD v1.23: the plant's `PLANT_INJECT_CONTACT`
+  (27/21: an aircraft into the traffic, `TrafficWorld.inject`: the same id moves it, a thirteenth replaces the
+  farthest generated) and `PLANT_INJECT_WEATHER` (27/22: a storm cell into the sky at the bearing and range of the
+  offset, placed in its lifecycle at the reflectivity asked, `WeatherWorld.inject` with a generator of its own so a
+  seeded sky is not moved); enum `weather_category`; the plant's `take_injections()` and `injections` counter.
+- *How*: `test_scenario_oracle.py` holds the parser beside the frozen `ScenarioEngine` (both files, and a quirk XML
+  through both `_parse`s), checks every translation of both scenarios and the injectors' defaults, and the engine's
+  frame clock with a fake client and views; `test_scenario_e2e.py` (port base 58500) runs plant + mission + defensive
+  + avionics + the EICAS's and TSD's bus halves under the real controller, the training scenario at speed 100 (its
+  510 s in 255 frames) and the failure scenario at speed 50, fresh partitions per scenario, and reads MSN_STATUS (3
+  waypoints, COMPLETE), DEF_STATUS (the contact, the salvo), AVN_STATUS (4 forced faults, 14 LRUs) and the plant's
+  injections; `test_command_port.py` (57500: a Python RT 24 under the real controller: queued, acknowledged,
+  refused, malformed, `--no-command-port`; the client alone); `test_cli.py` (the parsing and output on a fake bus;
+  59500: the CLI against the controller and the plant with a three-event scenario); `test_plant_injections.py`; one
+  gtest (`TheCommandPortQueuesWhatAClientSendsAndAnswers`). ICD README: the v1.23 paragraph, five section 2 rows,
+  the section 7 command-port paragraph, the v1.23 table, section 12, the revision row; `ofp/README.md`: the port and
+  the two commands.
+- *What the Python was*: the engine fired into live objects on a wall-clock thread polling every 100 ms: a radar's
+  `current_targets` table (past the radar's detection), the display bridge (past the weather radar), the RWR's
+  table, the mission service, the LRU monitor's `force_fault`. The parser's quirks are kept (`"1e3"` and `"false"`
+  stay text, so `bool("false")` is stealth). The CLI's `test` suites are the port's tests; `test_1553b` is the bus.
+- *Warnings / lessons*: a `Thread` subclass attribute named `_stop` breaks `join()` (section 6; one failed run). A
+  partition kept alive while the controller restarts its frame count at 0 freezes its frame-based cooldown (the
+  defensive terminal's `frame < last_dispense_`): the e2e restarts the partitions per scenario (section 6; one
+  failed run). The controller polls a plant message for its relay even without the consumer present (the CLI shows
+  every plant message with RT 27 alone). The plant's TERM_STATUS is zeros (it fills none; README section 12). The
+  ICD's `<enums>` tail is Alee's `avionics_command` now (anchor patch scripts on `</enums>`; one failed patch). The
+  scenario's units were never defined (its table had no reader): x/y are taken as km east/north, vx/vy/vz as m/s
+  (README section 2). An injected cell drifts with the wind from the frame it lands in (a test tolerance). The
+  demo did not change: run `py -m fmofp_scenario` beside `py -m fmofp_demo`.
+- *Files*: `ofp/bc/{include/fmofp/bc/command_port.hpp, src/command_port.cpp, src/main.cpp, CMakeLists.txt}`,
+  `ofp/bus/{include/fmofp/bus/transport.hpp, src/transport.cpp}`, `ofp/tests/{bus_controller,icd_messages}_test.cpp`,
+  `fmofp_bus/{command_port.py, bus_view.py, transport.py, rt_process.py}`, `fmofp_scenario/{__init__,scenario,engine,
+  __main__}.py`, `fmofp_cli/{__init__,cli,__main__}.py`, `fmofp_plant/{plant.py, traffic.py, weather.py}`,
+  `icd/fmofp_icd.xml` + README + generated files, `ofp/README.md`, the tests (`test_command_port.py`,
+  `test_plant_injections.py`, `test_scenario_oracle.py`, `test_scenario_e2e.py`, `test_cli.py`, `test_messages.py`).
+- *Tests and numbers*: Python 291 OK (was 261), ctest 2/2 (320 gtests, was 319), cppcheck clean; load
+  unchanged (107 messages for 23 terminals, worst minor frame 8612 us: the injections are aperiodic); headless demo
+  30 s with the command port open: 1500 frames, 3 overruns (worst frame 26.3 ms) on the idle machine and 13 in a run started right after the gate (worst 24.7 ms), 23/23 answering in both, the command port idle (received=0); meter 27 / 29.5 = 92 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1391,3 +1460,12 @@ done before this file existed are condensed from the private session notes.
   are one per self test with its worst component's status, set by the window from `EICAS_AVN_STATUS`. After the
   rebase over v1.21 and v1.22 (2026-11-10): `EICAS_AVN_STATUS` is RT 14 SA 8 (6 and 7 are the hydraulics' and
   the ECS's), and the ICD's version line stays 1.22. Recorded in the ICD README section 2.
+- 2026-11-10, Kevin ("ok go unit 28") and his agent: unit 28 as designed in section 2.28 with these choices: the
+  controller's command port is a UDP port at `port_base + 34` with two new frame types (4 command, 5
+  acknowledgement) and `--script` stays beside it; the engine's clock is the bus frame with a speed factor, not
+  wall time; the radar contact becomes an aircraft in the plant's traffic that the radars detect themselves (its
+  classification and identity carried, not applied: the radars have no IFF), the weather cell a storm cell in the
+  plant's sky placed in its lifecycle at the reflectivity asked, with a generator of its own so a seeded sky is
+  not moved; the threat, waypoint, phase and failure go to the terminals' existing commands; the parser's quirks
+  (`bool("false")` is stealth) are kept; an unknown phase is skipped with a note; the demo is unchanged (the
+  engine runs beside it). Recorded in the ICD README sections 2 and 7.

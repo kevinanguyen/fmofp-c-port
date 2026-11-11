@@ -17,6 +17,7 @@ from fmofp_bus.transport import MAX_FRAME_BYTES, decode_frame, encode_frame
 DEFAULT_PORT_BASE = 51000
 BC_PORT_OFFSET = 32
 MONITOR_PORT_OFFSET = 33
+COMMAND_PORT_OFFSET = 34  # the controller's command port (ICD README section 7, v1.23)
 LOOPBACK = "127.0.0.1"
 
 

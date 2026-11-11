@@ -52,14 +52,18 @@ TARGETING = Population("targeting", 5, 1000.0, 100000.0, math.pi / 6, 100.0, 300
 # aewc_radar: at most ten (seven here, the block's room beside the five), 5-400 km, within 45 degrees, 150-500 m/s,
 # up to 50 m/s2, three in ten stealth with RCS 0.01-0.1 m2, the rest 1-100 m2.
 AEWC = Population("aewc", 7, 5000.0, 400000.0, math.pi / 4, 150.0, 500.0, 50.0, 0.3, (1.0, 100.0), (0.01, 0.1))
+# The scenario engine's injected contacts (v1.23): none generated, never replaced for range.
+INJECTED = Population("injected", 0, 0.0, float("inf"), 0.0, 0.0, 0.0, 0.0, 0.0, (1.0, 10.0), None)
 
 
 class Target:
     """One aircraft: metres east, north and up of the plant's home, m/s, m/s2."""
 
-    __slots__ = ("target_id", "population", "position", "velocity", "acceleration", "rcs", "stealth")
+    __slots__ = ("target_id", "population", "position", "velocity", "acceleration", "rcs", "stealth",
+                 "injected_id")
 
-    def __init__(self, target_id, population, position, velocity, acceleration, rcs, stealth):
+    def __init__(self, target_id, population, position, velocity, acceleration, rcs, stealth, injected_id=None):
+        self.injected_id = injected_id  # the scenario engine's contact id, None for a generated aircraft
         self.target_id = target_id
         self.population = population
         self.position = position
@@ -141,6 +145,29 @@ class TrafficWorld:
             target.velocity = new_velocity
             if self.range_m(target, ownship) > target.population.max_range_m:
                 self.targets[i] = self.spawn(target.population, ownship)
+
+    def inject(self, contact_id, ownship, east_km, north_km, alt_ft, velocity, rcs, stealth):
+        """PLANT_INJECT_CONTACT (v1.23): an aircraft placed east and north of the aircraft now, flying at
+        `velocity` (m/s east, north, up), with no acceleration. The same contact id moves the aircraft injected
+        before; a new one replaces the farthest generated aircraft when the table is full. Returns the target."""
+        position = [ownship[0] + east_km * 1000.0, ownship[1] + north_km * 1000.0, alt_ft * M_PER_FT]
+        for target in self.targets:
+            if target.injected_id == contact_id:
+                target.position = position
+                target.velocity = list(velocity)
+                target.rcs = rcs
+                target.stealth = stealth
+                return target
+        target = Target(self.next_id, INJECTED, position, list(velocity), [0.0, 0.0, 0.0], rcs, stealth,
+                        injected_id=contact_id)
+        self.next_id = self.next_id % 255 + 1
+        if len(self.targets) >= MAX_TARGETS:
+            generated = [t for t in self.targets if t.injected_id is None]
+            victim = max(generated, key=lambda t: self.range_m(t, ownship)) if generated else self.targets[-1]
+            self.targets[self.targets.index(victim)] = target
+        else:
+            self.targets.append(target)
+        return target
 
     def message(self, ownship, ownship_velocity):
         """PLANT_TRAFFIC: each aircraft as the antennas would measure it from the aircraft."""

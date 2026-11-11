@@ -1,7 +1,7 @@
 // The bus controller process.
 //
 //   fmofp_bc --rt 1 --rt 5 [--port-base 51000] [--frames 0] [--free-run]
-//            [--no-monitor] [--timeout-ms 5] [--report] [--strict] [--script FILE]
+//            [--no-monitor] [--timeout-ms 5] [--report] [--strict] [--script FILE] [--no-command-port]
 //
 // --frames N runs N minor frames (0 = until killed). --report prints one line
 // per major frame. --strict exits 1 if any terminal failed to answer or any
@@ -18,6 +18,7 @@
 
 #include <fmofp/bc/bus_controller.hpp>
 #include <fmofp/bc/bus_health.hpp>
+#include <fmofp/bc/command_port.hpp>
 #include <fmofp/bc/icd_schedule.hpp>
 #include <fmofp/bc/schedule.hpp>
 #include <fmofp/bus/status.hpp>
@@ -33,6 +34,7 @@ struct Options {
     bool print_schedule{false};
     bool strict{false};
     const char* script{nullptr};
+    bool command_port{true};  // the clients' way in (ICD README section 7); --no-command-port leaves it closed
 };
 
 // A command from --script: data to a terminal in a given minor frame.
@@ -186,6 +188,8 @@ bool parse(int argc, char** argv, Options& o) {
         } else if (std::strcmp(a, "--script") == 0 && next != nullptr) {
             o.script = next;
             ++i;
+        } else if (std::strcmp(a, "--no-command-port") == 0) {
+            o.command_port = false;
         } else {
             return false;
         }
@@ -234,7 +238,7 @@ int main(int argc, char** argv) {
     if (!parse(argc, argv, o)) {
         std::fprintf(stderr,
                      "usage: fmofp_bc --rt N [--rt N ...] [--port-base N] [--frames N] [--free-run] "
-                     "[--no-monitor] [--timeout-ms N] [--report] [--strict] [--script FILE] [--schedule]\n");
+                     "[--no-monitor] [--timeout-ms N] [--report] [--strict] [--script FILE] [--schedule] [--no-command-port]\n");
         return 2;
     }
     if (o.script != nullptr && !load_script(o.script)) {
@@ -274,6 +278,16 @@ int main(int argc, char** argv) {
     std::printf("bc: %s on port base %u, %s\n",
                 o.bc.mode == fmofp::bc::BcMode::kRealTime ? "real time, 20 ms minor frames" : "free running",
                 o.bc.port_base, o.bc.monitor_enabled ? "monitor on" : "monitor off");
+    fmofp::bc::CommandPort command_port;
+    if (o.command_port) {
+        const auto port = static_cast<std::uint16_t>(o.bc.port_base + fmofp::bc::kCommandPortOffset);
+        if (command_port.open(port) != Status::kOk) {
+            std::fprintf(stderr, "bc: command port %u in use\n", static_cast<unsigned>(port));
+            bc.shutdown();
+            return 1;
+        }
+        std::printf("bc: command port on %u\n", static_cast<unsigned>(port));
+    }
 
     unsigned long scripted_sent = 0;
     fmofp::bc::BusHealthReporter bus_health;
@@ -286,6 +300,7 @@ int main(int argc, char** argv) {
         if (bc.minor_frame() == 0 && bc.stats().frames != 0) {
             (void)bus_health.report(bc);
         }
+        (void)command_port.poll(bc);  // the clients' commands for the next aperiodic slot
         scripted_sent += queue_scripted(bc, frame);
         const Status f = bc.run_minor_frame();
         if (f != Status::kOk && f != Status::kTimeout && f != Status::kMalformed) {
@@ -299,6 +314,12 @@ int main(int argc, char** argv) {
     }
 
     print_stats(bc);
+    if (o.command_port) {
+        const fmofp::bc::CommandPortStats& cs = command_port.stats();
+        std::printf("bc: command port: received=%u queued=%u refused=%u malformed=%u\n", cs.received, cs.queued,
+                    cs.refused, cs.malformed);
+        command_port.close();
+    }
     if (o.script != nullptr) {
         std::printf("bc: script: %lu commands sent of %zu\n", scripted_sent, g_script_count);
     }

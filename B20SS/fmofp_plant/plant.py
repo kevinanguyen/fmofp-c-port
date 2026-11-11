@@ -45,7 +45,7 @@ from fmofp_bus.block import BlockPublisher
 from fmofp_bus.icd.blocks import PlantGround, PlantSensorScan, PlantTerrain, PlantTraffic
 from fmofp_bus.icd.enums import GearPosition, Ssm
 from fmofp_bus.icd.messages import (PlantAirframe, PlantCabin, PlantElectrical, PlantEsm, PlantGenCmd, PlantGps,
-                                    PlantHydraulics, PlantRf, PlantSensors,
+                                    PlantHydraulics, PlantInjectContact, PlantInjectWeather, PlantRf, PlantSensors,
                                     PlantThrustCmd, PlantWeather)
 from fmofp_bus.rt_process import RtProcess
 from fmofp_bus.status import Status
@@ -372,6 +372,26 @@ class PlantModel:
             return False
         return self.electrical.command(cmd.payload)
 
+    def inject_contact(self, words):
+        """A PLANT_INJECT_CONTACT received (the scenario engine, v1.23): an aircraft into the traffic, placed
+        relative to the aircraft now. True when applied (there is traffic and the id is not 0)."""
+        status, cmd = PlantInjectContact.decode(words)
+        if status != Status.OK or self.traffic is None or cmd.contact_id == 0:
+            return False
+        self.traffic.inject(cmd.contact_id, self.ownship_enu(), cmd.x_km, cmd.y_km, cmd.alt_ft,
+                            (cmd.velocity_east, cmd.velocity_north, cmd.velocity_up), cmd.rcs, cmd.is_stealth)
+        return True
+
+    def inject_weather(self, words):
+        """A PLANT_INJECT_WEATHER received (v1.23): a storm cell into the sky at the bearing and range of the
+        east/north offset given. True when applied (there is weather)."""
+        status, cmd = PlantInjectWeather.decode(words)
+        if status != Status.OK or self.weather is None:
+            return False
+        azimuth = math.degrees(math.atan2(cmd.x_km, cmd.y_km)) % 360.0
+        self.weather.inject(azimuth, math.hypot(cmd.x_km, cmd.y_km), cmd.size, cmd.reflectivity)
+        return True
+
     def thrust_command(self, words):
         """A PLANT_THRUST_CMD received: the engines take the engine computer's command. True when applied."""
         status, cmd = PlantThrustCmd.decode(words)
@@ -441,6 +461,7 @@ class PlantTerminal:
         self.publish_failures = 0
         self.thrust_commands = 0
         self.generator_commands = 0
+        self.injections = 0
         self.terrain_block = BlockPublisher(PlantTerrain.MAX_PAYLOAD_WORDS)
         self.traffic_block = BlockPublisher(PlantTraffic.MAX_PAYLOAD_WORDS)
         self.ground_block = BlockPublisher(PlantGround.MAX_PAYLOAD_WORDS)
@@ -536,6 +557,14 @@ class PlantTerminal:
         if status == Status.OK and fresh and self.model.generator_command(words):
             self.generator_commands += 1
 
+    def take_injections(self):
+        """Applies the scenario engine's injections that arrived since the last frame (v1.23)."""
+        for cls, apply in ((PlantInjectContact, self.model.inject_contact),
+                           (PlantInjectWeather, self.model.inject_weather)):
+            status, words, fresh = self.process.terminal.get_received(cls.SUBADDRESS)
+            if status == Status.OK and fresh and apply(words):
+                self.injections += 1
+
     def publish_ground(self):
         status, words = self.model.ground_message().encode()
         if status not in (Status.OK, Status.CLAMPED):
@@ -589,6 +618,7 @@ class PlantTerminal:
         self.syncs += 1
         self.take_thrust_command()
         self.take_generator_command()
+        self.take_injections()
         if self.syncs % SYNCS_PER_ECU_STEP == 0:
             self.model.engines.step(ECU_DT)
         if self.syncs % SYNCS_PER_ENGINE == 0:

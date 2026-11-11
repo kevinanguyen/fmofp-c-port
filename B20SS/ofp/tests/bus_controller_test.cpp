@@ -13,6 +13,7 @@
 
 #include <fmofp/bc/bus_controller.hpp>
 #include <fmofp/bc/bus_health.hpp>
+#include <fmofp/bc/command_port.hpp>
 #include <fmofp/bc/icd_schedule.hpp>
 #include <fmofp/bc/schedule.hpp>
 #include <fmofp/bus/transport.hpp>
@@ -251,6 +252,98 @@ TEST(BusController, AQueuedCommandReachesTheTerminalNextFrame) {
     }
     EXPECT_EQ(Status::kNotReady, bc->queue_receive(24, 20, data.data(), 1));
     EXPECT_EQ(1U, bc->stats().aperiodic_dropped);
+}
+
+TEST(BusController, TheCommandPortQueuesWhatAClientSendsAndAnswers) {
+    ASSERT_EQ(Status::kOk, fmofp::osal::init());
+    fmofp::bc::CommandPort port;
+    const auto port_number = static_cast<std::uint16_t>(kPortBase + fmofp::bc::kCommandPortOffset);
+    ASSERT_EQ(Status::kOk, port.open(port_number));
+    fmofp::osal::UdpSocket client;
+    ASSERT_EQ(Status::kOk, client.open(static_cast<std::uint16_t>(kPortBase + 40)));
+
+    StubTerminal a;
+    ASSERT_EQ(Status::kOk, a.start(24));
+    const BcConfig cfg = config({24}, BcMode::kFreeRun);
+    auto bc = make_bc();
+    ASSERT_EQ(Status::kOk, bc->init(cfg, schedule_for(cfg)));
+
+    // A client's command: a receive of three words to RT 24 SA 20, as the scenario engine or the CLI sends it.
+    fmofp::bus::Frame command{};
+    command.type = fmofp::bus::FrameType::kCommand;
+    command.transaction = 77;
+    command.word_count = 4;
+    fmofp::bus::CommandWord cw{};
+    cw.rt = 24;
+    cw.transmit = false;
+    cw.subaddress = 20;
+    cw.count_or_mode = 3;
+    ASSERT_EQ(Status::kOk, fmofp::bus::encode_command_word(cw, command.words[0]));
+    command.words[1] = 0xCAFE;
+    command.words[2] = 0x0002;
+    command.words[3] = 0xBEEF;
+    std::array<std::uint8_t, fmofp::bus::kMaxFrameBytes> bytes{};
+    std::size_t length = 0;
+    ASSERT_EQ(Status::kOk, fmofp::bus::encode_frame(command, bytes.data(), bytes.size(), length));
+    ASSERT_EQ(Status::kOk, client.send_to(port_number, bytes.data(), length));
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+
+    EXPECT_EQ(1U, port.poll(*bc));
+    EXPECT_EQ(Status::kOk, bc->run_frames(2));
+    EXPECT_EQ(1U, bc->stats().aperiodic_sent);
+    wait_for_syncs(a, 2);
+
+    // The acknowledgement: the client's transaction number, the command word, kOk, the frame count then (0).
+    std::array<std::uint8_t, fmofp::bus::kMaxFrameBytes> reply{};
+    std::size_t reply_length = 0;
+    ASSERT_EQ(Status::kOk, client.receive(reply.data(), reply.size(), reply_length, 200 * kNsPerMs, nullptr));
+    fmofp::bus::Frame ack{};
+    ASSERT_EQ(Status::kOk, fmofp::bus::decode_frame(reply.data(), reply_length, ack));
+    EXPECT_EQ(fmofp::bus::FrameType::kCommandAck, ack.type);
+    EXPECT_EQ(Word{77}, ack.transaction);
+    ASSERT_EQ(fmofp::bc::kAckWords, ack.word_count);
+    EXPECT_EQ(command.words[0], ack.words[0]);
+    EXPECT_EQ(static_cast<Word>(Status::kOk), ack.words[1]);
+    EXPECT_EQ(Word{0}, ack.words[2]);
+    EXPECT_EQ(Word{0}, ack.words[3]);
+
+    // The terminal got the data in the frame after.
+    std::array<Word, 32> got{};
+    std::uint8_t count = 0;
+    bool fresh = false;
+    ASSERT_EQ(Status::kOk, a.process().terminal().get_received(20, got.data(), 32, count, fresh));
+    EXPECT_EQ(3, count);
+    EXPECT_TRUE(fresh);
+    EXPECT_EQ(Word{0xCAFE}, got[0]);
+    EXPECT_EQ(Word{0xBEEF}, got[2]);
+
+    // A transmit command is nothing to queue: refused, acknowledged with kInvalidArgument. Bytes that are no
+    // frame are counted malformed and acknowledged with the decoder's complaint.
+    cw.transmit = true;
+    ASSERT_EQ(Status::kOk, fmofp::bus::encode_command_word(cw, command.words[0]));
+    command.transaction = 78;
+    ASSERT_EQ(Status::kOk, fmofp::bus::encode_frame(command, bytes.data(), bytes.size(), length));
+    ASSERT_EQ(Status::kOk, client.send_to(port_number, bytes.data(), length));
+    const std::array<std::uint8_t, 4> junk{1, 2, 3, 4};
+    ASSERT_EQ(Status::kOk, client.send_to(port_number, junk.data(), junk.size()));
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+    EXPECT_EQ(0U, port.poll(*bc));
+    EXPECT_EQ(3U, port.stats().received);
+    EXPECT_EQ(1U, port.stats().queued);
+    EXPECT_EQ(1U, port.stats().refused);
+    EXPECT_EQ(1U, port.stats().malformed);
+    ASSERT_EQ(Status::kOk, client.receive(reply.data(), reply.size(), reply_length, 200 * kNsPerMs, nullptr));
+    ASSERT_EQ(Status::kOk, fmofp::bus::decode_frame(reply.data(), reply_length, ack));
+    EXPECT_EQ(Word{78}, ack.transaction);
+    EXPECT_EQ(static_cast<Word>(Status::kInvalidArgument), ack.words[1]);
+    ASSERT_EQ(Status::kOk, client.receive(reply.data(), reply.size(), reply_length, 200 * kNsPerMs, nullptr));
+    ASSERT_EQ(Status::kOk, fmofp::bus::decode_frame(reply.data(), reply_length, ack));
+    EXPECT_EQ(static_cast<Word>(Status::kBadLength), ack.words[1]);
+
+    a.stop();
+    bc->shutdown();
+    port.close();
+    client.close();
 }
 
 TEST(BusController, TheMonitorSeesEveryTransaction) {

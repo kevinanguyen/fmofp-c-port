@@ -10,6 +10,7 @@ see from them and processes that volume.
 """
 
 import math
+import random
 
 from fmofp_bus.icd.messages import PlantWeather
 
@@ -87,6 +88,9 @@ class WeatherWorld:
     def __init__(self, rng, populate=True):
         self.rng = rng
         self.cells = []
+        # The injected cells' lifetimes come from a generator of their own, so an injection does not move the
+        # seeded sky's draws (a seeded flight's weather stays what it was).
+        self.inject_rng = random.Random(0x494E4A)
         self.areas = []
         self.seq = 0
         if populate:
@@ -126,6 +130,26 @@ class WeatherWorld:
             self.cells.append(self._initial_cell())
         if not self.areas:
             self.areas.append(self._initial_area())
+
+    def inject(self, azimuth_deg, range_km, size_km, reflectivity_dbz):
+        """PLANT_INJECT_WEATHER (v1.23): a storm cell at the bearing and range given, of the given radius, placed
+        in its lifecycle where its peak reflectivity is the one asked for (the growth phase runs 35 to 65 dBZ,
+        the mature phase holds 65), so it goes on from there like the cells the sky makes. The sky holds eight:
+        a ninth replaces the weakest. Returns the cell."""
+        cell = StormCell(self.inject_rng, (azimuth_deg % 360.0, max(0.0, range_km)), max(0.1, size_km),
+                         max(0.0, reflectivity_dbz), False)
+        cell.injected = True
+        if reflectivity_dbz >= 65.0:
+            cell.age = cell.lifetime * cell.growth_phase  # the start of the mature phase
+        else:
+            fraction = min(1.0, max(0.0, (reflectivity_dbz - 35.0) / 30.0))
+            cell.age = cell.lifetime * cell.growth_phase * fraction
+        if len(self.cells) >= MAX_CELLS:
+            weakest = min(self.cells, key=lambda c: c.intensity)
+            self.cells[self.cells.index(weakest)] = cell
+        else:
+            self.cells.append(cell)
+        return cell
 
     def message(self):
         """PLANT_WEATHER for the current state."""

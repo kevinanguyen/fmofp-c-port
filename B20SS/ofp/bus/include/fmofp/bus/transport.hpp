@@ -29,6 +29,8 @@ enum class FrameType : std::uint8_t {
     kBcToRt = 1,
     kRtToBc = 2,
     kMonitor = 3,
+    kCommand = 4,     // a client asks the bus controller to send a receive transaction (bc/command_port.hpp)
+    kCommandAck = 5,  // the controller's answer: the outcome and its frame count
 };
 
 constexpr std::uint8_t kFlagParityError = 0x01U;

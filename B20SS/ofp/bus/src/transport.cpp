@@ -16,7 +16,9 @@ Word get_word(const std::uint8_t* in, std::size_t index) noexcept {
 bool valid_type(std::uint8_t raw) noexcept {
     return raw == static_cast<std::uint8_t>(FrameType::kBcToRt) ||
            raw == static_cast<std::uint8_t>(FrameType::kRtToBc) ||
-           raw == static_cast<std::uint8_t>(FrameType::kMonitor);
+           raw == static_cast<std::uint8_t>(FrameType::kMonitor) ||
+           raw == static_cast<std::uint8_t>(FrameType::kCommand) ||
+           raw == static_cast<std::uint8_t>(FrameType::kCommandAck);
 }
 
 }  // namespace

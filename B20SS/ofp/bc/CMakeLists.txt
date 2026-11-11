@@ -4,7 +4,8 @@ add_library(ofp_bc STATIC
     src/schedule.cpp
     src/icd_schedule.cpp
     src/bus_controller.cpp
-    src/bus_health.cpp)
+    src/bus_health.cpp
+    src/command_port.cpp)
 add_library(ofp::bc ALIAS ofp_bc)
 add_dependencies(ofp_bc ofp_icd_generate)
 target_include_directories(ofp_bc PUBLIC include)

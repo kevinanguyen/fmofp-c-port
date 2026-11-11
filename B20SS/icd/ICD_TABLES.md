@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.22 (DRAFT, 2026-11-10). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.23 (DRAFT, 2026-11-10). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -30,7 +30,7 @@
 | 21 | `flightsurfaces` | Flight surfaces - the ten control surfaces and their motion | existing | Systems/flightSurfaces/flightSurfaceService.py | Ported in v1.21 (fmofp_surfaces). FlightSurfaceService's ten surfaces (two ailerons, two elevators, the rudder, two flaps, two slats, the speedbrake), each moved toward its command at its slew rate within its limits every minor frame (the Python's 50 Hz loop), under the service's own commands: the ailerons and elevators follow the sensed roll and pitch and the slats the angle of attack (_sync_from_fcc, which read the flight control computer's data dictionary, the sensed flight state the plant publishes: PLANT_SENSORS relayed as FSF_SENSORS), and the flaps, speedbrake, rudder and trim follow FSF_CMD (set_flaps, set_speedbrake, set_rudder, set_trim). FSF_POSITIONS carries the measured positions, FSF_STATUS the flap detent, the trim and the health. It does not follow the flight control computer's FCS_SURFACE_CMD, which the Python's service never read either (README section 2) |
 | 22 | `defensive` | Defensive systems - RWR, chaff, flare, ECM | new | Systems/defensiveSys/defensiveService.py | Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17) |
 | 23 | `flightdatamonitoring` | Flight data monitoring - the flight data recorder and its storage | existing | Systems/flightDataMonitoring/fdmControl.py | Ported in v1.22 (fmofp_fdm). FlightDataMonitoring's 2 Hz recording loop: fdmsConfig.xml's flight data recorder takes the time, altitude and airspeed from the FMS flight data it hears by broadcast (31/25) into a ring of 512 records (the Python logged the number 123 for every parameter), the cockpit voice recorder has nothing to record on the bus, and FDM_CMD ejects a storage card (which, as in the Python, stops nothing). Nothing consumes FDM_STATUS yet; the dump is unit 28's |
-| 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD). From v1.22 it also invents the cabin environment ECSControl had no sensors for (PLANT_CABIN, twice a second), the hydraulic pressures HydraulicSystemController read as a constant (PLANT_HYDRAULICS, once a second) and the airframe sensor readings AirframeSystemManager had no source for (PLANT_AIRFRAME, once a second) |
+| 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD). From v1.22 it also invents the cabin environment ECSControl had no sensors for (PLANT_CABIN, twice a second), the hydraulic pressures HydraulicSystemController read as a constant (PLANT_HYDRAULICS, once a second) and the airframe sensor readings AirframeSystemManager had no source for (PLANT_AIRFRAME, once a second). From v1.23 it takes the scenario engine's injections into the world: a radar contact into its traffic (PLANT_INJECT_CONTACT) and a storm cell into its weather (PLANT_INJECT_WEATHER) |
 | 31 | `broadcast` | Broadcast address - every terminal that accepts a subaddress hears it | reserved |  | Not a terminal: MIL-STD-1553B address 31. A message or block here is the far end of a relay, stored by the terminals its listeners attribute names, each of which accepts that subaddress for broadcast (README section 8); nothing else stores it and nobody answers it. Added in v1.7 |
 
 RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
@@ -174,6 +174,8 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`PLANT_CABIN`](#plant_cabin) | 27 | 18 | T | 4 | 5 | Cabin environment from the plant | DRAFT |
 | [`PLANT_HYDRAULICS`](#plant_hydraulics) | 27 | 19 | T | 3 | 1 | Hydraulic pressures from the plant | DRAFT |
 | [`PLANT_AIRFRAME`](#plant_airframe) | 27 | 20 | T | 4 | 1 | Airframe sensor readings from the plant | DRAFT |
+| [`PLANT_INJECT_CONTACT`](#plant_inject_contact) | 27 | 21 | R | 9 | aperiodic | A radar contact injected into the plant's traffic | DRAFT |
+| [`PLANT_INJECT_WEATHER`](#plant_inject_weather) | 27 | 22 | R | 6 | aperiodic | A storm cell injected into the plant's weather | DRAFT |
 | [`BCAST_RDR_WX_STATUS`](#bcast_rdr_wx_status) | 31 | 1 | R | 2 | 5 | Weather radar status, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_WX_SCAN`](#bcast_rdr_wx_scan) | 31 | 2 | R | 10 | 5 | Weather radar scan summary, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_TFR_STATUS`](#bcast_rdr_tfr_status) | 31 | 3 | R | 2 | 5 | Terrain-following radar status, broadcast to the displays | DRAFT |
@@ -1195,6 +1197,18 @@ What AVN_CMD asks of the avionics terminal: InitiatedBIT.run_all (the full built
 | 4 | CLEAR_ALL_FAULTS |  |  |
 | 5 | APPLY_DATA_LOAD |  |  |
 | 6 | HANDLE_REDUNDANCY |  |  |
+
+### `weather_category` (3 bits)
+
+The scenario engine's weather_cell category (scenarioEngine.py: the cell dictionary's category, MODERATE by default), carried for the record
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | UNKNOWN |  |  |
+| 1 | LIGHT |  |  |
+| 2 | MODERATE |  |  |
+| 3 | SEVERE |  |  |
+| 4 | EXTREME |  |  |
 
 ## Messages
 
@@ -3591,6 +3605,46 @@ RUN_INITIATED_BIT is InitiatedBIT.run_all: the six self-test probes, the five pe
 AVN_STATUS relayed to the EICAS, its one consumer (section 8): the BITS rows (the power-on self tests' results).
 
 Same layout as [`AVN_STATUS`](#avn_status).
+
+### PLANT_INJECT_CONTACT
+
+**A radar contact injected into the plant's traffic** — RT 27 · SA 21 · receive (bus to terminal) · 9 words · aperiodic
+
+The scenario engine's radar_contact event (v1.23). scenarioEngine._inject_radar_contact wrote a target straight into a radar's current_targets table, past the radar's own detection; here it goes into the world the radars see: an aircraft x_km east and y_km north of the aircraft at alt_ft, flying at the given east, north and up velocity with the given radar cross-section. The plant's radars then detect and classify it themselves, so classification and identity are carried for the record and the tests, not applied (the port's radars have no IFF; README section 2). A contact with the id of one injected before moves it; one too many replaces the farthest generated aircraft (the traffic block holds twelve).
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-8 | `contact_id` | uint | raw counts | The scenario's track_id as a number (T01 is 1); 0 is REJECTED |
+| 0 | 7-4 | `classification` | enum | enum `target_class` | For the record |
+| 0 | 3-2 | `identity` | enum | enum `iff_identity` | For the record |
+| 0 | 1 | `is_stealth` | bool |  | The aircraft's stealth flag, as the plant's generated aircraft carry it |
+| 0 | 0 | `spare_0` | spare |  |  |
+| 1 | 15-8 | `spare_1` | spare |  |  |
+| 1 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+| 2 | 15-0 | `x_km` | sint | LSB 1/100 km, range -327.68 to 327.67 | East of the aircraft at injection |
+| 3 | 15-0 | `y_km` | sint | LSB 1/100 km, range -327.68 to 327.67 | North of the aircraft at injection |
+| 4 | 15-0 | `alt_ft` | uint | LSB 1 ft, range 0 to 65535 |  |
+| 5 | 15-0 | `velocity_east` | sint | LSB 1/100 m/s, range -327.68 to 327.67 |  |
+| 6 | 15-0 | `velocity_north` | sint | LSB 1/100 m/s, range -327.68 to 327.67 |  |
+| 7 | 15-0 | `velocity_up` | sint | LSB 1/100 m/s, range -327.68 to 327.67 |  |
+| 8 | 15-0 | `rcs` | uint | LSB 1/100 m2, range 0 to 655.35 | Radar cross-section; the scenario's default was 5 |
+
+### PLANT_INJECT_WEATHER
+
+**A storm cell injected into the plant's weather** — RT 27 · SA 22 · receive (bus to terminal) · 6 words · aperiodic
+
+The scenario engine's weather_cell event (v1.23). scenarioEngine._inject_weather pushed a cell straight to the radar display bridge, past the weather radar; here it goes into the sky the weather radar scans: a storm cell x_km east and y_km north of the aircraft at injection, of the given size, whose peak reflectivity is the given one (the plant's cells carry a peak dBZ and live a lifecycle; the injected cell is placed in its lifecycle where that reflectivity is reached and goes on from there, drifting with the wind). The 0-1 intensity and the category are carried for the record. The sky holds eight cells: a ninth replaces the weakest.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-13 | `category` | enum | enum `weather_category` | For the record |
+| 0 | 12-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+| 1 | 15-0 | `x_km` | sint | LSB 1/100 km, range -327.68 to 327.67 | East of the aircraft at injection |
+| 2 | 15-0 | `y_km` | sint | LSB 1/100 km, range -327.68 to 327.67 | North of the aircraft at injection |
+| 3 | 15-0 | `size` | uint | LSB 1/10 km, range 0 to 6553.5 | The cell's radius; the scenario's default was 5 |
+| 4 | 15-0 | `intensity` | uint | LSB 1/1000, range 0 to 1 | The 0-1 intensity of the Python's cell dictionary, for the record (default 0.7) |
+| 5 | 15-0 | `reflectivity` | uint | LSB 1/10 dBZ, range 0 to 100 | Peak reflectivity, the plant cell's intensity (default 45) |
 
 ## Block payloads
 
