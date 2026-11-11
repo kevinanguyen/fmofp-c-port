@@ -99,7 +99,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
   `git log -1`. Last milestone: `c78d4af` unit 28 scenario engine + debug CLI, ICD v1.23 (2026-11-10, section 7; CI run
-  42941262908, its result to be recorded next session). Before it: `6497634` unit 17 avionics, ICD v1.20
+  42941262908 all ten jobs green). Before it: `6497634` unit 17 avionics, ICD v1.20
   (2026-11-10, section 7; landed after v1.22; CI run 42925246480 all ten jobs green), `888eafe` unit 20 small
   utilities, ICD v1.22 (2026-11-10, section 7; CI run 42900090742 green), `337820b` unit 19 flight surfaces, ICD
   v1.21 (2026-11-10, CI run 42885140093, section 7), `a63556e` unit 16 power management, ICD v1.19 (2026-11-08; CI
@@ -158,8 +158,8 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-10 (unit 28 built and landed);
   before it Kevin's check after unit 17 landed and Alee's unit 17 (both 2026-11-10). Next by Kevin's own note: unit
   30 (hardening; its first job is the real-time demo's overruns with 23 terminals, section 2.30), then unit 29 last
-  (it cuts the upstream line, section 2.29; both humans decide what `py FMOFP/Main.py` becomes). The result of
-  unit 28's CI run 42941262908 is to be recorded in section 7 next session (`821a857` and `eb2cb92` are recorded).
+  (it cuts the upstream line, section 2.29; both humans decide what `py FMOFP/Main.py` becomes). Every CI run
+  through unit 28's is recorded in section 7.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866, the Windows 3.13 leg of 42729856922 and the Linux 3.14 leg of 42931963850); the two
@@ -1377,8 +1377,8 @@ done before this file existed are condensed from the private session notes.
   30 s with the command port open: 1500 frames, 3 overruns (worst frame 26.3 ms) on the idle machine and 13 in a run started right after the gate (worst 24.7 ms), 23/23 answering in both, the command port idle (received=0); meter 27 / 29.5 = 92 %.
 
 ### 2026-11-10 - unit 28 pushed; CI of 821a857 and eb2cb92 recorded - by Kevin's agent
-- *What*: unit 28 landed as `c78d4af` (the entry above) and was pushed; its CI run is 42941262908, in progress when
-  the session ended (record its result next session). `821a857` (the check after unit 17 landed) run 42931018335 all
+- *What*: unit 28 landed as `c78d4af` (the entry above) and was pushed; its CI run 42941262908 landed all ten jobs
+  green (recorded at the end of the same session). `821a857` (the check after unit 17 landed) run 42931018335 all
   ten jobs green; `eb2cb92` (the claim of unit 28, a documents-only commit) run 42931963850 nine green, the Linux
   Python 3.14 leg red on Alee's flaky `test_weather_radar_live` only ("a mode set against policy is applied first"),
   both `cpp` jobs green. No code changed.
