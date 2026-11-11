@@ -30,10 +30,10 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import CmdStatus, FmsFlightMode, GearPosition, Maneuver, Ssm, TerminalState
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_plant.plant import PlantModel, PlantTerminal
 
-PORT_BASE = 57000
+PORT_BASE = free_port_base(57000)
 FRAMES = 200
 SYNC_MODE_CODE = 17
 LEVEL = dict(roll=0.0, pitch=0.0, yaw=0.0, roll_rate=0.0, pitch_rate=0.0, yaw_rate=0.0)

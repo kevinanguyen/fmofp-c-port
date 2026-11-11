@@ -22,12 +22,12 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import CmdStatus, PowerCommand, TerminalState, ThermalStatus
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_display.systems_feed import SystemsFeed
 from fmofp_display.terminal import DisplayTerminal
 from fmofp_plant.plant import PlantModel, PlantTerminal
 
-PORT_BASE = 54500
+PORT_BASE = free_port_base(54500)
 FRAMES = 450
 SYNC_MODE_CODE = 17
 POWER_RT = m.PwrStatus.RT

@@ -32,6 +32,19 @@
       "cacheVariables": { "OFP_SANITIZE": "ON" }
     },
     {
+      "name": "windows-ucrt64-release",
+      "displayName": "Windows, MSYS2 UCRT64 GCC, optimised (-O2 -g)",
+      "description": "The binaries to fly: the demo uses this build when it exists. The plain preset stays the one to debug.",
+      "inherits": "windows-ucrt64",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "linux-gcc-release",
+      "displayName": "Linux GCC, optimised (-O2 -g)",
+      "inherits": "linux-gcc",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
       "name": "coverage",
       "displayName": "Coverage build (gcov/gcovr), any GCC host",
       "inherits": "base",
@@ -42,11 +55,15 @@
     { "name": "windows-ucrt64", "configurePreset": "windows-ucrt64" },
     { "name": "linux-gcc", "configurePreset": "linux-gcc" },
     { "name": "linux-asan", "configurePreset": "linux-asan" },
+    { "name": "windows-ucrt64-release", "configurePreset": "windows-ucrt64-release" },
+    { "name": "linux-gcc-release", "configurePreset": "linux-gcc-release" },
     { "name": "coverage", "configurePreset": "coverage", "targets": ["all", "coverage"] }
   ],
   "testPresets": [
     { "name": "windows-ucrt64", "configurePreset": "windows-ucrt64", "output": { "outputOnFailure": true } },
     { "name": "linux-gcc", "configurePreset": "linux-gcc", "output": { "outputOnFailure": true } },
-    { "name": "linux-asan", "configurePreset": "linux-asan", "output": { "outputOnFailure": true } }
+    { "name": "linux-asan", "configurePreset": "linux-asan", "output": { "outputOnFailure": true } },
+    { "name": "windows-ucrt64-release", "configurePreset": "windows-ucrt64-release", "output": { "outputOnFailure": true } },
+    { "name": "linux-gcc-release", "configurePreset": "linux-gcc-release", "output": { "outputOnFailure": true } }
   ]
 }

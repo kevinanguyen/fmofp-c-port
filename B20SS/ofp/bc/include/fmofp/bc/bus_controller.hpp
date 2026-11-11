@@ -48,6 +48,11 @@ struct TerminalStats {
     std::uint32_t malformed{0};       // a reply that did not fit the command
     std::uint32_t busy{0};
     bool responded{false};  // at least once since init
+    // Timing (unit 30): how long its answers took, and how many overrun
+    // frames it gave the slowest answer of.
+    osal::Nanoseconds worst_response_ns{0};
+    osal::Nanoseconds total_response_ns{0};  // over the answered transactions
+    std::uint32_t overruns_slowest{0};
 };
 
 struct BcStats {
@@ -58,6 +63,11 @@ struct BcStats {
     std::uint32_t aperiodic_dropped{0};
     std::uint32_t monitor_failures{0};
     osal::Nanoseconds worst_frame_ns{0};
+    // Timing (unit 30). An overrun frame either started late (its own work
+    // fitted the 20 ms period) or was held up by its terminals' answers
+    // (counted against the slowest one, TerminalStats::overruns_slowest).
+    std::uint32_t overruns_late_start{0};
+    osal::Nanoseconds worst_wake_late_ns{0};  // the latest a frame started after its deadline
 };
 
 // The most recent data a terminal transmitted on a subaddress.
@@ -136,6 +146,8 @@ private:
     std::array<std::array<LatestData, bus::kMaxSubaddress + 1>, bus::kBroadcastRt> latest_{};
     std::array<Aperiodic, kAperiodicQueueDepth> queue_{};
     std::uint8_t queued_{0};
+    std::uint8_t frame_slowest_rt_{bus::kBroadcastRt};  // this frame's slowest answer so far
+    osal::Nanoseconds frame_slowest_ns_{0};
 };
 
 }  // namespace fmofp::bc

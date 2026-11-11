@@ -201,6 +201,12 @@ TEST(BusControllerGate, RealTimeFramesHoldTwentyMillisecondsWithoutOverruns) {
     EXPECT_EQ(frames, a.syncs());
     EXPECT_EQ(0U, bc->terminal(24).no_response);
     EXPECT_EQ(0U, bc->terminal(2).no_response);
+    // The timing counters (unit 30): no overrun, so none started late and no terminal is held to one; every
+    // frame started within the period of its deadline.
+    EXPECT_EQ(0U, bc->stats().overruns_late_start);
+    EXPECT_EQ(0U, bc->terminal(24).overruns_slowest);
+    EXPECT_GE(bc->stats().worst_wake_late_ns, 0);
+    EXPECT_LT(bc->stats().worst_wake_late_ns, fmofp::bc::kMinorFramePeriodNs);
 }
 
 TEST(BusController, AMissingTerminalIsCountedAndTheBusKeepsGoing) {
@@ -221,6 +227,14 @@ TEST(BusController, AMissingTerminalIsCountedAndTheBusKeepsGoing) {
     EXPECT_GE(bc->terminal(7).no_response, 1U);
     EXPECT_EQ(bc->terminal(7).transactions, bc->terminal(7).no_response);
     EXPECT_EQ(kMinorFramesPerMajor + 2, bc->stats().frames);
+    // Response times (unit 30) are those of answered transactions: the terminal that answers has one, under
+    // the timeout it was given and no larger than their sum; the one that never answers has none.
+    EXPECT_GT(bc->terminal(24).worst_response_ns, 0);
+    EXPECT_LT(bc->terminal(24).worst_response_ns, 2 * cfg.response_timeout);
+    EXPECT_GE(bc->terminal(24).total_response_ns, bc->terminal(24).worst_response_ns);
+    EXPECT_EQ(0, bc->terminal(7).worst_response_ns);
+    EXPECT_EQ(0, bc->terminal(7).total_response_ns);
+    EXPECT_EQ(0U, bc->stats().overruns_late_start) << "free running has no deadline to miss";
 }
 
 TEST(BusController, AQueuedCommandReachesTheTerminalNextFrame) {

@@ -136,30 +136,32 @@ person may continue it in their next session; when it is green it is rebased ont
   as bus commands through the command port, timed by the bus frame) and **the debug CLI** `py -m fmofp_cli [-c CMD]`
   (`fmofp_cli/`: `terminals`, `status`, `msg` from the monitor, `send ID field=value` of any ICD command, the
   `scenario` commands); the bus library `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: unchanged by unit 28 (its two plant messages are aperiodic): 23 terminals, 107 scheduled messages, worst
-  minor frame 8612 us of the 10000 us budget. Thirty seconds of headless demo on Kevin's machine with 22 terminals
-  (before unit 17): 1500 frames, 0 overruns, 22/22 answering. On Alee's machine with 23: 23/23 answering on every
-  line, 0 overruns with `--no-events` (worst frame 16 ms), but 21-36 overruns in 1500 frames with the scripted events
-  on; the same machine overruns 9-24 times on `888eafe` without the avionics terminal (section 7, 2026-11-10): it does
-  not hold the real-time demo under the events' load either way. On Kevin's machine with 23 terminals (2026-11-10,
-  after unit 17 landed): 1500 frames, 2 overruns with the events on (worst frame 24.5 ms; 0 overruns with 22
-  terminals the same day), 0 overruns without (worst 13.6 ms), 23/23 answering; after unit 28 (the same day, the
-  command port open): 1500 frames, 3 overruns (worst frame 26.3 ms) on the idle machine and 13 in a run started right after the gate (worst 24.7 ms), 23/23 answering in both, the command port idle (received=0). The reference machine is at the edge: the timing work is unit 30's first job
-  (section 2.30).
-- **Tests**: Python 291 OK (`fmofp_bus/tests`, about 65 s on Windows); C++ ctest 2/2
-  (320 hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
-  workflows/ci.yml` job `cpp`, linux-gcc + linux-asan, and Alee's eight Python legs).
+- **Load**: 23 terminals, 107 scheduled messages, worst minor frame 8612 us of the 10000 us budget (the
+  schedule's estimate). The real-time demo, thirty seconds headless with the scripted events, 1500 frames, 23/23
+  answering: on Alee's machine 26-42 overruns before unit 30's first part and, after it (2026-11-11), 0-9 on the
+  debug build (seven runs: 7, 1, 7, 0, 6, 4, 9) and 0-6 on the optimised build (1, 5, 6, 1, 0, 0, and one run of 91
+  in which 69 frames started late and every terminal was slow at once: the machine, section 7). Kevin's machine,
+  before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; **to be measured there
+  with the optimised build**. `fmofp_bc --report` now says which terminal held each overrun frame up (section
+  5.5).
+- **Tests**: Python 298 OK (`fmofp_bus/tests`, about 65 s on Kevin's machine, 80 s on Alee's); C++
+  ctest 2/2 (320 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
+  one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
+  bash B20SS/verify.sh cpp py load`); CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan and, since
+  unit 30, linux-gcc-release; and Alee's eight Python legs).
 - **Meter**: 27 of 29.5 units = **92 %** (section 2). Pace measured over the log: about
   5 units per full working day, so about half a day more to 100 % (2 units open: 29, 30); the
   intern-ticket authoring phase comes after and is not in the number.
 - **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
-- **Open work / claims**: none. No `wip/` branches. Last session: Kevin's, 2026-11-10 (unit 28 built and landed);
-  before it Kevin's check after unit 17 landed and Alee's unit 17 (both 2026-11-10). Next by Kevin's own note: unit
-  30 (hardening; its first job is the real-time demo's overruns with 23 terminals, section 2.30), then unit 29 last
-  (it cuts the upstream line, section 2.29; both humans decide what `py FMOFP/Main.py` becomes). Every CI run
-  through unit 28's is recorded in section 7.
+- **Open work / claims**: unit 30 hardening is `IN PROGRESS (Alee, 2026-11-11)`, on `port/cpp` in parts, each
+  green (no `wip/` branch). Part 1 landed 2026-11-11 (section 7): the demo's overruns traced and cut (the block
+  CRC in C, the optimised build preset the demo prefers, the controller's timing report, test port bases that
+  step off Windows' reserved ranges). Left in unit 30 (section 2.30): the timing test, gcovr thresholds in CI, the
+  MISRA-subset lint, the display processes' loggers at WARNING, the intern documents. Then unit 29, last (it cuts
+  the upstream line, section 2.29; both humans decide what `py FMOFP/Main.py` becomes). Last session: Alee's,
+  2026-11-11.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866, the Windows 3.13 leg of 42729856922 and the Linux 3.14 leg of 42931963850); the two
@@ -341,6 +343,19 @@ First job (added 2026-11-10 after unit 17 landed): the real-time demo's overruns
 instead of five 50 Hz relays (about 1 ms of every minor frame, ICD README section 12); the display terminals'
 poll answering (Python processes on a loaded machine); the controller's response timeout and what it does
 with a late answer. The timing test of this unit then pins what was gained.
+
+First job done 2026-11-11 (section 7). What it found, in the order tried: `AVN_STATUS` at 1 Hz did not help
+(46-55 overruns against 26-42: reverted, the status stays at 5 Hz). The controller's new timing report
+(`--report`: per terminal the mean and worst answer and the overrun frames it was slowest in; the overrun
+frames that merely started late) then named the MFD's Python terminal: each completed SAR image cost its one
+loop 10.7 ms of bit-by-bit CRC, 6 ms of decoding and 2.4 ms of pickling between two answers. The CRC is
+`binascii.crc_hqx` now (0.2 ms), which also serves the plant's block publishers. Next the radar computer, 6-28 ms
+to answer at worst at `-O0`: the optimised presets (`windows-ucrt64-release`, `linux-gcc-release`, `-O2 -g`) bring
+it to 4-6 ms and the demo flies them when built. Not done, in case the reference machine still overruns: the
+SAR image's 6 ms decode and 2.4 ms pickle moved out of the display terminal's helper process into the window's
+(forward the raw words, decode on read); `PLANT_SENSORS` as one broadcast; the plant's own worst answers (4-21
+ms, a Python process). The timing test of this unit should pin: the release build's per-terminal worst answer
+in a free-running whole-aircraft run, and the schedule's estimate.
 
 ---
 
@@ -580,9 +595,14 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (291 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (298 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
+
+The optimised build (unit 30): `cmake --preset windows-ucrt64-release && cmake --build --preset
+windows-ucrt64-release` from `B20SS/ofp/` (`linux-gcc-release` on Linux), into `build/<preset>-release/`; the
+demo uses it when it exists. `PRESET=windows-ucrt64-release bash B20SS/verify.sh cpp py load` runs the gate
+against it. The plain presets stay Debug `-O0`: the gate's, and the ones to debug.
 
 By hand, from `B20SS/ofp/` in a UCRT64 shell or on Linux: `cmake --preset <preset>`,
 `cmake --build --preset <preset>`, `ctest --preset <preset>`, `cmake --build build/<preset>
@@ -600,7 +620,7 @@ events; Ctrl-C stops everything. Options: `--seconds S`, `--headless`, `--no-dis
 `--no-events`, `--hold heading=0,speed=450`, `--seed N`, `--port-base N`, `--build DIR`.
 Logs in `B20SS/logs/demo/` (ignored by git). `B20SS/ofp/README.md` has the per-process
 command lines, `fmofp_bc --schedule --rt ...` prints the schedule and its load, and
-`fmofp_bc --report` the per-terminal statistics.
+`fmofp_bc --report` the per-terminal statistics and, when it stops, where the frames' time went (unit 30: `bc: timing: overruns_late_start` and, per terminal, `mean_response_us`, `worst_response_us`, `overruns_slowest`; the demo's `logs/demo/bc.log` has them).
 
 With the aircraft running, from `B20SS/`: `py -m fmofp_scenario FMOFP/Interfaces/scenarios/trainingScenario.xml
 [--speed 10] [--port-base N]` runs a frozen scenario against it through the bus controller's command port, one
@@ -728,6 +748,23 @@ Python tests and displays
   last value of the last enum you wrote.
 - The command port answers when the controller polls it, once a frame: a client's `send` returns after up to one frame
   (20 ms real time); an engine step with several due events takes one frame per event.
+- `fmofp_bc`'s closing statistics are read by most e2e tests only after it exits, through a pipe Windows makes
+  4 KB long: with 23 terminals they are about 2.6 KB. Twenty-three more lines hung the display e2e for forty
+  minutes (the controller blocked writing, the test blocked waiting for its exit) and left 30 processes behind:
+  anything new the controller prints at exit goes behind `--report`, which only the demo passes (to a file).
+- A hung e2e test leaves its children: before rerunning, list them (`Get-CimInstance Win32_Process`, names
+  `fmofp_*` and `python` with `spawn_main` or `unittest`) and stop them, or the next run finds its ports taken.
+- "plant port in use?" with no process on the port: Windows reserves blocks of a hundred UDP ports at boot
+  (`netsh int ipv4 show excludedportrange protocol=udp`), different on each machine and restart. Every test's
+  `PORT_BASE` is `free_port_base(N)` since unit 30 (`_support.py`): N when a bus can be bound there, else just
+  below it. New tests do the same; `fmofp_demo`'s default 51000 is not protected (`--port-base`).
+- Measure the real-time demo on an idle machine, several runs, with `logs/demo/bc.log`'s timing lines: a game
+  running gave 262-326 overruns for code that gives 26-42; a run where `overruns_late_start` is most of the
+  overruns and every terminal's worst answer is tens of ms is the machine, not the bus.
+- Python on the bus: anything the terminal's one loop does between two polls delays its answer. Time it
+  (`time.perf_counter` around the suspect, in a scratch script) before changing the ICD to lighten the load.
+- An optimised build can warn where `-O0` does not and can change floating-point results: `-Werror` and the
+  oracle tests are the check, so run the Python suite against the release build after touching the C++.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -1384,6 +1421,50 @@ done before this file existed are condensed from the private session notes.
   both `cpp` jobs green. No code changed.
 - *Numbers*: meter 27 / 29.5 = 92 %.
 
+### 2026-11-11 - unit 30 hardening, part 1: the real-time demo's overruns - by Alee's agent
+- *What*: the unit's first job (section 2.30). (1) `fmofp_bc` measures where its frames' time goes
+  (`TerminalStats`: `worst_response_ns`, `total_response_ns`, `overruns_slowest`; `BcStats`:
+  `overruns_late_start`, `worst_wake_late_ns`), printed with `--report` when it stops. (2) The block CRC in
+  `fmofp_bus/block.py` is `binascii.crc_hqx` (the bit-by-bit loop stays in `test_block.py` as the reference).
+  (3) Optimised presets `windows-ucrt64-release` and `linux-gcc-release` (RelWithDebInfo, `-O2 -g`); the demo's
+  `default_build_dir()` prefers `build/<preset>-release/` once its controller exists; CI builds and unit-tests
+  `linux-gcc-release` (both CI files). (4) `_support.free_port_base(N)` for every test's `PORT_BASE` (23 test
+  modules; `test_support.py`).
+- *How it went*: the first candidate, `AVN_STATUS` at 1 Hz, was tried alone and measured: 46, 54, 55 overruns
+  against 39, 26, 42 the same hour: reverted. The timing report then showed the MFD terminal (RT 13) as the slowest
+  answer in 13 of 30 overrun frames, worst answer 19 ms, with every C++ partition at 0.1 ms on average; timing the
+  terminal's work on a SAR image in a scratch script gave CRC 10.7 ms, decode 6.0 ms, pickle 2.4 ms. After the CRC
+  fix the MFD was blamed for none, and the radar computer (RT 9) for most of what was left (worst answer 6-28 ms
+  at `-O0`); the optimised build brings that to 4-6 ms.
+- *Numbers, Alee's machine, 30 s headless with events, 1500 frames, 23/23 answering*: before, 39, 26, 42 (30 with
+  the report on); CRC fix, debug build: 18, 16, 7, then 7, 1, 7, 0, 6, 4, 9; CRC fix, optimised build: 1, 5, 91, 6,
+  1, 0, 0. The 91 had `overruns_late_start=69`, `worst_wake_late_us=49440` and worst answers of 39-49 ms from the
+  FCS, the radar and the plant alike: the machine stalled (it runs a browser and OneDrive beside the bus, 24-49 %
+  CPU when "idle"). With a game running nothing can be measured: 262-326 overruns before any change, and 165-216
+  on the finished code when the game was started again before the last four runs (50-69 late starts each), so the
+  finished code's own numbers are the seven runs above, taken before the timing lines went behind `--report` (a
+  change to what is printed at exit, not to the frame).
+- *Warnings / lessons*: the timing lines first printed unconditionally and hung `test_display_e2e`: the test
+  reads the controller's output after it exits, the 23 extra lines overflowed Windows' 4 KB pipe, the controller
+  blocked in `printf` and the test waited for it for forty minutes, leaving 30 processes that had to be stopped by
+  hand (section 6; they print with `--report` only now). The same day Windows had reserved UDP 55967-56066, on
+  `test_nav_e2e`'s 56000: "plant port in use?" with nothing on the port, on both builds; hence `free_port_base`
+  (the test runs at 55900 here today). The optimised build compiled under `-Werror` without a change, and the
+  whole Python suite passes against it: no oracle moved.
+- *Not done* (section 2.30): the SAR image's decode and pickle still run in the display terminal's helper process
+  (8 ms every 3 s); the plant's worst answers are 4-21 ms; `PLANT_SENSORS` is still five relays. Kevin's machine has
+  not flown the optimised build.
+- *Files*: `ofp/bc/{include/fmofp/bc/bus_controller.hpp, src/bus_controller.cpp, src/main.cpp}`,
+  `ofp/CMakePresets.json`, `ofp/tests/bus_controller_test.cpp`, `ofp/README.md`, `fmofp_bus/block.py`,
+  `fmofp_demo/demo.py`, `fmofp_bus/tests/{_support.py, test_support.py, test_block.py, test_demo.py}` and the 23
+  test modules' `PORT_BASE` lines, both CI files, this file.
+- *CI*: to be recorded (the first run of `linux-gcc-release`, on the runner's GCC, which is older than 16.2: if it
+  warns where this one does not, fix the code, not the flags).
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load) on the debug build and `cpp py load` on the optimised one:
+  Python 298 OK (was 291: `test_support.py` 5, one in `test_block.py`, one in `test_demo.py`), ctest 2/2
+  on both (320 gtests), cppcheck clean, load unchanged (107 messages for 23 terminals, 8612 us). Meter unchanged,
+  27 / 29.5 = 92 % (unit 30 is in progress).
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1477,3 +1558,10 @@ done before this file existed are condensed from the private session notes.
   not moved; the threat, waypoint, phase and failure go to the terminals' existing commands; the parser's quirks
   (`bool("false")` is stealth) are kept; an unknown phase is skipped with a note; the demo is unchanged (the
   engine runs beside it). Recorded in the ICD README sections 2 and 7.
+- 2026-11-11, Alee ("Yes, claim unit 30", "can you complete what is needed for this piece") and Alee's agent: unit
+  30 lands on `port/cpp` in parts, each green, the unit staying `IN PROGRESS` until the last (its items are
+  independent, and a `wip/` branch would hide the timing fixes from Kevin's machine, which is the reference for
+  them). Part 1's choices: `AVN_STATUS` stays at 5 Hz (1 Hz measured no better); the controller's timing lines
+  print with `--report` only; the optimised build is a preset beside the debug one, not a replacement (the gate
+  and gdb keep `-O0`), and the demo prefers it when built; the tests' port bases step below their usual place when
+  Windows has reserved it; no ICD change, so the next ICD version is still v1.24.

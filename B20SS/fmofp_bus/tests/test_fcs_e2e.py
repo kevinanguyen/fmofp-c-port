@@ -22,11 +22,11 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import GcasStatus, Ssm, TerminalState, TfrMode
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_plant.plant import PlantModel, PlantTerminal
 from fmofp_plant.terrain import FlatTerrain
 
-PORT_BASE = 55000
+PORT_BASE = free_port_base(55000)
 FRAMES_PER_SCENARIO = 45  # the terrain reaches the FCS by frame ~15; FCS_GCAS_ALERTS is 5 Hz
 
 # altitude and vertical speed are held; the terrain is flat at terrain_ft, so the

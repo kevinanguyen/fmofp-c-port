@@ -29,10 +29,10 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import TerminalState, WeatherMode
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_plant.plant import PlantModel, PlantTerminal
 
-PORT_BASE = 58000
+PORT_BASE = free_port_base(58000)
 FRAMES = 260
 SYNC_MODE_CODE = 17
 RADAR_RT = m.RdrWxStatus.RT

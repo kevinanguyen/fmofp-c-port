@@ -26,11 +26,11 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import AewcMode, LockStatus, TargetClass, TargetingMode, TerminalState, Threat, TrackFilter
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_plant.plant import PlantModel, PlantTerminal
 from fmofp_plant.traffic import MAX_TARGETS
 
-PORT_BASE = 60000
+PORT_BASE = free_port_base(60000)
 FRAMES = 300
 SYNC_MODE_CODE = 17
 RADAR_RT = m.RdrTgtStatus.RT

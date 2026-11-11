@@ -36,6 +36,15 @@ the monitor at 51033, the command port at 51034); a different `--port-base` lets
 buses share a machine. The command port is how the scenario engine, the debug CLI and
 the tests queue commands (ICD README section 7); `--no-command-port` leaves it closed.
 
+With `--report`, `fmofp_bc` also prints where the frames' time went when it stops (unit 30), after its
+statistics: `bc: timing: overruns_late_start=N worst_wake_late_us=N` (the overrun frames
+whose own work fitted the 20 ms period, so they overran because they started late, and the
+latest any frame started after its deadline), then one line per terminal,
+`rt N timing: mean_response_us=N worst_response_us=N overruns_slowest=N`: how long its
+answers took, and of how many overrun frames it gave the slowest answer. A terminal with a
+large `overruns_slowest` is the first place to look; a large `overruns_late_start` with
+every terminal quick is the machine, not the bus.
+
 ## Seeing the whole aircraft run
 
 One command starts everything on the bus and shows what crosses it. From `B20SS/`:
@@ -399,6 +408,25 @@ ctest --preset linux-gcc
 `linux-asan` is the same build with AddressSanitizer and UndefinedBehaviorSanitizer;
 CI runs both. MinGW GCC has no sanitizers, so on Windows use `linux-asan` under WSL
 if you need it locally.
+
+## The optimised build
+
+The presets above build Debug (`-O0`): the build to step through in gdb, and the one the
+gate (`B20SS/verify.sh`) tests. `windows-ucrt64-release` and `linux-gcc-release` build the
+same code with `-O2 -g` (CMake's RelWithDebInfo) into `build/<preset>-release/`:
+
+```bash
+cmake --preset windows-ucrt64-release     # or linux-gcc-release
+cmake --build --preset windows-ucrt64-release
+ctest --preset windows-ucrt64-release
+```
+
+`py -m fmofp_demo` flies this build when it exists and the debug one otherwise (`--build
+DIR` chooses by hand). The radar computer is why: its worst answer to the bus was 6 to 28 ms
+at `-O0` and 4 to 6 ms at `-O2` in the thirty-second demo. The whole gate runs against it
+with `PRESET=windows-ucrt64-release bash B20SS/verify.sh cpp py load`: the oracle tests
+compare the C++ with the frozen Python to many places, so they are also the check that
+optimisation changed no computed word. CI builds and unit-tests it (`linux-gcc-release`).
 
 ## Other targets
 

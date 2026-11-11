@@ -18,8 +18,9 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import TerminalState
 from fmofp_bus.rt_process import RtProcess
 from fmofp_bus.status import Status
+from fmofp_bus.tests._support import free_port_base
 
-PORT_BASE = 54000
+PORT_BASE = free_port_base(54000)
 RT = 24  # a free address: a terminal with no messages of its own (RT 1 is the avionics terminal since v1.20)
 FRAMES = 60
 

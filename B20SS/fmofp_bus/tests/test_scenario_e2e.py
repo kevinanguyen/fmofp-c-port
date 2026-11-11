@@ -23,13 +23,13 @@ from fmofp_bus.command_port import CommandClient
 from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import CmdStatus, MissionPhase
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_display.terminal import DisplayTerminal
 from fmofp_plant.plant import PlantModel, PlantTerminal
 from fmofp_scenario.engine import ScenarioEngine, describe
 from fmofp_scenario.scenario import FAILURE, TRAINING
 
-PORT_BASE = 58500
+PORT_BASE = free_port_base(58500)
 PLANT_RT = m.PlantSensors.RT
 EICAS_RT = m.DspEicasStatus.RT
 TSD_RT = m.DspTsdStatus.RT

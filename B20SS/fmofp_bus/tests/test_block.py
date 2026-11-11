@@ -20,6 +20,25 @@ class CrcTest(unittest.TestCase):
         self.assertEqual(0x1D0F, block.crc16_ccitt_false([0]))  # the C++ unit test pins the same two
         self.assertEqual(block.crc16_ccitt_false_bytes(b"\x31\x32\x33\x34"), block.crc16_ccitt_false([0x3132, 0x3334]))
 
+    def test_the_library_crc_is_the_bit_by_bit_one(self):
+        """block.py computes the CRC with binascii.crc_hqx since unit 30 (the loop below took 10 ms for a SAR
+        image in the display terminal's bus loop); the definition stays here as the reference."""
+        def reference(data):
+            crc = 0xFFFF
+            for byte in data:
+                crc ^= byte << 8
+                for _ in range(8):
+                    crc = ((crc << 1) ^ 0x1021) if crc & 0x8000 else (crc << 1)
+                    crc &= 0xFFFF
+            return crc
+
+        for length in (0, 1, 2, 31, 62, 2063, block.MAX_PAYLOAD_WORDS):
+            words = [(i * 40503 + 0x9E37) & 0xFFFF for i in range(length)]
+            data = b"".join(w.to_bytes(2, "big") for w in words)
+            self.assertEqual(reference(data), block.crc16_ccitt_false(words), length)
+            self.assertEqual(reference(data), block.crc16_ccitt_false_bytes(data), length)
+        self.assertEqual(reference(b"\x00\xff\x80"), block.crc16_ccitt_false_bytes(bytearray(b"\x00\xff\x80")))
+
 
 class TransmitterTest(unittest.TestCase):
     def test_descriptor_segments_and_versions(self):

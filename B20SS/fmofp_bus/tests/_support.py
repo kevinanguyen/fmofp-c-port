@@ -31,6 +31,7 @@ The binaries are named by environment variables (CI sets them):
 """
 
 import os
+import socket
 import subprocess
 import sys
 import unittest
@@ -48,6 +49,44 @@ def needs(*names):
     """Skip the test class unless every named binary is configured."""
     missing = [n for n in names if not os.environ.get(n)]
     return unittest.skipIf(missing, f"set {', '.join(missing)} to the binaries to run")
+
+
+# A bus at port base B uses UDP ports B+1 .. B+34 (the terminals, the controller at +32, the monitor at +33, the
+# command port at +34). Each e2e test owns a base, a multiple of 500, and a few also use base+100 or base+200.
+BUS_PORTS = 34
+# Where a test's bus goes when its own base cannot be bound: below it, clear of the base before's +200.
+_FALLBACK_OFFSETS = (0, -150, -100, -200, -250)
+
+
+def _bus_ports_free(port_base):
+    """True when every UDP port of a bus at `port_base` can be bound on the loopback right now."""
+    sockets = []
+    try:
+        for port in range(port_base + 1, port_base + BUS_PORTS + 1):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sockets.append(sock)
+            sock.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        for sock in sockets:
+            sock.close()
+
+
+def free_port_base(preferred):
+    """`preferred` when a bus can be opened there, else the first base just below it where one can.
+
+    Windows reserves blocks of a hundred UDP ports at boot (`netsh int ipv4 show excludedportrange
+    protocol=udp`: Hyper-V, WSL and Docker take them), a different set on each machine and after each restart; a
+    bind inside one fails with "access denied" although no process holds the port. On 2026-11-11 the block
+    55967-56066 sat on test_nav_e2e's 56000 and the gate was red for a reason no code could fix (unit 30). If
+    nothing nearby is free either, the preferred base is returned and the test fails with its own message.
+    """
+    for offset in _FALLBACK_OFFSETS:
+        if _bus_ports_free(preferred + offset):
+            return preferred + offset
+    return preferred
 
 
 class RadarTool:

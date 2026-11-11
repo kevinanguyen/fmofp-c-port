@@ -18,10 +18,10 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import Ssm, TerminalState
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_plant.plant import PlantModel, PlantTerminal
 
-PORT_BASE = 56000
+PORT_BASE = free_port_base(56000)
 FRAMES = 300  # six seconds of simulated flight: six GPS epochs
 
 

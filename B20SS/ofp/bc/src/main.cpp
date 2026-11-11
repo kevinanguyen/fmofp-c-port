@@ -231,6 +231,26 @@ void print_stats(const fmofp::bc::BusController& bc) {
     }
 }
 
+// Timing (unit 30): where the frames' time goes. Only with --report: a test
+// that reads this program's output after it exits gives it a pipe of 4 KB on
+// Windows, the statistics above fill most of that with 23 terminals, and a
+// write to a full pipe never returns (it hung the display e2e test once).
+void print_timing(const fmofp::bc::BusController& bc) {
+    const fmofp::bc::BcStats& s = bc.stats();
+    const fmofp::bc::BcConfig& c = bc.config();
+    std::printf("bc: timing: overruns_late_start=%u worst_wake_late_us=%lld\n", s.overruns_late_start,
+                static_cast<long long>(s.worst_wake_late_ns / fmofp::osal::kNsPerUs));
+    for (std::uint8_t i = 0; i < c.terminal_count; ++i) {
+        const std::uint8_t rt = c.terminals[i];
+        const fmofp::bc::TerminalStats& t = bc.terminal(rt);
+        const std::uint32_t answered = t.transactions - t.no_response;
+        const long long mean_us =
+            answered == 0 ? 0 : static_cast<long long>(t.total_response_ns / answered / fmofp::osal::kNsPerUs);
+        std::printf("  rt %2u timing: mean_response_us=%lld worst_response_us=%lld overruns_slowest=%u\n", rt, mean_us,
+                    static_cast<long long>(t.worst_response_ns / fmofp::osal::kNsPerUs), t.overruns_slowest);
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -314,6 +334,9 @@ int main(int argc, char** argv) {
     }
 
     print_stats(bc);
+    if (o.report) {
+        print_timing(bc);
+    }
     if (o.command_port) {
         const fmofp::bc::CommandPortStats& cs = command_port.stats();
         std::printf("bc: command port: received=%u queued=%u refused=%u malformed=%u\n", cs.received, cs.queued,

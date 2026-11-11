@@ -83,6 +83,9 @@ pipelines:
               - cmake --build --preset linux-gcc
               - ctest --preset linux-gcc
               - cmake --build --preset linux-gcc --target cppcheck
+              - cmake --preset linux-gcc-release
+              - cmake --build --preset linux-gcc-release
+              - ctest --preset linux-gcc-release
               - cd ../..
               - python3 B20SS/icd/tools/icd_tool.py gen-py
               - git diff --exit-code -- B20SS/fmofp_bus/icd

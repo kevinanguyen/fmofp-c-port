@@ -21,10 +21,10 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import CmdStatus, SurfaceCommand, TerminalState, TrimAxis
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_plant.plant import PlantModel, PlantTerminal
 
-PORT_BASE = 52500
+PORT_BASE = free_port_base(52500)
 FRAMES = 420
 SYNC_MODE_CODE = 17
 SURFACES_RT = m.FsfStatus.RT

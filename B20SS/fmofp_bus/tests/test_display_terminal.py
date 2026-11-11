@@ -15,10 +15,10 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import DisplayMode, TerminalState, WeatherMode
 from fmofp_bus.rt_process import RtProcess
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_display.terminal_process import TerminalProcess
 
-PORT_BASE = 64000
+PORT_BASE = free_port_base(64000)
 ORPHAN_PORT_BASE = PORT_BASE + 100
 ORPHAN_FRAMES = 1500  # 30 s of bus, more than the test needs; the controller is killed at the end
 

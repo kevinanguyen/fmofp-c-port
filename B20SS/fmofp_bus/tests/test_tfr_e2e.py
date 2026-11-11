@@ -25,11 +25,11 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import ClearanceLevel, Ssm, TerminalState, TfrMode
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_plant.plant import PlantModel, PlantTerminal
 from fmofp_plant.terrain import PROFILE_SAMPLES, sample_distance
 
-PORT_BASE = 59000
+PORT_BASE = free_port_base(59000)
 FRAMES = 230
 SYNC_MODE_CODE = 17
 RADAR_RT = m.RdrTfrStatus.RT

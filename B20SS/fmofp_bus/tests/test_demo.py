@@ -13,11 +13,11 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import FmsFlightMode, GcasStatus, Ssm, TerminalState, WeatherMode
 from fmofp_bus.monitor import MonitorRecord
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_demo.demo import (B20SS, DISPLAYS, PARTITIONS, PLANT_RT, SYNC_HZ, SYNC_MODE_CODE, Dashboard, binaries,
-                             default_events, event_frame, missing_binaries, script_lines)
+                             default_build_dir, default_events, event_frame, missing_binaries, script_lines)
 
-PORT_BASE = 63000
+PORT_BASE = free_port_base(63000)
 
 
 class ScriptedFlightTest(unittest.TestCase):
@@ -47,6 +47,19 @@ class ScriptedFlightTest(unittest.TestCase):
         self.assertEqual([5, 7, 12, 9, 3, 6, 2, 22, 10, 8, 21, 4, 19, 20, 23, 1], [rt for _, rt in PARTITIONS])
         self.assertEqual([15, 11, 13, 14, 16, 17], [rt for _, rt in DISPLAYS])
         self.assertEqual(27, PLANT_RT)
+
+    def test_the_demo_flies_the_optimised_build_when_there_is_one(self):
+        """`<preset>-release` (unit 30) is preferred once its bus controller exists; otherwise the debug build."""
+        preset = "windows-ucrt64" if sys.platform == "win32" else "linux-gcc"
+        exe = ".exe" if sys.platform == "win32" else ""
+        with tempfile.TemporaryDirectory() as root:
+            self.assertEqual(os.path.join(root, preset), default_build_dir(root), "nothing built: the debug directory")
+            os.makedirs(os.path.join(root, preset + "-release", "bc"))
+            self.assertEqual(os.path.join(root, preset), default_build_dir(root), "configured, not built")
+            with open(os.path.join(root, preset + "-release", "bc", "fmofp_bc" + exe), "w", encoding="ascii"):
+                pass
+            self.assertEqual(os.path.join(root, preset + "-release"), default_build_dir(root))
+        self.assertTrue(default_build_dir().startswith(os.path.join(B20SS, "ofp", "build", preset)))
 
 
 def transmit(rt, subaddress, message):

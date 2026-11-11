@@ -28,11 +28,11 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import GroundFeature, SarMode, TerminalState
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_plant.ground import Area, GroundScene, Line, Point
 from fmofp_plant.plant import PlantModel, PlantTerminal
 
-PORT_BASE = 52000
+PORT_BASE = free_port_base(52000)
 FRAMES = 950
 SYNC_MODE_CODE = 17
 RADAR_RT = m.RdrSarStatus.RT

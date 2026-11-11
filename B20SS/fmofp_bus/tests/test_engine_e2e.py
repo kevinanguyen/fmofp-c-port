@@ -23,10 +23,10 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import CmdStatus, EngineCommand, EngineSelect, FuelTank, Ssm, TerminalState
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env, needs
+from fmofp_bus.tests._support import binary_env, free_port_base, needs
 from fmofp_plant.plant import PlantModel, PlantTerminal
 
-PORT_BASE = 62000
+PORT_BASE = free_port_base(62000)
 FRAMES = 330
 SYNC_MODE_CODE = 17
 AIRSPEED_KT = 450.0

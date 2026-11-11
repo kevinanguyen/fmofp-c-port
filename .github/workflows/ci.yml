@@ -171,7 +171,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        preset: [linux-gcc, linux-asan]
+        # linux-gcc-release (unit 30): the optimised build the demo flies must compile under -Werror at -O2 and
+        # pass the same unit tests; the Python suite runs against the debug build only.
+        preset: [linux-gcc, linux-asan, linux-gcc-release]
 
     steps:
       - uses: actions/checkout@v5

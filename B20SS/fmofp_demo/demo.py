@@ -259,9 +259,17 @@ def shown(path):
     return path if relative.startswith("..") else relative
 
 
-def default_build_dir():
+def default_build_dir(build_root=None):
+    """The optimised build (`<preset>-release`, unit 30) when it has been built, else the debug one: the radar
+    computer's frame is several times shorter at -O2, which is what the real-time bus needs; the debug build
+    stays the one the gate tests and a debugger use."""
     preset = "windows-ucrt64" if sys.platform == "win32" else "linux-gcc"
-    return os.path.join(B20SS, "ofp", "build", preset)
+    build_root = build_root or os.path.join(B20SS, "ofp", "build")
+    release = os.path.join(build_root, preset + "-release")
+    exe = ".exe" if sys.platform == "win32" else ""
+    if os.path.isfile(os.path.join(release, "bc", "fmofp_bc" + exe)):
+        return release
+    return os.path.join(build_root, preset)
 
 
 def binaries(build_dir):

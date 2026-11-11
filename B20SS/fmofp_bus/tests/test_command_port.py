@@ -20,10 +20,10 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import TerminalState
 from fmofp_bus.rt_process import COMMAND_PORT_OFFSET, LOOPBACK, RtProcess
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env
+from fmofp_bus.tests._support import binary_env, free_port_base
 from fmofp_bus.transport import FrameType, decode_frame
 
-PORT_BASE = 57500
+PORT_BASE = free_port_base(57500)
 RT = 24  # a free address: RT 1 is the avionics terminal, RT 4 the ECS
 FRAMES = 150
 

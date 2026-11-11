@@ -14,12 +14,12 @@ from fmofp_bus.command_port import Acknowledgement, CommandClient
 from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import IffIdentity, MissionCommand, MissionPhase, TargetClass, TerminalState, WeatherCategory
 from fmofp_bus.status import Status
-from fmofp_bus.tests._support import binary_env
+from fmofp_bus.tests._support import binary_env, free_port_base
 from fmofp_cli.cli import DebugCli, parse_field
 from fmofp_plant.plant import PlantModel, PlantTerminal
 from fmofp_scenario.scenario import TRAINING
 
-PORT_BASE = 59500
+PORT_BASE = free_port_base(59500)
 PLANT_RT = m.PlantSensors.RT
 FRAMES = 300
 

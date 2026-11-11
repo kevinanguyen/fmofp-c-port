@@ -137,6 +137,13 @@ Status BusController::run_minor_frame() noexcept {
         }
     }
     const osal::Nanoseconds frame_start = osal::now();
+    // How late the frame starts against its deadline: the operating system's
+    // wake-up, or the previous frame's work running past it.
+    if (config_.mode == BcMode::kRealTime && frame_start - next_deadline_ > stats_.worst_wake_late_ns) {
+        stats_.worst_wake_late_ns = frame_start - next_deadline_;
+    }
+    frame_slowest_rt_ = bus::kBroadcastRt;
+    frame_slowest_ns_ = 0;
 
     Status result = send_sync();
 
@@ -189,6 +196,14 @@ Status BusController::run_minor_frame() noexcept {
     next_deadline_ += kMinorFramePeriodNs;
     if (config_.mode == BcMode::kRealTime && frame_end > next_deadline_) {
         ++stats_.overruns;
+        // Whose overrun it was: a frame whose own work fitted the period
+        // started late; otherwise the terminal with the frame's slowest
+        // answer is the first place to look.
+        if (took <= kMinorFramePeriodNs) {
+            ++stats_.overruns_late_start;
+        } else {
+            ++terminals_[frame_slowest_rt_].overruns_slowest;
+        }
     } else if (config_.mode == BcMode::kFreeRun) {
         // Free running has no timeline to fall behind; keep deadlines current
         // so a later switch to real time does not start with a backlog.
@@ -253,6 +268,7 @@ Status BusController::transact(std::uint8_t rt, bool transmit, std::uint8_t sa, 
 
     TerminalStats& term = terminals_[rt];
     ++term.transactions;
+    const osal::Nanoseconds asked = osal::now();
     const Status sent = socket_.send_to(terminal_port(config_, rt), bytes.data(), length);
     if (sent != Status::kOk) {
         return sent;
@@ -283,6 +299,16 @@ Status BusController::transact(std::uint8_t rt, bool transmit, std::uint8_t sa, 
         return got;
     }
     term.responded = true;
+    // How long the terminal took to answer, a retry included.
+    const osal::Nanoseconds answered_in = osal::now() - asked;
+    term.total_response_ns += answered_in;
+    if (answered_in > term.worst_response_ns) {
+        term.worst_response_ns = answered_in;
+    }
+    if (answered_in > frame_slowest_ns_) {
+        frame_slowest_ns_ = answered_in;
+        frame_slowest_rt_ = rt;
+    }
 
     // The reply must come from the addressed terminal and be the right size
     // for the command, otherwise it is counted and not believed.

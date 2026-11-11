@@ -7,6 +7,8 @@ RemoteTerminal's subaddresses; blocks_from_records reassembles what a monitor
 saw. The C++ twin is ofp/bus/include/fmofp/bus/block.hpp.
 """
 
+import binascii
+import struct
 from dataclasses import dataclass
 
 from fmofp_bus.status import Status, worst
@@ -19,19 +21,19 @@ MAX_PAYLOAD_WORDS = MAX_SEGMENTS * SEGMENT_PAYLOAD_WORDS
 
 
 def crc16_ccitt_false_bytes(data):
-    """CRC-16/CCITT-FALSE: polynomial 0x1021, initial 0xFFFF, no reflection, no final XOR."""
-    crc = 0xFFFF
-    for byte in data:
-        crc ^= byte << 8
-        for _ in range(8):
-            crc = ((crc << 1) ^ 0x1021) if crc & 0x8000 else (crc << 1)
-            crc &= 0xFFFF
-    return crc
+    """CRC-16/CCITT-FALSE: polynomial 0x1021, initial 0xFFFF, no reflection, no final XOR.
+
+    binascii.crc_hqx is that CRC in C. The bit-by-bit loop that stood here took 10.7 ms for a SAR image's
+    2063 words, in the display terminal's one loop, between two answers to the bus (unit 30: the real-time
+    demo's overruns); test_block.py keeps the loop as the reference it is checked against.
+    """
+    return binascii.crc_hqx(bytes(data), 0xFFFF)
 
 
 def crc16_ccitt_false(words):
     """The CRC over bus words as big-endian bytes, which is how the C++ computes it."""
-    return crc16_ccitt_false_bytes(b"".join(int(w).to_bytes(2, "big") for w in words))
+    values = [int(w) for w in words]
+    return crc16_ccitt_false_bytes(struct.pack(f">{len(values)}H", *values))
 
 
 def segment_count(length):
