@@ -208,7 +208,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 25 | TSD on the bus | 0.5 | DONE 2026-11-01 |
 | 26 | SMS on the bus | 0.5 | DONE 2026-11-02 |
 | 27 | HUD on the bus | 0.5 | STRUCK 2026-11-02 (the Python HUD is an empty placeholder; removed from the total) |
-| 28 | Scenario engine + debug CLI on the bus | 1.5 | open |
+| 28 | Scenario engine + debug CLI on the bus | 1.5 | IN PROGRESS (Kevin, 2026-11-10) |
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | open |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | open |
 
