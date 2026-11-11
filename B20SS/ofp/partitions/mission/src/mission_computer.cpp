@@ -44,8 +44,8 @@ bool before(const Target& a, const Target& b) noexcept {
 NameWords pack_name(const Name& name) noexcept {
     NameWords words{};
     for (std::size_t i = 0; i < kNameWords; ++i) {
-        const auto hi = static_cast<std::uint16_t>(static_cast<unsigned char>(name[2 * i]));
-        const auto lo = static_cast<std::uint16_t>(static_cast<unsigned char>(name[2 * i + 1]));
+        const unsigned hi = static_cast<unsigned char>(name[2 * i]);
+        const unsigned lo = static_cast<unsigned char>(name[2 * i + 1]);
         words[i] = static_cast<std::uint16_t>((hi << 8U) | lo);
     }
     return words;
@@ -54,8 +54,8 @@ NameWords pack_name(const Name& name) noexcept {
 Name unpack_name(const NameWords& words) noexcept {
     Name name{};
     for (std::size_t i = 0; i < kNameWords; ++i) {
-        name[2 * i] = static_cast<char>((words[i] >> 8U) & 0xFFU);
-        name[2 * i + 1] = static_cast<char>(words[i] & 0xFFU);
+        name[2 * i] = static_cast<char>((static_cast<unsigned>(words[i]) >> 8U) & 0xFFU);
+        name[2 * i + 1] = static_cast<char>(static_cast<unsigned>(words[i]) & 0xFFU);
     }
     return name;
 }

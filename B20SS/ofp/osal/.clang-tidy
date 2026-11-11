@@ -1,0 +1,7 @@
+# The operating system layer: the flight code's lint (../.clang-tidy) less one check.
+#
+# The sockets API takes a `sockaddr*` and is handed a `sockaddr_in`: bind, sendto and recvfrom cannot be called
+# without a reinterpret_cast, on Windows or on Linux. This directory is where the OS's C interfaces are met so
+# that nothing above it has to; the check stays on everywhere else.
+InheritParentConfig: true
+Checks: '-cppcoreguidelines-pro-type-reinterpret-cast'

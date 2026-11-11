@@ -23,7 +23,7 @@ INT to_poll_ms(Nanoseconds timeout) noexcept {
         return 0;
     }
     const Nanoseconds ms = (timeout + kNsPerMs - 1) / kNsPerMs;
-    return ms > 60 * 1000 ? 60 * 1000 : static_cast<INT>(ms);
+    return ms > Nanoseconds{60000} ? INT{60000} : static_cast<INT>(ms);
 }
 
 bool g_started = false;

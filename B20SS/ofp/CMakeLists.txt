@@ -67,6 +67,20 @@ if(OFP_CPPCHECK)
         VERBATIM)
 endif()
 
+# `cmake --build <dir> --target lint` runs clang-tidy with .clang-tidy (the MISRA-style subset of unit 30: the
+# rules of CLAUDE.md that a tool can hold) over the flight code in the compile database; a finding fails it.
+# It needs the generated ICD headers, hence the dependency.
+find_program(OFP_CLANG_TIDY clang-tidy)
+if(OFP_CLANG_TIDY)
+    add_custom_target(lint
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/lint.py ${CMAKE_BINARY_DIR}
+            --clang-tidy ${OFP_CLANG_TIDY}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "clang-tidy over the flight code"
+        VERBATIM)
+    add_dependencies(lint ofp_icd_generate)
+endif()
+
 # `cmake --build <dir> --target coverage` after configuring with -DOFP_COVERAGE=ON.
 # Runs the tests first, so it needs every test executable built.
 find_program(OFP_GCOVR gcovr)

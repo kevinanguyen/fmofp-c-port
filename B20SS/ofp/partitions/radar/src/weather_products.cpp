@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace fmofp::radar {
 
@@ -124,7 +125,7 @@ double vil_column(const Volume& v, std::size_t nel, std::size_t az, std::size_t 
 }
 
 double composite_column(const Volume& v, std::size_t nel, std::size_t az, std::size_t r) noexcept {
-    double max_dbz = -INFINITY;
+    double max_dbz = -std::numeric_limits<double>::infinity();
     for (std::size_t el = 0; el < nel && el < kMaxElevations; ++el) {
         if (v.dbz[az][el][r] > max_dbz) {
             max_dbz = v.dbz[az][el][r];
@@ -201,7 +202,7 @@ std::size_t select(std::size_t n, std::size_t max_points, const PointTracker& tr
     std::array<bool, kMaxSelected> previous_used{};
     for (std::size_t i = 0; i < n; ++i) {
         work.matched[i] = false;
-        double best_distance = INFINITY;
+        double best_distance = std::numeric_limits<double>::infinity();
         std::size_t best = kMaxSelected;
         for (std::size_t k = 0; k < tracker.count && k < kMaxSelected; ++k) {
             if (previous_used[k]) {
@@ -312,7 +313,7 @@ void generate_points(const Field& field, PointKind kind, std::size_t max_points,
     out.significant = 0;
     out.max_value = 0.0;
     max_points = std::min(max_points, kMaxSelected);
-    double sample_max = -INFINITY;
+    double sample_max = -std::numeric_limits<double>::infinity();
     for (std::size_t az = 0; az < kAzimuths; ++az) {
         for (std::size_t r = 0; r < kRanges; ++r) {
             out.max_value = std::fmax(out.max_value, field[az][r]);

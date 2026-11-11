@@ -16,7 +16,7 @@
 namespace fmofp::bc {
 
 constexpr std::uint8_t kMinorFramesPerMajor = 50;
-constexpr std::int64_t kMinorFramePeriodNs = 20 * 1000 * 1000;
+constexpr std::int64_t kMinorFramePeriodNs = std::int64_t{20} * 1000 * 1000;
 constexpr std::uint16_t kMajorFrameModulus = 1024;  // the sync word carries 10 bits of it
 constexpr std::size_t kMaxSlotsPerFrame = 32;
 constexpr std::size_t kMaxScheduledMessages = 160;

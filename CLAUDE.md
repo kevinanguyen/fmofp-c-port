@@ -162,12 +162,16 @@ person may continue it in their next session; when it is green it is rebased ont
   green (no `wip/` branch). Part 1 (`fb32655`, CI green, checked on Kevin's machine the same day: three demo runs
   on the optimised build with 0 overruns, section 7): the demo's overruns. Part 2
   (2026-11-11, section 7): the display processes' logs, the timing test, the coverage floors, the architecture
-  page. **Left in unit 30, each waiting on a human** (section 2.30): the MISRA-subset lint needs clang-tidy, which
-  is not installed on Alee's machine (cppcheck's misra addon cannot read C++); the debugging guide needs gdb
-  installed there to be tested as written; the ticket format is the humans' to decide (nothing in the repository
-  to follow). Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
-  `py FMOFP/Main.py` becomes). Last session: Alee's, 2026-11-11 (part 2); before it Kevin's check of part 1 and
-  Alee's part 1 the same day.
+  page (`cbc1fc1`, CI run 43114870513 all green, the first `coverage` job among them). Part 3 (2026-11-11,
+  section 7): the MISRA-subset lint (clang-tidy, `cmake --build build/<preset> --target lint`, in CI on the
+  `linux-gcc` leg) and the debugging guide (`ofp/docs/DEBUGGING.md`, every command run under gdb). **Left in
+  unit 30, waiting on the humans** (section 2.30): the ticket format (nothing in the repository says what a
+  ticket carries), and whether the release build becomes the gate's second leg. Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
+  `py FMOFP/Main.py` becomes). Last session: Alee's, 2026-11-11 (part 3); before it Alee's part 2, Kevin's check
+  of part 1 and Alee's part 1 the same day.
+- **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine. CI's clang-tidy is
+  Ubuntu's older one: if the first run of the `Lint (clang-tidy)` step finds something this one did not, or does
+  not know a check, fix the code or the check list in `ofp/.clang-tidy`, not the step.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866, the Windows 3.13 leg of 42729856922 and the Linux 3.14 leg of 42931963850); the two
@@ -374,6 +378,13 @@ narrowing; cppcheck's `misra.py` is MISRA C and reports `nullptr` as an unknown 
 `ofp/docs/DEBUGGING.md` (build, run and step one partition under gdb: write it with gdb at hand, every command
 run), the ticket format (`ofp/docs/TICKETS.md`, once the humans say what a ticket must carry), and the release
 build as the gate's second leg in `verify.sh` if the humans want it there (today it is a command, section 5.4).
+
+Part 3 done 2026-11-11 (section 7): the lint is `ofp/.clang-tidy` (each check beside the rule of `ofp/CLAUDE.md`
+it holds, and the three `bugprone` checks left out with the reason), `ofp/osal/.clang-tidy` (the sockets API's
+`sockaddr*` casts), `ofp/cmake/lint.py` (the flight sources from the compile database, less the mains and the
+tools) and the `lint` target, in CI on the `linux-gcc` leg; its findings, in six files, are all fixed in the
+code, none silenced. `ofp/docs/DEBUGGING.md` is the guide: a unit test, the stdin tool and a partition on the bus
+under gdb. Still open: the ticket format, and the release build as a gate leg, both the humans'.
 
 ---
 
@@ -597,7 +608,10 @@ pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w
 ```
 
 Versions that are known to work: g++ 16.2, cmake 4.4, ninja 1.13, gtest 1.18, cppcheck 2.21,
-gcovr 8.6. No sanitizers on MinGW: CI's `linux-asan` job covers that. Optional: GitHub CLI
+gcovr 8.6. No sanitizers on MinGW: CI's `linux-asan` job covers that. For the lint and the debugger (unit 30):
+`pacman -S --needed mingw-w64-ucrt-x86_64-clang-tools-extra mingw-w64-ucrt-x86_64-gdb` (clang-tidy 23.1, gdb 18.1;
+about 1 GB with clang; without clang-tidy the `lint` target does not exist and the gate does not miss it).
+On Linux: `apt-get install clang-tidy gdb`. Optional: GitHub CLI
 (`winget install GitHub.cli`, then `gh auth login`).
 
 ### 5.3 Linux (what CI installs)
@@ -619,6 +633,10 @@ bash B20SS/verify.sh icd py     # any subset, in order
 
 Coverage (unit 30): `cmake --preset coverage && cmake --build --preset coverage` from `B20SS/ofp/` runs the unit
 tests instrumented and prints one line per module with its floor (80 %); it fails when a module is under.
+
+The lint (unit 30): `cmake --build build/<preset> --target lint` from `B20SS/ofp/` (clang-tidy over the flight
+code, about 20 s; `ofp/.clang-tidy` lists the checks). It is not a step of `verify.sh` (Kevin's machine may not
+have clang-tidy): run it after touching C++ if you have it; CI runs it either way.
 
 The optimised build (unit 30): `cmake --preset windows-ucrt64-release && cmake --build --preset
 windows-ucrt64-release` from `B20SS/ofp/` (`linux-gcc-release` on Linux), into `build/<preset>-release/`; the
@@ -797,6 +815,17 @@ Python tests and displays
   77 % and the partitions' shared socket loop at 73 % (their mode command, self test and error paths untested).
 - A timing assertion on a desktop holds a mean, not a worst case: one answer is as slow as the machine's worst
   moment (17 ms from a partition whose mean was 0.19 ms, in a run where nothing was wrong).
+- A tolerance counted in frames in a free-running test is a tolerance on the build's speed: `test_scenario_e2e`
+  allowed an acknowledgement 5 frames after the engine's decision and failed two runs in three against the
+  optimised build (9 and 11 frames: the frames are a millisecond or two there). It allows 25 since unit 30 part 3.
+- clang-tidy reads GCC's compile line: it needs `--extra-arg=-Wno-unknown-warning-option` for GCC-only warning
+  flags (`cmake/lint.py` passes it), and from Git Bash a scratch path must reach MSYS2 as `C:/...`, not `/tmp/...`.
+- What the lint found that `-Wconversion` and cppcheck had not: `20 * 1000 * 1000` multiplied as `int` before it
+  widened to 64 bits, a `char` promoted with its sign into a bus word, the C macro `INFINITY` (a float narrowed
+  through a macro), two implicit 64-to-32-bit narrowings in the socket timeouts. Write the type at the literal.
+- gdb: `fmofp_bc` refuses `--timeout-ms` above 1000 (it prints its usage and exits, and the partition under gdb
+  waits for ever); a partition that exits at once under gdb could not bind its port; `watch` without `-l` dies
+  with the function's scope. A batch gdb run in a script wants `timeout 60` in front of it.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -1555,6 +1584,47 @@ done before this file existed are condensed from the private session notes.
   gtests, was 320), cppcheck clean, load unchanged (107 messages for 23 terminals, 8612 us); `cmake --build
   --preset coverage` OK. Meter unchanged, 27 / 29.5 = 92 % (unit 30 is in progress).
 
+### 2026-11-11 - unit 30 hardening, part 3: the MISRA-subset lint and the debugging guide - by Alee's agent
+- *What*: (1) The lint: `ofp/.clang-tidy` (no recursion; no malloc or owning raw pointers; no union access,
+  reinterpret, const or C-style casts; narrowing conversions; uninitialised variables and members; no goto; signed
+  bitwise; switch paths; explicit constructors; braces; unchecked C results; float loop counters; and `bugprone-*`
+  less `branch-clone`, `easily-swappable-parameters` and `exception-escape`, each with its reason in the file),
+  every finding an error; `ofp/osal/.clang-tidy` lets the operating system layer make the sockets API's
+  `sockaddr*` casts; `ofp/cmake/lint.py` takes the flight sources from the compile database (bus, osal, bc, each
+  partition's `src/`, less `main.cpp`, the stdin tools and the stub) and runs clang-tidy over them in parallel;
+  the `lint` target; a `Lint (clang-tidy)` step on CI's `linux-gcc` leg and in the Bitbucket file. (2) What it
+  found, fixed in the code: `kMinorFramePeriodNs` multiplied as `int` before widening (`schedule.hpp`); the socket
+  timeouts' 64-to-32-bit narrowing (`udp_win32.cpp`, `udp_posix.cpp`); characters promoted with their sign into
+  bus words and words shifted as `int` (`mission_computer.cpp`); a `size_t` narrowed into a 16-bit count
+  (`sar_radar.cpp`); the C macro `INFINITY` (`weather_products.cpp`, now `std::numeric_limits`). No value changed:
+  the oracle tests pass on both builds. (3) `ofp/docs/DEBUGGING.md`: a unit test under gdb (break, step, print,
+  watch), the stdin tool with a command file, a partition on the bus with `fmofp_bc` polling it (conditional
+  breakpoints on the frame, what a stopped terminal does to the bus), and a table of what goes wrong. (4)
+  `test_scenario_e2e`'s acknowledgement tolerance, 5 frames to 25.
+- *How*: Alee said yes to installing clang-tidy (23.1.5, with clang) and gdb (18.1) in MSYS2. cppcheck's MISRA
+  addon had been tried in part 2 and cannot read C++. The check list started from the rules of `ofp/CLAUDE.md`
+  and lost only checks whose findings were all the same non-defect. Every command of the guide was run with the
+  comms partition, the power tool and the unit tests, and the output in it is what gdb printed.
+- *Warnings / lessons*: the lint has run only on this machine's clang-tidy 23; CI installs Ubuntu's (older): its
+  first run is the test of the check list there, and of the two Linux-only files (`clock_posix.cpp`,
+  `udp_posix.cpp`), read by eye here. The lint is not in `verify.sh`: Kevin's machine has no clang-tidy, and the
+  gate must stay runnable on both. The scenario test failed two runs in three against the optimised build before
+  its tolerance changed (section 6): it had passed there the day before, so "green once" on a free-running test
+  is not "green". Under gdb the first live run ended at once with an odd exit code (the port was held by an
+  earlier experiment) and the second waited for ever (the controller refused `--timeout-ms 2000`): both are in
+  the guide's table. The stuck gdb and partition were stopped by hand.
+- *CI*: `cbc1fc1` (part 2) run 43114870513 all green, the first `coverage` job included (the runner's gcov
+  agreed with the floors); `34479ad` (Kevin's check) run 43114263529 all green. This part's run is to be
+  recorded.
+- *Files*: `ofp/.clang-tidy`, `ofp/osal/.clang-tidy`, `ofp/cmake/lint.py`, `ofp/CMakeLists.txt`,
+  `ofp/bc/include/fmofp/bc/schedule.hpp`, `ofp/osal/src/{udp_win32,udp_posix}.cpp`,
+  `ofp/partitions/mission/src/mission_computer.cpp`, `ofp/partitions/radar/src/{sar_radar,weather_products}.cpp`,
+  `ofp/docs/DEBUGGING.md`, `ofp/README.md`, `fmofp_bus/tests/test_scenario_e2e.py`, both CI files, this file.
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load) on the debug build; on the optimised one `cpp` and `load`
+  OK and the Python suite 303 OK three runs in a row after the tolerance change; ctest 2/2 on both (325 gtests),
+  cppcheck clean, `lint: OK (41 flight sources, no finding)` in about 20 s. Meter unchanged, 27 / 29.5 = 92 %
+  (unit 30 is in progress: the ticket format is left).
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1661,3 +1731,11 @@ done before this file existed are condensed from the private session notes.
   written beside `OFP_COVERAGE_FLOORS`. The timing test holds means, not worst cases. The display programs are
   quiet by default. Not decided, waiting on the humans: installing clang-tidy and gdb on Alee's machine (the lint,
   the debugging guide), and what an intern ticket must carry (the ticket format).
+- 2026-11-11, Alee ("Yes, install both") and Alee's agent: part 3's choices. The MISRA-subset lint is clang-tidy
+  with a check list drawn from the rules of `ofp/CLAUDE.md`, every finding an error, over the flight code only
+  (not the mains, the stdin tools or the tests); a finding is fixed in the code, and a line kept as it is carries
+  `// NOLINT(check-name): reason`; three `bugprone` checks are off for stated reasons and the operating system
+  layer alone may `reinterpret_cast`. The lint runs in CI and by hand, not in `verify.sh` (the gate must run on a
+  machine without clang-tidy); either human may move it into the gate once both machines have it.
+  `test_scenario_e2e`'s acknowledgement tolerance is 25 frames. Still the humans': the ticket format, and the
+  release build as a second gate leg.

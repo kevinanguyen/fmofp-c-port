@@ -432,6 +432,7 @@ optimisation changed no computed word. CI builds and unit-tests it (`linux-gcc-r
 
 ```bash
 cmake --build build/<preset> --target cppcheck     # static analysis, fails on any finding
+cmake --build build/<preset> --target lint         # clang-tidy, the MISRA-style subset, fails on any finding
 cmake --preset coverage && cmake --build --preset coverage   # tests + gcovr report + the floor per module
 ```
 
@@ -445,7 +446,19 @@ those runs), and the generated code has generated tests. A module with a reason 
 lower gets its own floor: `-DOFP_COVERAGE_FLOORS="partitions/x=70"`, with the reason in
 `CMakeLists.txt`. CI runs it (`coverage`).
 
-The intern's reading list is `docs/`: start with `docs/ARCHITECTURE.md`.
+The lint is clang-tidy with `.clang-tidy` in this directory: the rules of `CLAUDE.md` that a
+tool can hold (no recursion, no heap, no unions or reinterpreting casts, no unchecked
+narrowing, every value initialised, every result that can fail looked at, and the
+`bugprone` checks), each check listed there beside the rule it stands for. It runs over
+the flight code only (`cmake/lint.py` picks `bus`, `osal`, `bc` and every partition's
+`src/` from the compile database, less the mains and the stdin tools) and needs
+clang-tidy installed (`pacman -S mingw-w64-ucrt-x86_64-clang-tools-extra` in UCRT64,
+`apt-get install clang-tidy` on Linux); without it the target does not exist. To keep a
+line as it is, say why on it: `// NOLINT(check-name): reason`. CI runs it on the
+`linux-gcc` leg.
+
+The intern's reading list is `docs/`: `docs/ARCHITECTURE.md` first, then
+`docs/DEBUGGING.md` (one partition under gdb: a unit test, the stdin tool, on the bus).
 
 ## Generated code
 

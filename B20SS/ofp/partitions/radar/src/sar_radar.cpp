@@ -340,7 +340,7 @@ std::size_t ChangeDetector::process(const SarImage& image, ChangeEvent* out, std
     erode(tmp_, mask_);
     regions_ = label(mask_);
     std::size_t written = 0;
-    const std::size_t considered = std::min(regions_, kChangeMaxEvents);
+    const auto considered = static_cast<std::uint16_t>(std::min(regions_, kChangeMaxEvents));
     for (std::uint16_t id = 1; id <= considered; ++id) {
         std::size_t area = 0;
         std::size_t sum_rows = 0;
