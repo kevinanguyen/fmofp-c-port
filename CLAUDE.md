@@ -98,8 +98,8 @@ person may continue it in their next session; when it is green it is rebased ont
 
 - **Branch** `port/cpp` on `origin` = github.com/kevinanguyen/fmofp-c-port (renamed from
   `fmofp` on 2026-11-04; the old URL redirects, new clones use the new name). HEAD: see
-  `git log -1`. Last milestone: unit 17 avionics, ICD v1.20 (2026-11-10, section 7; landed after
-  v1.22; its CI run is to be recorded). Before it: `888eafe` unit 20 small utilities, ICD v1.22
+  `git log -1`. Last milestone: `6497634` unit 17 avionics, ICD v1.20 (2026-11-10, section 7; landed
+  after v1.22; CI run 42925246480 all ten jobs green). Before it: `888eafe` unit 20 small utilities, ICD v1.22
   (2026-11-10, section 7; CI run 42900090742 green), `337820b` unit 19 flight surfaces, ICD v1.21 (2026-11-10, CI run
   42885140093, section 7), `a63556e` unit 16 power management, ICD v1.19 (2026-11-08; CI run
   42507980864 all ten jobs green), `c4057ed` (unit
@@ -136,8 +136,11 @@ person may continue it in their next session; when it is green it is rebased ont
   frames, 0 overruns, 22/22 answering. On Alee's machine with 23: 23/23 answering on every line, 0
   overruns with `--no-events` (worst frame 16 ms), but 21-36 overruns in 1500 frames with the scripted
   events on; the same machine overruns 9-24 times on `888eafe` without the avionics terminal (section 7,
-  2026-11-10): it does not hold the real-time demo under the events' load either way. To be measured on
-  Kevin's machine with 23 terminals.
+  2026-11-10): it does not hold the real-time demo under the events' load either way. On Kevin's machine
+  with 23 terminals (2026-11-10, after the landing): 1500 frames, 2 overruns with the events on (worst
+  frame 24.5 ms; 0 overruns with 22 terminals the same day), 0 overruns without (worst 13.6 ms), 23/23
+  answering: the reference machine is at the edge too. Unit 28 adds no terminal; the timing work is unit
+  30's first job (section 2.30).
 - **Tests**: Python 261 OK (`fmofp_bus/tests`, about 53 s on Windows); C++ ctest 2/2
   (319 hand-written gtests + generated ICD round-trip tests), cppcheck clean; CI (`.github/
   workflows/ci.yml` job `cpp`, linux-gcc + linux-asan, and Alee's eight Python legs).
@@ -148,7 +151,8 @@ person may continue it in their next session; when it is green it is rebased ont
   stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
   lint only.
 - **Open work / claims**: none. No `wip/` branches (`wip/unit17-avionics` was rebased onto `888eafe`,
-  landed as one commit and deleted, 2026-11-10). Last session: Alee's, 2026-11-10 (unit 17 finished).
+  landed as one commit and deleted, 2026-11-10). Last session: Kevin's, 2026-11-10 (the check after unit 17
+  landed: gate green here, the 23-terminal demo measured); before it Alee's, 2026-11-10 (unit 17 finished).
   Kevin's next unit by his own note: 28 scenario engine + CLI (ICD v1.23), then 29 last, 30. For unit
   28: the scenario engine's failure injection is `AVN_CMD FORCE_FAULT` / `CLEAR_FAULT` /
   `CLEAR_ALL_FAULTS` with `fmofp_bus.avionics.key_fields(<system>)` (section 2.17), and the demo's
@@ -332,6 +336,13 @@ MFD log grows 2 MB per three minutes); the intern documents: how to build, run a
 partition under gdb, the architecture page, the ticket format. Cheap backlog items from the
 ICD README section 12 can ride along (a plant whose airspeed answers the thrust, engine
 spool-up).
+
+First job (added 2026-11-10 after unit 17 landed): the real-time demo's overruns with 23 terminals (section 1:
+2 in 1500 frames on Kevin's machine with the events on, 21-36 on Alee's). Candidates, cheapest first:
+`AVN_STATUS` at 1 Hz instead of 5 (its content changes once a second); `PLANT_SENSORS` as one broadcast
+instead of five 50 Hz relays (about 1 ms of every minor frame, ICD README section 12); the display terminals'
+poll answering (Python processes on a loaded machine); the controller's response timeout and what it does
+with a late answer. The timing test of this unit then pins what was gained.
 
 ---
 
@@ -1279,6 +1290,22 @@ done before this file existed are condensed from the private session notes.
 - *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 261 OK (was 239), ctest 2/2 (319 gtests),
   cppcheck clean; load 107 messages for 23 terminals, worst minor frame 8612 us (was 8492 for 22); meter
   25.5 / 29.5 = 86 %.
+
+### 2026-11-10 - check after unit 17 landed; the 23-terminal demo measured on Kevin's machine - by Kevin's agent
+- *What*: section 0.1 on Kevin's machine after Alee's push: the pull brought `6497634` (unit 17, rebased onto
+  `888eafe`, one commit, as the protocol asks; the `wip/unit17-avionics` branch is gone on GitHub, the stale
+  remote-tracking ref here pruned with `git fetch --prune`), this file re-read, upstream/main still `4c25f52`.
+  No code changed.
+- *Checked here*: `bash B20SS/verify.sh` on `6497634`: OK (icd cpp py load), Python 261 OK in 50 s, ctest 2/2
+  (319 gtests), cppcheck clean, load 107 messages for 23 terminals, worst minor frame 8612 us, the same numbers
+  as Alee's. The headless demo, 30 s, 23 terminals: with the scripted events 1500 frames, 2 overruns, worst
+  frame 24.5 ms, 23/23 answering; with `--no-events` 0 overruns, worst 13.6 ms. The reference machine held 22
+  terminals at 0 overruns the same day: the margin is gone, as Alee suspected, though far from his 21-36.
+  Unit 28 adds no terminal (the scenario engine and the CLI are clients of the controller); the timing work
+  goes to unit 30 (section 2.30).
+- *CI*: `6497634` run 42925246480 all ten jobs green; `888eafe` (unit 20) run 42900090742 green (recorded by
+  Alee).
+- *Numbers*: meter unchanged, 25.5 / 29.5 = 86 %.
 
 ---
 
