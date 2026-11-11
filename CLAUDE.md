@@ -141,8 +141,8 @@ person may continue it in their next session; when it is green it is rebased ont
   answering: on Alee's machine 26-42 overruns before unit 30's first part and, after it (2026-11-11), 0-9 on the
   debug build (seven runs: 7, 1, 7, 0, 6, 4, 9) and 0-6 on the optimised build (1, 5, 6, 1, 0, 0, and one run of 91
   in which 69 frames started late and every terminal was slow at once: the machine, section 7). Kevin's machine,
-  before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; **to be measured there
-  with the optimised build**. `fmofp_bc --report` now says which terminal held each overrun frame up (section
+  before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
+  optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
 - **Tests**: Python 298 OK (`fmofp_bus/tests`, about 65 s on Kevin's machine, 80 s on Alee's); C++
   ctest 2/2 (320 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
@@ -160,8 +160,9 @@ person may continue it in their next session; when it is green it is rebased ont
   CRC in C, the optimised build preset the demo prefers, the controller's timing report, test port bases that
   step off Windows' reserved ranges). Left in unit 30 (section 2.30): the timing test, gcovr thresholds in CI, the
   MISRA-subset lint, the display processes' loggers at WARNING, the intern documents. Then unit 29, last (it cuts
-  the upstream line, section 2.29; both humans decide what `py FMOFP/Main.py` becomes). Last session: Alee's,
-  2026-11-11.
+  the upstream line, section 2.29; both humans decide what `py FMOFP/Main.py` becomes). Last session: Kevin's,
+  2026-11-11 (the check after part 1 landed: the gate green here on both builds, the optimised build's demo
+  measured); before it Alee's part 1 the same day.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866, the Windows 3.13 leg of 42729856922 and the Linux 3.14 leg of 42931963850); the two
@@ -1464,6 +1465,24 @@ done before this file existed are condensed from the private session notes.
   Python 298 OK (was 291: `test_support.py` 5, one in `test_block.py`, one in `test_demo.py`), ctest 2/2
   on both (320 gtests), cppcheck clean, load unchanged (107 messages for 23 terminals, 8612 us). Meter unchanged,
   27 / 29.5 = 92 % (unit 30 is in progress).
+
+### 2026-11-11 - check after unit 30 part 1 landed; the optimised build flown on Kevin's machine - by Kevin's agent
+- *What*: section 0.1 on Kevin's machine: tree clean, the pull brought Alee's `f4ee9e3` (the claim of unit 30) and
+  `fb32655` (part 1: 37 files), this file re-read in full, upstream/main still `4c25f52`, no `wip/` branch, no pull
+  request. Unit 30 is Alee's (claimed 2026-11-11, landing in parts) and unit 29 is last by design (section 2.29):
+  nothing to claim on this side today. No code changed.
+- *Checked here*: `bash B20SS/verify.sh` on `fb32655` (the debug build): OK (icd cpp py load): ctest 2/2 (320 gtests), cppcheck clean, Python 298 OK in 63 s, load 107 messages for 23 terminals, worst minor frame 8612 us, the same numbers as Alee's. The optimised build, which
+  this machine had not flown: `cmake --preset windows-ucrt64-release && cmake --build --preset
+  windows-ucrt64-release` from `B20SS/ofp/`, then `PRESET=windows-ucrt64-release bash B20SS/verify.sh cpp py load`:
+  OK (cpp py load): the preset configured and built under -Werror without a change, ctest 2/2 (320 gtests), cppcheck clean, the whole Python suite 298 OK in 62 s against the optimised binaries, load unchanged. The headless demo, 30 s, 23 terminals, the scripted events on, now flying the optimised build
+  (the launcher found `build/windows-ucrt64-release/`): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent. The controller's timing lines
+  (`logs/demo/bc.log`): overruns_late_start=0, worst_wake_late_us 1139-1698; every terminal overruns_slowest=0; the C++ partitions answer in 54-84 us on average with worst answers of 0.3-1.4 ms (the radar computer 62 us, worst 1.4 ms), the plant in 108 us (worst 1.4 ms), the display terminals in 108-450 us (the MFD 108 us, worst 1.3 ms; the TSD and the SMS the slowest at 345-450 us): the machine that gave 2-3 overruns a day earlier gives none. Before part 1 this machine gave 2-3 overruns in 1500 frames (13 in a run
+  right after the gate).
+- *CI*: `fb32655` run 43106860923 all eleven jobs green, the first `linux-gcc-release` job among them (1m48s: the
+  runner's older GCC warned nowhere, so nothing to fix); `f4ee9e3` (the claim, a documents-only commit) run
+  43045647662 red on `linux-gcc` only, in its "Install toolchain" step after 40 min 56 s (an apt hang on the runner,
+  before any step of ours ran), its Lint job green.
+- *Numbers*: meter unchanged, 27 / 29.5 = 92 % (unit 30 in progress).
 
 ---
 
