@@ -232,7 +232,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 26 | SMS on the bus | 0.5 | DONE 2026-11-02 |
 | 27 | HUD on the bus | 0.5 | STRUCK 2026-11-02 (the Python HUD is an empty placeholder; removed from the total) |
 | 28 | Scenario engine + debug CLI on the bus | 1.5 | DONE 2026-11-10 |
-| 29 | Retire the old Python messaging stack and the radar bridge | 1 | open |
+| 29 | Retire the old Python messaging stack and the radar bridge | 1 | IN PROGRESS (Alee, 2026-11-12) |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | IN PROGRESS (Alee, 2026-11-11) |
 
 **Done: 27 / 29.5 = 92 %.** Open: 2 units (29, 30).
@@ -1846,3 +1846,9 @@ done before this file existed are condensed from the private session notes.
 - 2026-11-12, Alee ("change focus back on to completing the project before worrying about how the interns will
   submit their work"): the ticket draft's five remaining questions wait until the port is done. Finishing the
   port comes first: unit 29, and closing unit 30.
+- 2026-11-12, Alee ("Cut imports, delete all"): unit 29 takes way (a) of section 2.29: the imports of the old
+  messaging are cut out of the frozen modules the port keeps, and `local_messaging`, `MIL_STD_1553B` and
+  `Interfaces/userInterface/messaging` are deleted whole with their tests; the oracle tests arbitrate that no
+  logic moved. This edits the frozen Python (section 0.5's exception is this unit) and cuts the upstream line:
+  later `TubAleeLo/fmofp` changes to those files will not merge. Kevin has not been asked and may overrule
+  before or after it lands (it is one commit, revertible).
