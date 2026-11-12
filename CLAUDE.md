@@ -164,14 +164,16 @@ person may continue it in their next session; when it is green it is rebased ont
   (2026-11-11, section 7): the display processes' logs, the timing test, the coverage floors, the architecture
   page (`cbc1fc1`, CI run 43114870513 all green, the first `coverage` job among them). Part 3 (2026-11-11,
   section 7): the MISRA-subset lint (clang-tidy, `cmake --build build/<preset> --target lint`, in CI on the
-  `linux-gcc` leg) and the debugging guide (`ofp/docs/DEBUGGING.md`, every command run under gdb). **Left in
-  unit 30, waiting on the humans** (section 2.30): the ticket format (nothing in the repository says what a
-  ticket carries), and whether the release build becomes the gate's second leg. Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
-  `py FMOFP/Main.py` becomes). Last session: Alee's, 2026-11-11 (part 3); before it Alee's part 2, Kevin's check
-  of part 1 and Alee's part 1 the same day.
-- **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine. CI's clang-tidy is
-  Ubuntu's older one: if the first run of the `Lint (clang-tidy)` step finds something this one did not, or does
-  not know a check, fix the code or the check list in `ofp/.clang-tidy`, not the step.
+  `linux-gcc` leg) and the debugging guide (`ofp/docs/DEBUGGING.md`, every command run under gdb), `66be6ef`, CI
+  run 43121089010 all twelve jobs green. Part 4 (2026-11-12, section 7): **a draft** of the ticket format,
+  `ofp/docs/TICKETS.md`, marked DRAFT, with six questions for both humans at its end. **Left in unit 30,
+  waiting on the humans** (section 2.30): their answers to those questions (then the DRAFT box comes off and
+  the unit is done), and whether the release build becomes the gate's second leg. Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
+  `py FMOFP/Main.py` becomes). Last session: Alee's, 2026-11-12 (the ticket format draft); before it Alee's
+  parts 1-3 and Kevin's check of part 1, all 2026-11-11.
+- **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine, and green on CI's
+  older clang-tidy (run 43121089010). If a later run of the `Lint (clang-tidy)` step finds something, fix the
+  code or the check list in `ofp/.clang-tidy`, not the step.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
   leg of 42435137866, the Windows 3.13 leg of 42729856922 and the Linux 3.14 leg of 42931963850); the two
@@ -385,6 +387,13 @@ it holds, and the three `bugprone` checks left out with the reason), `ofp/osal/.
 tools) and the `lint` target, in CI on the `linux-gcc` leg; its findings, in six files, are all fixed in the
 code, none silenced. `ofp/docs/DEBUGGING.md` is the guide: a unit test, the stdin tool and a partition on the bus
 under gdb. Still open: the ticket format, and the release build as a gate leg, both the humans'.
+
+Part 4, 2026-11-12 (section 7): `ofp/docs/TICKETS.md` is a **draft** of the ticket format, written at Alee's
+asking for both humans to review: where tickets come from (the ICD README's sections 2 and 12, the tools'
+floors, planted faults), the eleven fields a ticket carries, what done means for every ticket, how an oracle
+test is split when a ticket departs from the Python, one ticket written out (OFP-001, the fitness check), and
+six open questions (where tickets live, hints, planted-fault tickets, how interns submit, the level scale, the
+SSTR tickets as a model). The unit is done when the humans have answered them and the DRAFT box is removed.
 
 ---
 
@@ -1625,6 +1634,24 @@ done before this file existed are condensed from the private session notes.
   cppcheck clean, `lint: OK (41 flight sources, no finding)` in about 20 s. Meter unchanged, 27 / 29.5 = 92 %
   (unit 30 is in progress: the ticket format is left).
 
+### 2026-11-12 - unit 30 hardening, part 4: a draft of the ticket format; CI of part 3 - by Alee's agent
+- *What*: section 0.1 first: tree clean, nothing new on `origin` since `66be6ef`, upstream/main still `4c25f52`,
+  no `wip/` branch. Then, at Alee's "Draft a format": `ofp/docs/TICKETS.md`, marked DRAFT (section 2.30 says
+  what is in it), and a line for it in `ofp/README.md`. No code changed.
+- *How*: the format is built on what the port already keeps: the ICD README's section 2 rows are the defect
+  tickets, its section 12 the feature tickets. The written-out ticket (the fitness check's equality, unit 17)
+  was run through `fmofp_avionics_tool` before it was written (`fitness 99 99` is OK, `90 10` CRITICAL, `80 10`
+  WARNING, `81 10` OK).
+- *Warnings / lessons*: running the example found what memory had wrong: the terminal's placeholder readings
+  are processor 75 and memory 80 against a memory warning threshold of 75, so fixing the comparison turns all
+  three components to WARNING on the bus for good; the ticket says so. A ticket's "what happens now" must be
+  pasted output. Nothing in the format is decided: the six questions at its end are the humans'.
+- *CI*: `66be6ef` (part 3) run 43121089010 all twelve jobs green, the first `Lint (clang-tidy)` step among them:
+  Ubuntu's older clang-tidy knew every check and found nothing, the two Linux-only OSAL files included.
+- *Files*: `ofp/docs/TICKETS.md`, `ofp/README.md`, this file.
+- *Tests and numbers*: `verify.sh icd` OK (documents only). Meter unchanged, 27 / 29.5 = 92 % (unit 30 in
+  progress until the draft is settled).
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1739,3 +1766,6 @@ done before this file existed are condensed from the private session notes.
   machine without clang-tidy); either human may move it into the gate once both machines have it.
   `test_scenario_e2e`'s acknowledgement tolerance is 25 frames. Still the humans': the ticket format, and the
   release build as a second gate leg.
+- 2026-11-12, Alee ("Draft a format"): the agent drafts the ticket format for both humans to review. It is a
+  proposal (`ofp/docs/TICKETS.md`, marked DRAFT), not a decision: the format, and the six questions at its end,
+  are settled when Alee and Kevin say so here.

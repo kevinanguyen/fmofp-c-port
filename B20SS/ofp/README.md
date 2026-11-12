@@ -459,6 +459,7 @@ line as it is, say why on it: `// NOLINT(check-name): reason`. CI runs it on the
 
 The intern's reading list is `docs/`: `docs/ARCHITECTURE.md` first, then
 `docs/DEBUGGING.md` (one partition under gdb: a unit test, the stdin tool, on the bus).
+`docs/TICKETS.md` is a draft of the intern ticket format, under review.
 
 ## Generated code
 
