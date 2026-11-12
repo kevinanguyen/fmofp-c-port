@@ -131,10 +131,10 @@ The example's output was run as shown, and its side effect was found by running 
 
 1. **Where do tickets live?** *Answered, Alee, 2026-11-12: issues on the tracker.* The fields of section 2 are
    the issue template `.github/ISSUE_TEMPLATE/intern-ticket.md` (label `intern-ticket`); a ticket's id is in
-   its title. Still open under this: **which tracker**. Issues are switched off on the fork
-   (`kevinanguyen/fmofp-c-port`, a GitHub default for forks: Kevin turns them on under Settings > General >
-   Features); they are on at `TubAleeLo/fmofp`, which does not have the C++; Bitbucket has no template files
-   (the fields would be pasted from this page).
+   its title. *The tracker, Alee, 2026-11-12: the fork's GitHub*, `kevinanguyen/fmofp-c-port`, beside the
+   code and its pull requests. **To do, Kevin (the owner)**: issues are switched off there, a GitHub default
+   for forks: turn them on under Settings > General > Features > Issues, and create the label
+   `intern-ticket`. Until then the template shows nowhere.
 2. **Hints**: in the ticket, on a separate page the mentor holds, or none?
 3. **Are Investigation tickets wanted** (a fault planted on a branch for the intern to find)? They teach the
    debugger best and cost the author the most.

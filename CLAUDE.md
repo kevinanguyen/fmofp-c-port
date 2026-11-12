@@ -168,8 +168,9 @@ person may continue it in their next session; when it is green it is rebased ont
   run 43121089010 all twelve jobs green. Part 4 (2026-11-12, section 7): **a draft** of the ticket format,
   `ofp/docs/TICKETS.md`, marked DRAFT, with six questions for both humans at its end; the first is answered
   (Alee, 2026-11-12: tickets are tracker issues; the template is `.github/ISSUE_TEMPLATE/intern-ticket.md`, but
-  **issues are switched off on the fork: Kevin's setting**). **Left in unit 30, waiting on the humans**
-  (section 2.30): which tracker, and the other five questions (then the DRAFT box comes off and the unit is done), and whether the release build becomes the gate's second leg. Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
+  the tracker is this fork's GitHub). **Kevin, one thing to do as the owner: issues are switched off on the
+  fork; turn them on (Settings > General > Features > Issues) and create the label `intern-ticket`.** **Left
+  in unit 30, waiting on the humans** (section 2.30): the draft's other five questions (then the DRAFT box comes off and the unit is done), and whether the release build becomes the gate's second leg. Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
   `py FMOFP/Main.py` becomes). Last session: Alee's, 2026-11-12 (the ticket format draft); before it Alee's
   parts 1-3 and Kevin's check of part 1, all 2026-11-11.
 - **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine, and green on CI's
@@ -1665,6 +1666,14 @@ done before this file existed are condensed from the private session notes.
 - *Files*: `.github/ISSUE_TEMPLATE/intern-ticket.md`, `ofp/docs/TICKETS.md`, this file.
 - *Tests and numbers*: `verify.sh icd` OK (documents only). Meter unchanged, 27 / 29.5 = 92 %.
 
+### 2026-11-12 - the tracker is the fork's GitHub - by Alee's agent
+- *What*: Alee chose the fork's GitHub issues as the tracker (section 8); `ofp/docs/TICKETS.md` and section 1
+  say so, with Kevin's one step (switch issues on, create the label). No code changed.
+- *CI*: `a3f01c4` run 43325183135 and `a81228e` run 43325725130 (both documents only) were still in progress
+  when this was written: to be recorded.
+- *Files*: `ofp/docs/TICKETS.md`, this file.
+- *Tests and numbers*: `verify.sh icd` OK. Meter unchanged, 27 / 29.5 = 92 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1787,3 +1796,6 @@ done before this file existed are condensed from the private session notes.
   decided: which tracker. Issues are off on the fork (GitHub's default for a fork; turning them on is Kevin's,
   as the owner), on at `TubAleeLo/fmofp` (which has no C++), and Bitbucket takes no template file. The draft's
   other five questions are still open.
+- 2026-11-12, Alee ("The fork's GitHub"): the tracker for intern tickets is the fork's own GitHub issues
+  (`kevinanguyen/fmofp-c-port`), beside the code and the pull requests. It needs Kevin, as the owner, to switch
+  issues on and create the `intern-ticket` label; Kevin may overrule the choice when he does.
