@@ -171,8 +171,11 @@ person may continue it in their next session; when it is green it is rebased ont
   the tracker is this fork's GitHub). **Kevin, one thing to do as the owner: issues are switched off on the
   fork; turn them on (Settings > General > Features > Issues) and create the label `intern-ticket`.** **Left
   in unit 30, waiting on the humans** (section 2.30): the draft's other five questions (then the DRAFT box comes off and the unit is done), and whether the release build becomes the gate's second leg. Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
-  `py FMOFP/Main.py` becomes). Last session: Alee's, 2026-11-12 (the ticket format draft); before it Alee's
-  parts 1-3 and Kevin's check of part 1, all 2026-11-11.
+  `py FMOFP/Main.py` becomes). **Unit 29 was scoped on 2026-11-12 and is not a plain deletion** (section 2.29: 22
+  frozen modules the oracles and displays import reach into the stacks to delete; three ways forward, the
+  humans' choice; not claimed). The ticket draft's five questions are parked until the port is done (Alee,
+  section 8). Last session: Alee's, 2026-11-12; before it Alee's parts 1-3 and Kevin's check of part 1, all
+  2026-11-11.
 - **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine, and green on CI's
   older clang-tidy (run 43121089010). If a later run of the `Lint (clang-tidy)` step finds something, fix the
   code or the check list in `ofp/.clang-tidy`, not the step.
@@ -339,6 +342,29 @@ aircraft). Both CI files change (Alee's Python jobs test the deleted stack). **D
 last among the port units**: Alee's upstream still edits these files every week, so after
 this unit upstream merges will conflict and the merge rule (section 4.4) stops the pulling;
 tell both humans that the upstream line is cut from then on.
+
+Scoped 2026-11-12 (section 7), before any deletion; **the plan above is too simple**. The port still imports 59
+frozen modules directly (the oracle tests, the display processes, the scenario parser) and 165 with everything
+they import; 22 of those 165 import the three packages to be deleted (`local_messaging`, `MIL_STD_1553B`,
+`Interfaces/userInterface/messaging`: 176 modules together). Which 22: the five radars (`weather_radar`,
+`tfr_radar`, `targeting_radar`, `aewc_radar`, `sar_radar`: the 1553 library and the display bridge), the radar
+messenger and its handlers, `fuelControl`, `flight_control_system`, the FMS and FCS completion handlers,
+`fms_message_processor`, `missionControl`, `scenarioEngine`, `core/event_driven_communication`, and on the
+display side `mfd.py`, `mode_node`, `display_tree_manager`, the radar data coordinator and the weather display's
+message adapter. At import time alone those need 59 of the 176 modules (23,400 lines: `RT_socket`, `BC_socket`,
+`message_schemas`, `metadata_codec`, `MessageRoutingService`, `RadarMessageHandler`, the message
+configurations); through imports inside functions, 121 (60,000 lines). So deleting the stacks breaks the oracle
+tests and the displays unless one of these is chosen, by the humans:
+(a) **cut the imports out of the 22 frozen modules** (an edit of the frozen Python, which this unit is the one
+place for), delete all 176 modules and their tests, the oracles then proving the cut changed no logic;
+(b) delete only what nothing kept reaches at import time (about 117 modules, 37,000 lines) and keep a 59-module
+residue, with function-level imports left to fail if ever called;
+(c) delete nothing: `Main.py` becomes the demo launcher and the old stack is left, marked retired.
+Also not needed by the port and not in the three packages: about 140 modules (the Python services' own
+messengers, `predefinedMessages`, `Utils/message_loop_prevention`, the old `Systems/comms`), and `FMOFP/Tests`
+(51 files, 17,000 lines), which both CI files' Python legs run (`ci_test_boot_smoke.py`, `run_all_tests.py`).
+The scripts that measured this are in the session scratchpad (`scope29.py`, `scope29b.py`: static, by `ast`);
+rewrite them rather than look for them.
 
 ### 2.30 Hardening, 1.5
 
@@ -1674,6 +1700,24 @@ done before this file existed are condensed from the private session notes.
 - *Files*: `ofp/docs/TICKETS.md`, this file.
 - *Tests and numbers*: `verify.sh icd` OK. Meter unchanged, 27 / 29.5 = 92 %.
 
+### 2026-11-12 - back to finishing the port: unit 29 scoped, not started - by Alee's agent
+- *What*: Alee: finish the project before the questions of how interns submit work. The ticket draft's five
+  open questions are parked (section 8). Unit 29 scoped by reading the imports (section 2.29): no file deleted,
+  no unit claimed, no code changed.
+- *How*: two scratch scripts walk every `import` with `ast` from the port's six packages into `B20SS/FMOFP`,
+  transitively, and report where the kept modules reach into the three packages to be deleted, at module top
+  level and inside functions.
+- *Warnings / lessons*: the 2.29 plan ("delete what the bus replaced") assumed the frozen modules the oracles
+  import stand alone. They do not: the radars import the 1553 library and the display bridge at the top of the
+  file, so `import weather_radar` runs `RT_socket`, `message_schemas` and `MessageRoutingService`. Unit 29 is
+  either an edit of 22 frozen modules or a partial deletion, and needs the humans' choice before a claim. The
+  count is static: it does not see `importlib` or string imports (the oracle tests are the real check).
+- *CI*: `6cd419c` run 43326244745 and `a81228e` run 43325725130 all green. `a3f01c4` (the draft, documents only)
+  run 43325183135 red on the Linux Python 3.10 leg's "Run full test suite" (Alee's suite; which test was not
+  read: the commit touched no code and the next two runs of the same tree are green), the `cpp` jobs green.
+- *Files*: this file.
+- *Tests and numbers*: `verify.sh icd` OK (documents only). Meter unchanged, 27 / 29.5 = 92 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1799,3 +1843,6 @@ done before this file existed are condensed from the private session notes.
 - 2026-11-12, Alee ("The fork's GitHub"): the tracker for intern tickets is the fork's own GitHub issues
   (`kevinanguyen/fmofp-c-port`), beside the code and the pull requests. It needs Kevin, as the owner, to switch
   issues on and create the `intern-ticket` label; Kevin may overrule the choice when he does.
+- 2026-11-12, Alee ("change focus back on to completing the project before worrying about how the interns will
+  submit their work"): the ticket draft's five remaining questions wait until the port is done. Finishing the
+  port comes first: unit 29, and closing unit 30.
