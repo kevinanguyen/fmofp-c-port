@@ -21,7 +21,8 @@ supply:
 
 ## 2. What a ticket carries
 
-Every ticket has these fields, in this order. A field that does not apply says "none", it is not left out.
+A ticket is an issue on the tracker, opened from the "Intern ticket" template
+(`.github/ISSUE_TEMPLATE/intern-ticket.md`), which lays these fields out. Every ticket has these fields, in this order. A field that does not apply says "none", it is not left out.
 
 | Field | What goes in it |
 |---|---|
@@ -128,9 +129,12 @@ The example's output was run as shown, and its side effect was found by running 
 
 ## 6. Open questions for Alee and Kevin
 
-1. **Where do tickets live?** Markdown files in the repository (`B20SS/ofp/tickets/OFP-001.md`, reviewed like
-   code, visible to interns as they are) or issues on the tracker (GitHub or Bitbucket, with the fields above
-   as an issue template)? The draft works for either.
+1. **Where do tickets live?** *Answered, Alee, 2026-11-12: issues on the tracker.* The fields of section 2 are
+   the issue template `.github/ISSUE_TEMPLATE/intern-ticket.md` (label `intern-ticket`); a ticket's id is in
+   its title. Still open under this: **which tracker**. Issues are switched off on the fork
+   (`kevinanguyen/fmofp-c-port`, a GitHub default for forks: Kevin turns them on under Settings > General >
+   Features); they are on at `TubAleeLo/fmofp`, which does not have the C++; Bitbucket has no template files
+   (the fields would be pasted from this page).
 2. **Hints**: in the ticket, on a separate page the mentor holds, or none?
 3. **Are Investigation tickets wanted** (a fault planted on a branch for the intern to find)? They teach the
    debugger best and cost the author the most.

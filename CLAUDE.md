@@ -166,9 +166,10 @@ person may continue it in their next session; when it is green it is rebased ont
   section 7): the MISRA-subset lint (clang-tidy, `cmake --build build/<preset> --target lint`, in CI on the
   `linux-gcc` leg) and the debugging guide (`ofp/docs/DEBUGGING.md`, every command run under gdb), `66be6ef`, CI
   run 43121089010 all twelve jobs green. Part 4 (2026-11-12, section 7): **a draft** of the ticket format,
-  `ofp/docs/TICKETS.md`, marked DRAFT, with six questions for both humans at its end. **Left in unit 30,
-  waiting on the humans** (section 2.30): their answers to those questions (then the DRAFT box comes off and
-  the unit is done), and whether the release build becomes the gate's second leg. Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
+  `ofp/docs/TICKETS.md`, marked DRAFT, with six questions for both humans at its end; the first is answered
+  (Alee, 2026-11-12: tickets are tracker issues; the template is `.github/ISSUE_TEMPLATE/intern-ticket.md`, but
+  **issues are switched off on the fork: Kevin's setting**). **Left in unit 30, waiting on the humans**
+  (section 2.30): which tracker, and the other five questions (then the DRAFT box comes off and the unit is done), and whether the release build becomes the gate's second leg. Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
   `py FMOFP/Main.py` becomes). Last session: Alee's, 2026-11-12 (the ticket format draft); before it Alee's
   parts 1-3 and Kevin's check of part 1, all 2026-11-11.
 - **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine, and green on CI's
@@ -1652,6 +1653,18 @@ done before this file existed are condensed from the private session notes.
 - *Tests and numbers*: `verify.sh icd` OK (documents only). Meter unchanged, 27 / 29.5 = 92 % (unit 30 in
   progress until the draft is settled).
 
+### 2026-11-12 - tickets are tracker issues; the issue template - by Alee's agent
+- *What*: Alee answered the draft's first question: tickets are issues on the tracker (section 8).
+  `.github/ISSUE_TEMPLATE/intern-ticket.md` lays out the format's fields (label `intern-ticket`);
+  `ofp/docs/TICKETS.md` says so in its section 2 and marks question 1 answered. No code changed.
+- *Warnings*: the fork has issues switched off (`has_issues: false` from the public API; GitHub's default for a
+  fork), so the template shows nowhere until Kevin turns them on (Settings > General > Features > Issues) or
+  the humans pick another tracker. The agent did not and may not change repository settings. The template has
+  not been seen rendered for the same reason. The `intern-ticket` label must be created on the tracker once.
+- *CI*: `a3f01c4` (the draft) run 43325183135 was in progress when this was written.
+- *Files*: `.github/ISSUE_TEMPLATE/intern-ticket.md`, `ofp/docs/TICKETS.md`, this file.
+- *Tests and numbers*: `verify.sh icd` OK (documents only). Meter unchanged, 27 / 29.5 = 92 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1769,3 +1782,8 @@ done before this file existed are condensed from the private session notes.
 - 2026-11-12, Alee ("Draft a format"): the agent drafts the ticket format for both humans to review. It is a
   proposal (`ofp/docs/TICKETS.md`, marked DRAFT), not a decision: the format, and the six questions at its end,
   are settled when Alee and Kevin say so here.
+- 2026-11-12, Alee ("Tracker issues"): intern tickets live as issues on the tracker, not as files in the
+  repository. The format's fields are the issue template `.github/ISSUE_TEMPLATE/intern-ticket.md`. Not yet
+  decided: which tracker. Issues are off on the fork (GitHub's default for a fork; turning them on is Kevin's,
+  as the owner), on at `TubAleeLo/fmofp` (which has no C++), and Bitbucket takes no template file. The draft's
+  other five questions are still open.
