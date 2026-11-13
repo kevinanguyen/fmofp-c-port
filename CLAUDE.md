@@ -153,9 +153,9 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 28 of 29.5 units = **95 %** (section 2). Pace measured over the log: about
-  5 units per full working day; what is left is unit 30's last piece, which is the humans' answers, not work
-  (section 2.30); the intern-ticket authoring phase comes after and is not in the number.
+- **Meter**: 29.5 of 29.5 units = **100 %** (section 2): **the port is done** (2026-11-12). Every unit is
+  DONE or STRUCK. What comes next is not in the number: the intern-ticket authoring phase, which starts with
+  the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
   modules of `core/` (`system_manager`, `initializer`, `baseStartUp`, `systemsStartUp`), `SystemStart.py`, the
@@ -168,13 +168,16 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: unit 30 hardening is `IN PROGRESS (Alee, 2026-11-11)`, parts 1-4 on `port/cpp`
-  (section 7). **Left in unit 30, waiting on the humans** (section 2.30): the five open questions at the end of
-  the ticket format draft (`ofp/docs/TICKETS.md`; parked by Alee until the port is done, section 8), and
-  whether the release build becomes the gate's second leg. **Kevin, two things: (1) issues are switched off on
-  the fork: turn them on (Settings > General > Features > Issues) and create the label `intern-ticket`; (2)
-  unit 29 was Alee's decision alone ("Cut imports, delete all"): it is one commit, read section 7's entry and
-  say if anything should come back.** No `wip/` branch. Last session: Alee's, 2026-11-12 (unit 29).
+- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
+  meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
+  Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
+  a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
+  fork: turn them on (Settings > General > Features > Issues) and create the label `intern-ticket`.** (3)
+  **Kevin: unit 29 (`49314b2`) was Alee's decision alone; it is one commit, read section 7's entry and say if
+  anything should come back.** (4) Whether the release build becomes a second leg of `verify.sh` (today a
+  command, section 5.4). (5) The real-time demo's overruns after unit 29 have not been measured on an idle
+  machine (section 7): fly `py -m fmofp_demo --headless --seconds 30` on Kevin's machine. Backlog, nobody's
+  yet: the ICD README's section 12. Last session: Alee's, 2026-11-12 (units 29 and 30 closed).
 - **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine, and green on CI's
   older clang-tidy (run 43121089010). If a later run of the `Lint (clang-tidy)` step finds something, fix the
   code or the check list in `ofp/.clang-tidy`, not the step.
@@ -232,9 +235,9 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 27 | HUD on the bus | 0.5 | STRUCK 2026-11-02 (the Python HUD is an empty placeholder; removed from the total) |
 | 28 | Scenario engine + debug CLI on the bus | 1.5 | DONE 2026-11-10 |
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | DONE 2026-11-12 |
-| 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | IN PROGRESS (Alee, 2026-11-11) |
+| 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | DONE 2026-11-12 (the ticket format a draft, its questions carried to the ticket phase: section 8) |
 
-**Done: 28 / 29.5 = 95 %.** Open: 1 unit (30).
+**Done: 29.5 / 29.5 = 100 %.** Open: none.
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -429,6 +432,11 @@ floors, planted faults), the eleven fields a ticket carries, what done means for
 test is split when a ticket departs from the Python, one ticket written out (OFP-001, the fitness check), and
 six open questions (where tickets live, hints, planted-fault tickets, how interns submit, the level scale, the
 SSTR tickets as a model). The unit is done when the humans have answered them and the DRAFT box is removed.
+
+DONE 2026-11-12 by Alee's decision (section 8): the unit closes with the format as a draft. Everything else
+in the unit is built and in CI (the optimised build, the timing test, the coverage floors, the lint, the
+architecture page, the debugging guide). The first question is answered (tracker issues on this fork); the
+other five, and the DRAFT box, belong to the ticket-authoring phase that follows the port.
 
 ---
 
@@ -1802,6 +1810,26 @@ done before this file existed are condensed from the private session notes.
   machine** (late starts 2-7, worst answers of 20-40 ms from C++ and Python terminals alike): not a
   measurement, and no C++ changed; Kevin's machine is the reference. Meter 28 / 29.5 = 95 %.
 
+### 2026-11-12 - unit 30 closed; the port at 100 %; CI of unit 29 - by Alee's agent
+- *What*: Alee closed unit 30 ("Yes, close unit 30"): the ticket format stays a draft and its five open
+  questions go to the ticket-authoring phase. With unit 29 landed the same day, every unit is DONE or STRUCK:
+  29.5 / 29.5. No code changed in this entry.
+- *What "done" covers*: the flight software is C++ on the simulated bus (sixteen partitions and the bus
+  controller), measured against the frozen Python's logic by oracle tests; the displays, the plant, the
+  scenario engine and the debug prompt are Python on the bus; the old Python messaging is deleted; the gate,
+  the optimised build, the timing test, the coverage floors and the lint are in CI; the intern has an
+  architecture page and a debugging guide.
+- *What it does not cover* (section 1 lists who each waits on): the ticket format's five questions and the
+  tickets themselves; issues switched on at the fork; Kevin's review of unit 29; the demo's overruns measured
+  on an idle machine after unit 29; the user manual, which still describes the Python application; the ICD
+  README's section 12 backlog.
+- *CI*: `49314b2` (unit 29) run 43362639091 was still in progress when this was written: the Lint job (ruff
+  over the cut Python) and three of the four `cpp` jobs (linux-asan, linux-gcc-release, coverage) green,
+  `linux-gcc` and the eight Python legs still running. To be recorded. `9a5062d` and `ef5f704` (documents only)
+  not read.
+- *Files*: this file.
+- *Tests and numbers*: `verify.sh icd` OK (documents only). Meter 29.5 / 29.5 = 100 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1943,3 +1971,6 @@ done before this file existed are condensed from the private session notes.
   does not need that imports something deleted is deleted; one the port needs is cut. Modules the port does not
   need that import nothing deleted stay. The legacy suites that tested deleted code are deleted, not rewritten.
   Unit 29 is DONE; the meter is 28 / 29.5.
+- 2026-11-12, Alee ("Yes, close unit 30"): unit 30 is DONE with the ticket format as a draft; its five open
+  questions and the removal of the DRAFT box are carried into the intern-ticket authoring phase, which was
+  never in the meter. The port is complete at 29.5 / 29.5.
