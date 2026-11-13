@@ -12,17 +12,9 @@ import traceback
 import math
 from typing import List
 
-from FMOFP.MIL_STD_1553B.mil_std_1553B import MIL_STD_1553B_Message
 from FMOFP.Utils.logger.sys_logger import get_logger
 from FMOFP.Systems.flightManagementSys.flightControlSys.attitude_calculator import get_attitude_calculator
-from FMOFP.Systems.flightManagementSys.flightControlSys.fcs_completion_message_handler import get_fcs_completion_message_handler
 from FMOFP.Systems.flightManagementSys.flightControlSys.fcs_message_type_detector import fcs_message_type_detector
-from FMOFP.Systems.flightManagementSys.fms_messaging.message_types import (
-    COMMAND_TYPE_CONTROL_INPUT,
-    COMMAND_TYPE_MODE_CHANGE,
-    is_control_input_message,
-    is_orientation_data_message
-)
 
 logger = get_logger()
 
@@ -89,9 +81,6 @@ class FlightControlSystem:
         # Initialize message type detector
         self.message_detector = fcs_message_type_detector()
         
-        # Initialize completion message handler
-        self.completion_handler = get_fcs_completion_message_handler()
-        
         # Aircraft attitude/orientation - will be updated from attitude calculator
         self.attitude = {
             'roll': 0,         # Roll angle in degrees
@@ -118,10 +107,6 @@ class FlightControlSystem:
     def set_messenger(self, messenger):
         """Set the messenger for FCS communications via FMS."""
         self.fms_messenger = messenger
-        
-        # Also set messenger for the completion handler
-        if self.completion_handler:
-            self.completion_handler.set_messenger(messenger)
             
         logger.info("[FCS] FCS messenger set")
 
@@ -307,10 +292,6 @@ class FlightControlSystem:
             self.control_inputs[control_type] = value
             logger.info(f"[FCS] {control_type} changed from {old_value} to {value}")
             
-            # Send completion message if requested
-            if send_completion:
-                self._send_control_input_completion(control_type, old_value, value, request_id)
-            
             return True
         except Exception as e:
             logger.error(f"[FCS] Error setting control input: {str(e)}")
@@ -355,100 +336,10 @@ class FlightControlSystem:
                 # Default update rate
                 self._update_interval = 0.02  # 50Hz update rate
             
-            # Send completion message if requested
-            if send_completion:
-                self._send_mode_change_completion(old_mode, mode, request_id)
-            
             return True
         except Exception as e:
             logger.error(f"[FCS] Error setting mode: {str(e)}")
             return False
-
-    def _send_control_input_completion(self, control_type: str, old_value: float, new_value: float, request_id: str = None):
-        """
-        Send control input completion message.
-        
-        Args:
-            control_type: Type of control that was changed
-            old_value: Previous control value
-            new_value: New control value
-            request_id: Original request ID
-        """
-        try:
-            # Skip during startup
-            if self._in_startup:
-                logger.info("[FCS] Skipping control input completion notification during startup")
-                return
-                
-            # Only send if we have a messenger and completion handler
-            if not self.fms_messenger or not self.completion_handler:
-                logger.warning("[FCS] Cannot send control input completion - messenger or handler not available")
-                return
-            
-            # Send the control input completion message
-            success = self.completion_handler.send_control_input_completion(
-                system_name='flight_control_system',
-                control_type=control_type,
-                value=new_value,
-                request_id=request_id
-            )
-            
-            if success:
-                logger.info("[FCS] Control input completion notification sent successfully")
-            else:
-                logger.error("[FCS] Failed to send control input completion notification")
-                
-        except Exception as e:
-            logger.error(f"[FCS] Error sending control input completion: {str(e)}")
-            logger.error(traceback.format_exc())
-
-    def _send_mode_change_completion(self, old_mode: str, new_mode: str, request_id: str = None):
-        """
-        Send mode change completion message.
-        
-        Args:
-            old_mode: Previous mode
-            new_mode: New mode
-            request_id: Original request ID
-        """
-        try:
-            # Skip during startup
-            if self._in_startup:
-                logger.info("[FCS] Skipping mode change completion notification during startup")
-                return
-                
-            # Only send if we have a messenger and completion handler
-            if not self.fms_messenger or not self.completion_handler:
-                logger.warning("[FCS] Cannot send mode change completion - messenger or handler not available")
-                return
-            
-            # Map mode to integer value for standardized messaging
-            mode_map = {
-                FlightControlModes.NORMAL: 0,
-                FlightControlModes.COMBAT: 1,
-                FlightControlModes.PRECISION: 2,
-                FlightControlModes.AUTOPILOT: 3,
-                FlightControlModes.TERRAIN: 4,
-                FlightControlModes.EMERGENCY: 5
-            }
-            mode_value = mode_map.get(new_mode, 0)
-            
-            # Send the mode change completion message
-            success = self.completion_handler.send_mode_change_completion(
-                system_name='flight_control_system',
-                old_mode=old_mode,
-                new_mode=new_mode,
-                mode_value=mode_value,
-                request_id=request_id
-            )
-            
-            if success:
-                logger.info("[FCS] Mode change completion notification sent successfully")
-            else:
-                logger.error("[FCS] Failed to send mode change completion notification")
-                
-        except Exception as e:
-            logger.error(f"[FCS] Error sending mode change completion: {str(e)}")
 
     def send_orientation_data(self):
         """Send orientation data to other systems via messenger."""
@@ -524,269 +415,6 @@ class FlightControlSystem:
             return result
         except Exception as e:
             logger.error(f"[FCS] Error sending orientation data: {e}")
-            logger.error(traceback.format_exc())
-            return False
-
-    def receive_message_sync(self, message: MIL_STD_1553B_Message) -> bool:
-        """
-        Synchronously process an incoming message.
-        
-        Args:
-            message: The message to process
-            
-        Returns:
-            bool: True if message was processed, False otherwise
-        """
-        try:
-            # Check if we're in startup mode and should discard messages
-            if self._in_startup:
-                current_time = time.time()
-                if self._startup_complete_time and current_time < self._startup_complete_time:
-                    logger.info(f"[FCS] Discarding message during startup: {message.message_type if hasattr(message, 'message_type') else None}")
-                    return False
-                else:
-                    # Startup timeout has passed, set startup to false
-                    self._in_startup = False
-                    logger.info("[FCS] Startup period complete, now accepting messages")
-            
-            # Log message details
-            logger.info(f"[FCS] Received message: {message}")
-            if hasattr(message, 'message_type'):
-                logger.info(f"[FCS] Message type: {message.message_type}")
-            if hasattr(message, 'command_type'):
-                logger.info(f"[FCS] Command type: {message.command_type}")
-            
-            # Process the message
-            return self._process_message_sync(message)
-        except Exception as e:
-            logger.error(f"[FCS] Error handling message synchronously: {str(e)}")
-            return False
-
-    def _process_message_sync(self, message: MIL_STD_1553B_Message) -> bool:
-        """
-        Process message synchronously.
-        
-        Args:
-            message: The message to process
-            
-        Returns:
-            bool: True if message was processed, False otherwise
-        """
-        try:
-            # Extract request_id from message
-            request_id = None
-            if hasattr(message, 'request_id'):
-                request_id = message.request_id
-            elif hasattr(message, 'request_uuid'):
-                request_id = message.request_uuid
-            elif hasattr(message, 'metadata') and isinstance(message.metadata, dict):
-                request_id = message.metadata.get('request_id', message.metadata.get('request_uuid'))
-            
-            # Use message detector to determine handler
-            if self.message_detector:
-                handler_type = self.message_detector.detect_message_type(message)
-                logger.info(f"[FCS] Message detector determined handler: {handler_type}")
-                
-                # Route to appropriate handler
-                if handler_type == "control_input_handler":
-                    return self._handle_control_input_sync(message, request_id)
-                elif handler_type == "mode_handler":
-                    return self._handle_mode_change_sync(message, request_id)
-                elif handler_type == "orientation_data_handler":
-                    return self._handle_orientation_data_request_sync(message, request_id)
-                elif handler_type == "status_handler":
-                    return True  # Status requests don't need special handling yet
-                else:
-                    logger.warning(f"[FCS] Unrecognized handler type: {handler_type}")
-            
-            # Fall back to direct message type checking
-            if hasattr(message, 'command_type') and message.command_type == COMMAND_TYPE_CONTROL_INPUT:
-                return self._handle_control_input_sync(message, request_id)
-            elif hasattr(message, 'command_type') and message.command_type == COMMAND_TYPE_MODE_CHANGE:
-                return self._handle_mode_change_sync(message, request_id)
-            elif is_control_input_message(message):
-                return self._handle_control_input_sync(message, request_id)
-            elif is_orientation_data_message(message):
-                return self._handle_orientation_data_request_sync(message, request_id)
-            else:
-                logger.warning(f"[FCS] Unhandled message type: {getattr(message, 'message_type', 'unknown')}")
-                return False
-        except Exception as e:
-            logger.error(f"[FCS] Error processing message synchronously: {str(e)}")
-            logger.error(traceback.format_exc())
-            return False
-
-    def _handle_control_input_sync(self, message: MIL_STD_1553B_Message, request_id: str = None) -> bool:
-        """
-        Handle control input message.
-        
-        Args:
-            message: The control input message
-            request_id: Request ID for completion message
-            
-        Returns:
-            bool: True if message was processed, False otherwise
-        """
-        try:
-            logger.info("[FCS] Handling control input message")
-            
-            # Extract control type and value from message
-            control_type = None
-            value = None
-            
-            # Try to get from message data
-            if hasattr(message, 'data') and isinstance(message.data, list) and len(message.data) >= 2:
-                # First word might be control type encoded as integer
-                control_word = message.data[0]
-                value_word = message.data[1]
-                
-                # Convert to proper types if needed
-                if isinstance(control_word, str):
-                    try:
-                        # Try parsing as hex or binary
-                        if control_word.startswith('0x'):
-                            control_word = int(control_word, 16)
-                        elif control_word.startswith('0b'):
-                            control_word = int(control_word, 2)
-                        else:
-                            control_word = int(control_word)
-                    except ValueError:
-                        # If it's not a number, it might be the direct string
-                        control_type = control_word
-                
-                # Map integer control word to control type
-                if isinstance(control_word, int) and not control_type:
-                    if control_word == 1:
-                        control_type = 'aileron'
-                    elif control_word == 2:
-                        control_type = 'elevator'
-                    elif control_word == 3:
-                        control_type = 'rudder'
-                    elif control_word == 4:
-                        control_type = 'throttle'
-                
-                # Convert value word to float
-                if isinstance(value_word, str):
-                    try:
-                        # Try parsing as number
-                        value = float(value_word)
-                    except ValueError:
-                        logger.warning(f"[FCS] Invalid value word: {value_word}")
-                elif isinstance(value_word, (int, float)):
-                    # Scale integer values to proper range
-                    if isinstance(value_word, int):
-                        # Assume 16-bit signed integer and scale to -1.0 to 1.0
-                        if value_word > 32767:  # Handle unsigned values
-                            value_word = value_word - 65536
-                        value = value_word / 32767.0
-                    else:
-                        value = value_word
-            
-            # Try to get from message attributes
-            if control_type is None and hasattr(message, 'control_type'):
-                control_type = message.control_type
-            
-            if value is None and hasattr(message, 'value'):
-                value = message.value
-            
-            # Try to get from metadata
-            if (control_type is None or value is None) and hasattr(message, 'metadata') and isinstance(message.metadata, dict):
-                metadata = message.metadata
-                if control_type is None and 'control_type' in metadata:
-                    control_type = metadata['control_type']
-                if value is None and 'value' in metadata:
-                    value = metadata['value']
-            
-            # Check if we have what we need
-            if control_type is None or value is None:
-                logger.warning("[FCS] Missing control type or value in message")
-                return False
-            
-            # Set the control input
-            return self.set_control_input(control_type, value, send_completion=True, request_id=request_id)
-        except Exception as e:
-            logger.error(f"[FCS] Error handling control input message: {str(e)}")
-            logger.error(traceback.format_exc())
-            return False
-
-    def _handle_mode_change_sync(self, message: MIL_STD_1553B_Message, request_id: str = None) -> bool:
-        """
-        Handle mode change message.
-        
-        Args:
-            message: The mode change message
-            request_id: Request ID for completion message
-            
-        Returns:
-            bool: True if message was processed, False otherwise
-        """
-        try:
-            logger.info("[FCS] Handling mode change message")
-            
-            # Extract mode from message
-            mode = None
-            
-            # Try to get from message data
-            if hasattr(message, 'data'):
-                if isinstance(message.data, str):
-                    mode = message.data
-                elif isinstance(message.data, list) and len(message.data) > 0:
-                    mode_data = message.data[0]
-                    if isinstance(mode_data, str):
-                        mode = mode_data
-                    elif isinstance(mode_data, int):
-                        # Map integer to mode
-                        if mode_data == 0:
-                            mode = FlightControlModes.NORMAL
-                        elif mode_data == 1:
-                            mode = FlightControlModes.COMBAT
-                        elif mode_data == 2:
-                            mode = FlightControlModes.PRECISION
-                        elif mode_data == 3:
-                            mode = FlightControlModes.AUTOPILOT
-                        elif mode_data == 4:
-                            mode = FlightControlModes.TERRAIN
-                        elif mode_data == 5:
-                            mode = FlightControlModes.EMERGENCY
-            
-            # Try to get from message attributes
-            if mode is None and hasattr(message, 'mode'):
-                mode = message.mode
-            
-            # Try to get from metadata
-            if mode is None and hasattr(message, 'metadata') and isinstance(message.metadata, dict):
-                mode = message.metadata.get('mode')
-            
-            # Check if we have what we need
-            if mode is None:
-                logger.warning("[FCS] Missing mode in message")
-                return False
-            
-            # Set the mode
-            return self.set_mode(mode, send_completion=True, request_id=request_id)
-        except Exception as e:
-            logger.error(f"[FCS] Error handling mode change message: {str(e)}")
-            logger.error(traceback.format_exc())
-            return False
-
-    def _handle_orientation_data_request_sync(self, message: MIL_STD_1553B_Message, request_id: str = None) -> bool:
-        """
-        Handle orientation data request message.
-        
-        Args:
-            message: The orientation data request message
-            request_id: Request ID for response message
-            
-        Returns:
-            bool: True if message was processed, False otherwise
-        """
-        try:
-            logger.info("[FCS] Handling orientation data request message")
-            
-            # Send orientation data
-            return self.send_orientation_data()
-        except Exception as e:
-            logger.error(f"[FCS] Error handling orientation data request: {str(e)}")
             logger.error(traceback.format_exc())
             return False
 

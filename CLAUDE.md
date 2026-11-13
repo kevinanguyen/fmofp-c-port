@@ -85,8 +85,9 @@ person may continue it in their next session; when it is green it is rebased ont
 - Never push to `upstream` (TubAleeLo/fmofp, Alee's repository). Keep its push URL disabled:
   `git remote set-url --push upstream DISABLED`.
 - Never force-push or rewrite history on `port/cpp`.
-- Never edit the frozen Python under `B20SS/FMOFP/` except by merging upstream (section
-  4.4). The C++ is measured against that Python.
+- Never edit the frozen Python under `B20SS/FMOFP/`. The C++ is measured against that Python. (Unit 29,
+  2026-11-12, was the one sanctioned edit: it cut the old messaging out of it. Upstream no longer merges,
+  section 4.4.)
 - Never commit build directories, logs, databases or anything under `B20SS/logs/`.
 - Never put the other person's or your own secrets, tokens or passwords anywhere in the
   repository, including this file.
@@ -152,30 +153,28 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 27 of 29.5 units = **92 %** (section 2). Pace measured over the log: about
-  5 units per full working day, so about half a day more to 100 % (2 units open: 29, 30); the
-  intern-ticket authoring phase comes after and is not in the number.
-- **Upstream**: merged through `4c25f52` (2026-11-02). Port baseline for the ported logic
-  stays `0ab9236` (Alee's freeze, 2026-10-10); later upstream commits have been plumbing and
-  lint only.
-- **Open work / claims**: unit 30 hardening is `IN PROGRESS (Alee, 2026-11-11)`, on `port/cpp` in parts, each
-  green (no `wip/` branch). Part 1 (`fb32655`, CI green, checked on Kevin's machine the same day: three demo runs
-  on the optimised build with 0 overruns, section 7): the demo's overruns. Part 2
-  (2026-11-11, section 7): the display processes' logs, the timing test, the coverage floors, the architecture
-  page (`cbc1fc1`, CI run 43114870513 all green, the first `coverage` job among them). Part 3 (2026-11-11,
-  section 7): the MISRA-subset lint (clang-tidy, `cmake --build build/<preset> --target lint`, in CI on the
-  `linux-gcc` leg) and the debugging guide (`ofp/docs/DEBUGGING.md`, every command run under gdb), `66be6ef`, CI
-  run 43121089010 all twelve jobs green. Part 4 (2026-11-12, section 7): **a draft** of the ticket format,
-  `ofp/docs/TICKETS.md`, marked DRAFT, with six questions for both humans at its end; the first is answered
-  (Alee, 2026-11-12: tickets are tracker issues; the template is `.github/ISSUE_TEMPLATE/intern-ticket.md`, but
-  the tracker is this fork's GitHub). **Kevin, one thing to do as the owner: issues are switched off on the
-  fork; turn them on (Settings > General > Features > Issues) and create the label `intern-ticket`.** **Left
-  in unit 30, waiting on the humans** (section 2.30): the draft's other five questions (then the DRAFT box comes off and the unit is done), and whether the release build becomes the gate's second leg. Then unit 29, last (it cuts the upstream line, section 2.29; both humans decide what
-  `py FMOFP/Main.py` becomes). **Unit 29 was scoped on 2026-11-12 and is not a plain deletion** (section 2.29: 22
-  frozen modules the oracles and displays import reach into the stacks to delete; three ways forward, the
-  humans' choice; not claimed). The ticket draft's five questions are parked until the port is done (Alee,
-  section 8). Last session: Alee's, 2026-11-12; before it Alee's parts 1-3 and Kevin's check of part 1, all
-  2026-11-11.
+- **Meter**: 28 of 29.5 units = **95 %** (section 2). Pace measured over the log: about
+  5 units per full working day; what is left is unit 30's last piece, which is the humans' answers, not work
+  (section 2.30); the intern-ticket authoring phase comes after and is not in the number.
+- **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
+  `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
+  modules of `core/` (`system_manager`, `initializer`, `baseStartUp`, `systemsStartUp`), `SystemStart.py`, the
+  messengers and completion handlers, the old CLI and loop prevention, and their tests are deleted: 263 files,
+  about 99,000 lines. What is left under `B20SS/FMOFP/` (282 Python files, about 84,000 lines) is the subsystems'
+  logic the oracle tests run, the display classes, `core/event_driven_communication.py`, `storage/`, `Utils/`
+  and 18 legacy suites (`FMOFP/Tests/run_all_tests.py`, all green). **`py FMOFP/Main.py` starts the demo**
+  (`fmofp_demo`). The old bus's message table lives on as `B20SS/icd/legacy/message_schemas.py` (the ICD
+  tool's legacy check reads it).
+- **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
+  `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
+  Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
+- **Open work / claims**: unit 30 hardening is `IN PROGRESS (Alee, 2026-11-11)`, parts 1-4 on `port/cpp`
+  (section 7). **Left in unit 30, waiting on the humans** (section 2.30): the five open questions at the end of
+  the ticket format draft (`ofp/docs/TICKETS.md`; parked by Alee until the port is done, section 8), and
+  whether the release build becomes the gate's second leg. **Kevin, two things: (1) issues are switched off on
+  the fork: turn them on (Settings > General > Features > Issues) and create the label `intern-ticket`; (2)
+  unit 29 was Alee's decision alone ("Cut imports, delete all"): it is one commit, read section 7's entry and
+  say if anything should come back.** No `wip/` branch. Last session: Alee's, 2026-11-12 (unit 29).
 - **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine, and green on CI's
   older clang-tidy (run 43121089010). If a later run of the `Lint (clang-tidy)` step finds something, fix the
   code or the check list in `ofp/.clang-tidy`, not the step.
@@ -232,10 +231,10 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 26 | SMS on the bus | 0.5 | DONE 2026-11-02 |
 | 27 | HUD on the bus | 0.5 | STRUCK 2026-11-02 (the Python HUD is an empty placeholder; removed from the total) |
 | 28 | Scenario engine + debug CLI on the bus | 1.5 | DONE 2026-11-10 |
-| 29 | Retire the old Python messaging stack and the radar bridge | 1 | IN PROGRESS (Alee, 2026-11-12) |
+| 29 | Retire the old Python messaging stack and the radar bridge | 1 | DONE 2026-11-12 |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | IN PROGRESS (Alee, 2026-11-11) |
 
-**Done: 27 / 29.5 = 92 %.** Open: 2 units (29, 30).
+**Done: 28 / 29.5 = 95 %.** Open: 1 unit (30).
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -365,6 +364,14 @@ messengers, `predefinedMessages`, `Utils/message_loop_prevention`, the old `Syst
 (51 files, 17,000 lines), which both CI files' Python legs run (`ci_test_boot_smoke.py`, `run_all_tests.py`).
 The scripts that measured this are in the session scratchpad (`scope29.py`, `scope29b.py`: static, by `ast`);
 rewrite them rather than look for them.
+
+DONE 2026-11-12 (section 7), by way (a), Alee's choice (section 8). What the scoping did not see and the work
+did: `radar_mode_converter` (in a deleted package, so its imports had not been followed) needs the display's
+`display_radar_enums`, which the first plan deleted and the work restored; four files of pure data were moved,
+not deleted (section 7); the cascade (anything not needed by the port that imported something deleted) took 68
+more modules, the whole Python boot path among them. The cut in the kept modules is the same everywhere: the
+methods that received or sent a message on the old bus are gone (`receive_message*`, `_handle_*`, `_send_*`),
+the logic the oracles run is untouched.
 
 ### 2.30 Hardening, 1.5
 
@@ -543,6 +550,12 @@ member), not inheritance.
 
 ### 4.4 Upstream (Alee's TubAleeLo/fmofp): merge when clean, otherwise report
 
+**Since unit 29 (2026-11-12) upstream is no longer merged.** `port/cpp` deleted the packages upstream still
+edits and cut the modules that used them, so every upstream commit now conflicts or re-adds dead code. Still
+`git fetch upstream` each session and report what moved (`git log --oneline HEAD..upstream/main`): a change
+to a subsystem's *logic* upstream is news the humans may want ported by hand. The procedure below is how it
+was done until then.
+
 Every session: `git fetch upstream`; `git log --oneline HEAD..upstream/main`. If there is
 anything: `git diff --name-only $(git merge-base HEAD upstream/main) upstream/main`, and for
 every file in the **mirrored set** (ICD sources: `rtAddressConfig.xml`, `message_schemas.py`,
@@ -710,8 +723,9 @@ line per event; `py -m fmofp_cli [--port-base N] [-c CMD]` is the debug prompt (
 `partitions/<name>/`, `tests/`, `CLAUDE.md` rules, `README.md`). `B20SS/fmofp_bus/` the
 Python bus library and all port tests (`tests/`). `B20SS/fmofp_plant/` the plant.
 `B20SS/fmofp_display/` the display terminals and feeds. `B20SS/fmofp_demo/` the launcher.
-`B20SS/FMOFP/` the frozen Python application (`PLANNING.md` beside it describes its
-architecture; its own tests are Alee's). `B20SS/verify.sh` the gate.
+`B20SS/FMOFP/` what is kept of the frozen Python application: `Systems/` (the logic the oracles run),
+`Interfaces/` (the display classes, the scenario files), `Main.py` (starts `fmofp_demo`), `Tests/` (18
+legacy suites; `PLANNING.md` beside it is history). `B20SS/icd/legacy/` the old bus's message table. `B20SS/verify.sh` the gate.
 
 ---
 
@@ -863,6 +877,23 @@ Python tests and displays
 - gdb: `fmofp_bc` refuses `--timeout-ms` above 1000 (it prints its usage and exits, and the partition under gdb
   waits for ever); a partition that exits at once under gdb could not bind its port; `watch` without `-l` dies
   with the function's scope. A batch gdb run in a script wants `timeout 60` in front of it.
+- A module is "kept" or "not needed" only as far as the import walk went: imports of a module in a package
+  about to be deleted are not followed, so when one of its files is moved instead, walk *its* imports
+  (`radar_mode_converter` wanted `display_radar_enums`, deleted by the first plan, inside a `try: ... except
+  ImportError` that would have hidden the loss).
+- ruff does not report an import of a module that does not exist, nor a call to a method that was removed
+  (`self._send_x()`): after deleting code, grep for every deleted name as well as linting (F821 finds only
+  names, F401 the imports the cut left unused: `ruff check --fix` removes those).
+- The frozen Python mixes line endings and has whitespace-only lines: edit it with a script that reads and
+  writes with `newline=""`, matches `\r?\n`, states how many matches it expects and compiles the result
+  before writing; remove whole methods by `ast` line ranges, not by hand.
+- `fmofp_display/app.py` had already been switching the MFD's old radar handler off
+  (`mfd_module.get_radar_message_handler = lambda: None`): look in the port for a monkey-patch of anything you
+  are about to delete from the frozen code.
+- The legacy runner (`FMOFP/Tests/run_all_tests.py`) takes its suites from a list in the file: a deleted test
+  must leave the list too, or the runner fails on a missing module.
+- The real-time demo cannot be judged while a game runs on Alee's machine (again: 6-33 overruns in four runs
+  with one running, late starts and 20-40 ms worst answers from C++ partitions and Python terminals alike).
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -1718,6 +1749,59 @@ done before this file existed are condensed from the private session notes.
 - *Files*: this file.
 - *Tests and numbers*: `verify.sh icd` OK (documents only). Meter unchanged, 27 / 29.5 = 92 %.
 
+### 2026-11-12 - unit 29 retire the old Python messaging stack - by Alee's agent
+- *What*: deleted `FMOFP/local_messaging/`, `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`
+  (176 modules), and with them everything not needed by the port that imported them, to a fixpoint (68 more):
+  `Interfaces/predefinedMessages/`, `core/system_manager.py`, `initializer.py`, `baseStartUp.py`,
+  `systemsStartUp.py`, `SystemStart.py`, the old `Main.py`, `Utils/debug/` (the old CLI),
+  `Utils/message_loop_prevention/`, `Utils/partitions/`, `universal_message_extractor`,
+  `message_format_adapter`, the radar handlers and `radar_message_extractor`, the display manager and the
+  display-side radar data handler and event manager, and 27 legacy suites. Also deleted, kept by the port only
+  because logic modules imported them: `radarMessenger`, the radar, FMS and FCS completion handlers,
+  `data_response_sender`, `fmsMessenger`, `fms_messaging/address_utils`, `fms_message_processor`. 263 files,
+  about 99,000 lines. **Moved, not deleted** (pure data the kept code reads): `message_schemas.py` to
+  `B20SS/icd/legacy/` (`icd_tool.py`'s `LEGACY_SCHEMAS`), `radar_display_modes.py` and
+  `radar_mode_converter.py` to `Interfaces/userInterface/displays/radar/`, `display_message_types.py` to
+  `Interfaces/userInterface/displays/`.
+- *The cut in the kept modules* (the frozen Python's one sanctioned edit): the five radars lost
+  `receive_message*`, every `_handle_*` and `_send_*`, `_extract_mode_value_from_data`, the completion notice
+  in `set_mode` (its `send_completion` and `request_id` parameters stay, unused) and, in the weather radar,
+  the four pushes into the display bridge (a debug line says what was computed); `radarControl` no longer
+  starts a messenger (`radar_messenger` is None; the radars only store it); `flight_control_system` and
+  `flightManagementSystem` lost their message entry points and the completion handler (`set_messenger` and
+  `send_orientation_data` stay, duck-typed); the event bus lost its 1553-message branches; `fuelControl` its
+  `ScheduleMessage`, `send_fuel_status` and `receive_message`; `missionControl` takes its no-op shim directly;
+  `scenarioEngine._inject_weather` builds the cell and logs it (on the bus the cell goes into the plant's sky);
+  `mfd.py` lost the radar handler and `_setup_radar_handlers`; `mode_node`, the display tree manager, the radar
+  data coordinator and `display_radar_enums` import the moved files; the weather display's message adapter
+  carries the radar's address as a constant (9, as in `rtAddressConfig.xml`); `radar_base_message` lost
+  `to_mil_std_message`. No logic the oracles measure was touched.
+- *Around it*: `FMOFP/Main.py` is a 25-line launcher for `fmofp_demo` (same options; `pyproject.toml`'s
+  `fmofp = FMOFP.Main:main` still holds); `install.py` checks the directories and imports that exist and says
+  what `Main.py` starts; `ci_test_boot_smoke.py` keeps its two checks that still apply;
+  `run_all_tests.py` lists 18 suites and says what left; `fmofp_display/app.py` no longer patches the handler
+  that is gone; the root README, `PLANNING.md` (a notice: it is history), `ofp/README.md`,
+  `ofp/docs/ARCHITECTURE.md` and the ICD README say so. Both CI files are unchanged: their commands still
+  apply (the Python legs run the smoke test and the runner, the lint job ruff over `B20SS/FMOFP`).
+- *How*: by script, in the session scratchpad: an `ast` import walk for the plan (what the port needs, the
+  cascade, what needs cutting), a method remover working on `ast` line ranges, regex edits with expected match
+  counts, ruff in a scratch virtual environment (not installed globally) for dangling names and unused
+  imports, then a grep for every deleted name. The work was saved on `wip/unit29-retire` when the session's
+  usage ran out and landed from there as one commit (the branch is deleted).
+- *Warnings / lessons*: section 6's six new lines. The frozen radars' `set_mode(..., send_completion=True)`
+  and the FCS setters accept and ignore the completion arguments now. `mfd.py` keeps `_handle_weather_data` and
+  its siblings, which only the deleted registration called. About 80 modules the port does not need and that
+  import nothing deleted were left alone (the old `Systems/comms` services, `Utils/common`): dead weight, not
+  broken. The user manual (`B20SS/FMOFP_User_Manual/`) still describes the Python application and was not
+  touched. Kevin was not asked (section 1).
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 303 OK (the same 303: every oracle and display
+  test passes against the cut modules), ctest 2/2, cppcheck clean, load unchanged (107 messages for 23
+  terminals, 8612 us). `ruff check B20SS/FMOFP` clean. `FMOFP/Tests/run_all_tests.py`: 18 suites, all pass
+  (was 45). `py FMOFP/Main.py --headless --seconds 30`: 1500 frames, 23 terminals, 19 of 19 scripted commands,
+  no error in the display logs; overruns 33, then 13, 6 and 17 in three more runs **with a game running on the
+  machine** (late starts 2-7, worst answers of 20-40 ms from C++ and Python terminals alike): not a
+  measurement, and no C++ changed; Kevin's machine is the reference. Meter 28 / 29.5 = 95 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -1852,3 +1936,10 @@ done before this file existed are condensed from the private session notes.
   logic moved. This edits the frozen Python (section 0.5's exception is this unit) and cuts the upstream line:
   later `TubAleeLo/fmofp` changes to those files will not merge. Kevin has not been asked and may overrule
   before or after it lands (it is one commit, revertible).
+- 2026-11-12, Alee's agent, under Alee's "Cut imports, delete all" (told to Alee; either human may overrule):
+  `py FMOFP/Main.py` becomes a launcher for `fmofp_demo`, which was the open question of section 2.29 (the
+  documented command and the `fmofp` script keep working; nothing else was a candidate once the Python boot
+  path was gone). Four files of pure data are moved rather than deleted. The cascade rule: a module the port
+  does not need that imports something deleted is deleted; one the port needs is cut. Modules the port does not
+  need that import nothing deleted stay. The legacy suites that tested deleted code are deleted, not rewritten.
+  Unit 29 is DONE; the meter is 28 / 29.5.

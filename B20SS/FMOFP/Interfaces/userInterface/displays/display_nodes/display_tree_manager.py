@@ -69,13 +69,9 @@ def get_radar_enum(radar_type: str) -> Optional[Type]:
     try:
         if radar_type not in RADAR_ENUMS:
             # Try dynamic import if not already imported
-            try:
-                # First try to import from display-local module
-                module = importlib.import_module('...messaging.display_radar_enums', package=__name__)
-            except ImportError:
-                # Fall back to system module if necessary
-                module = importlib.import_module('Systems.radarManagement.radar_enums')
-                
+            # (A display-local copy under ...messaging was tried first; it never existed.)
+            module = importlib.import_module('Systems.radarManagement.radar_enums')
+
             enum_name = RADAR_MODE_ENUM_NAMES.get(radar_type)
             if not enum_name:
                 enum_name = f"{radar_type.replace('_radar', '')}_radarMode"
@@ -359,7 +355,7 @@ class DisplayTreeManager:
             
             # Extract current mode using helper function from display_message_types
             # Import locally to avoid circular imports
-            from ...messaging.display_message_types import get_message_type
+            from ..display_message_types import get_message_type
             
             # Extract current mode
             current_mode = None
@@ -430,7 +426,7 @@ class DisplayTreeManager:
                 return
             
             # Import helper functions from display_message_types
-            from ...messaging.display_message_types import get_message_type
+            from ..display_message_types import get_message_type
             
             # Log message type if available
             msg_type = get_message_type(visual_data)
@@ -580,7 +576,7 @@ class DisplayTreeManager:
                 return
 
             # Import helper functions from display_message_types
-            from ...messaging.display_message_types import (
+            from ..display_message_types import (
                 get_message_type, 
                 is_message_type,
                 WEATHER_RADAR_MODE_CHANGE_REQUEST,
@@ -618,7 +614,7 @@ class DisplayTreeManager:
                 return
 
             # Import helper functions from display_message_types
-            from ...messaging.display_message_types import (
+            from ..display_message_types import (
                 get_message_type,
                 is_vil_message,
                 is_precipitation_message
@@ -656,7 +652,7 @@ class DisplayTreeManager:
                 return
 
             # Import helper functions from display_message_types
-            from ...messaging.display_message_types import get_message_type
+            from ..display_message_types import get_message_type
             
             # Log message type if available
             msg_type = get_message_type(visual_data)

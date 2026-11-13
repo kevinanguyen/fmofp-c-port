@@ -110,8 +110,8 @@ def test_check_directories_all_present(r: _Results) -> None:
         tmp_path = Path(tmp)
         # Create all required directories
         required = [tmp_path / "FMOFP" / sub for sub in
-                    ("Systems", "Interfaces", "MIL_STD_1553B",
-                     "storage", "Utils", "core", "local_messaging")]
+                    ("Systems", "Interfaces",
+                     "storage", "Utils", "core")]
         fmofp_dir = tmp_path / "FMOFP"
         fmofp_dir.mkdir()
         for d in required:

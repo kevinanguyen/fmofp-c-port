@@ -1,9 +1,9 @@
 """
 Radar Messaging Package
 
-Contains components for handling radar message sending and receiving.
+What is left of it after the old Python bus was retired (the port's unit 29): the radars' own message
+definitions and type constants, and the storm cell tracker and precipitation analyser, which the oracle tests
+measure the C++ against. The messenger, the completion handler and the response sender are gone.
 """
 
-from FMOFP.Systems.radarManagement.radar_messaging.data_response_sender import get_data_response_sender
-
-__all__ = ['get_data_response_sender']
+__all__ = []

@@ -12,7 +12,7 @@ import uuid
 from typing import Dict, List, Any
 
 # Import display-local message types and helper functions
-from ...messaging.display_message_types import (
+from ..display_message_types import (
     is_vil_message,
     is_precipitation_message
 )

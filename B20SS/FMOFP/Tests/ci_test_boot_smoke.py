@@ -40,12 +40,6 @@ CHECKS = [
         "import os; print('OK'); os._exit(0)\n",
     ),
     (
-        "core.system_manager imports (module-level SystemManager() boot object)",
-        "import FMOFP.core.system_manager as sm\n"
-        "assert sm.get_system_manager() is not None\n"
-        "import os; print('OK'); os._exit(0)\n",
-    ),
-    (
         # Guards the display-node lock-held-notify deadlock class (August
         # 2026): VisualNode.update()/ModeNode.update() awaited
         # _notify_subscribers() while holding the node's non-reentrant
@@ -69,46 +63,6 @@ CHECKS = [
         "    assert len(seen) == 2, f'subscribers not notified: {seen}'\n"
         "asyncio.run(main())\n"
         "print('OK'); os._exit(0)\n",
-    ),
-    (
-        # Full end-to-end boot: initialize → start → an operational system
-        # state, i.e. what SystemStart.py/Main.py actually do. This is the
-        # check that fails if ANY future regression stalls the boot chain,
-        # whatever its mechanism (it caught the operation_tracker
-        # lock-across-callback event-loop freeze that the three targeted
-        # checks above could not see). RUNNING is transient — the system
-        # settles into NORMAL within ~1s — so both count as success.
-        "full boot reaches an operational SystemState",
-        # Mirrors SystemStart.py's bootstrap. Story C12 removed the second
-        # sys.path entry and the dual-path shim this used to install: with
-        # every import FMOFP-prefixed there is only one module identity, so
-        # this check now polls the same SystemStateManager singleton the boot
-        # path updates without any compensation.
-        "import sys, os\n"
-        "import asyncio\n"
-        "from FMOFP.core.initializer import get_initializer\n"
-        "from FMOFP.Utils.common.system_states import SystemState\n"
-        "from FMOFP.Utils.common.system_state_manager import get_system_state_manager\n"
-        "init = get_initializer(); init.initialize()\n"
-        "loop = init.get_loop()\n"
-        "from Main import start_fmofp\n"
-        "async def watch():\n"
-        "    sm = get_system_state_manager()\n"
-        "    for _ in range(600):\n"
-        "        await asyncio.sleep(0.1)\n"
-        "        try:\n"
-        "            state = sm.get_state()\n"
-        "        except ValueError:\n"
-        "            continue  # state node not created yet\n"
-        "        if state in (SystemState.RUNNING, SystemState.NORMAL):\n"
-        "            print('OK'); os._exit(0)\n"
-        "    print('never reached an operational state'); os._exit(5)\n"
-        # Keep strong references to both tasks: asyncio holds only weak
-        # refs, and an unreferenced pending task can be garbage-collected
-        # mid-flight (observed live here — the watcher silently vanished).
-        "_t1 = loop.create_task(start_fmofp())\n"
-        "_t2 = loop.create_task(watch())\n"
-        "loop.run_forever()\n",
     ),
 ]
 

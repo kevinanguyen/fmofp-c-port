@@ -16,9 +16,6 @@ from FMOFP.Systems.radarManagement.targeting.targeting_radar import targeting_ra
 from FMOFP.Systems.radarManagement.syntheticAperture.sar_radar import sar_radar, sar_radarMode
 from FMOFP.Systems.radarManagement.aewc.aewc_radar import aewc_radar, aewc_radarMode
 from FMOFP.Systems.radarManagement.radar_enums import RadarMode, MissionPhase, weather_radarMode
-from FMOFP.Systems.radarManagement.radar_messaging.radarMessenger import (
-    RadarMessenger, get_radar_messenger
-)
 from FMOFP.Utils.common.thread_manager import thread_manager
 from FMOFP.Utils.logger.sys_logger import get_logger
 from FMOFP.Utils.common.operation_tracker import is_operation_completed, mark_operation_completed
@@ -27,7 +24,7 @@ from FMOFP.Systems.radarManagement.radar_data_fusion import get_radar_data_fusio
 logger = get_logger()
 
 class AbstractRadar(ABC):
-    def __init__(self, name: str, radar_messenger: RadarMessenger):
+    def __init__(self, name: str, radar_messenger):
         self.name = name
         self.mode = RadarMode.STANDBY
         self.radar_messenger = radar_messenger
@@ -64,7 +61,7 @@ class AbstractRadar(ABC):
 
 class RadarFactory:
     @staticmethod
-    def create_radar(radar_type: str, radar_control, radar_messenger: RadarMessenger, **kwargs) -> AbstractRadar:
+    def create_radar(radar_type: str, radar_control, radar_messenger, **kwargs) -> AbstractRadar:
         try:
             name = kwargs.get('name')
             if not name:
@@ -116,7 +113,9 @@ class RadarManagementSystem:
         if not self._initialized:
             self.radars: Dict[str, AbstractRadar] = {}
             self.mission_phase = MissionPhase.PRE_FLIGHT
-            self.radar_messenger = None  # Will be set during initialization
+            # The radars took a messenger for the old Python bus (retired with the port's unit 29: the
+            # radar computer on the bus is the C++ partition at RT 9). None since; the radars only store it.
+            self.radar_messenger = None
             self._running = threading.Event()  # Use Event for thread-safe flag
             self._lock = threading.Lock()
             self._loop = None  # Event loop for async operations
@@ -158,20 +157,6 @@ class RadarManagementSystem:
             while not self._loop:
                 time.sleep(0.1)
             logger.info("Event loop is ready")
-
-            # Initialize and start radar messenger
-            self.radar_messenger = get_radar_messenger()
-            self.radar_messenger.set_radar_control(self)  # Give messenger direct access
-            logger.info("Starting RadarMessenger...")
-            try:
-                self.radar_messenger.start()
-                if not self.radar_messenger.running:
-                    raise RuntimeError("RadarMessenger failed to start")
-                logger.info("RadarMessenger started successfully")
-            except Exception as e:
-                logger.error(f"Failed to start RadarMessenger: {e}")
-                logger.error(traceback.format_exc())
-                raise
 
             # Initialize radars
             self.initialize_radars()
@@ -376,17 +361,6 @@ class RadarManagementSystem:
             # Stop each radar
             for radar in self.radars.values():
                 radar.stop()
-
-            # Stop radar messenger
-            # NOTE: RadarMessenger.stop() is a synchronous method (it does a
-            # blocking thread.join() internally), not a coroutine. It was
-            # previously awaited here, which raised
-            # "TypeError: object NoneType can't be used in 'await' expression"
-            # on every shutdown since stop() returns None, not an awaitable.
-            if self.radar_messenger:
-                logger.info("Stopping RadarMessenger...")
-                self.radar_messenger.stop()
-                logger.info("RadarMessenger stopped successfully")
 
             logger.info("Radar Management System running flag set to False")
             logger.info("=== Radar Management System stopped ===")

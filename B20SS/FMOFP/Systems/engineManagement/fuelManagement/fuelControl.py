@@ -4,8 +4,6 @@ import random
 from typing import Dict, List
 from collections import defaultdict
 from FMOFP.storage.DBM import DatabaseManager
-from FMOFP.MIL_STD_1553B.Messaging import ScheduleMessage
-from FMOFP.MIL_STD_1553B.mil_std_1553B  import MIL_STD_1553B_Message
 from FMOFP.Utils.logger.sys_logger import get_logger
 from FMOFP.Systems.engineManagement.fuelManagement.fuelMonitor import FuelMonitor
 from FMOFP.Systems.engineManagement.fuelManagement.fuelTransfer import FuelTransferManager
@@ -77,7 +75,6 @@ class FuelSystem:
         # class -- but it's live, not dead.
         self.db = DatabaseManager('FMOFP/dbConfig.xml').get_system_db('default')
         self._setup_database()
-        self.messaging = ScheduleMessage()
         self.rt_address = 3  # Assign a unique RT address for the Fuel Management System
 
     def _setup_database(self):
@@ -175,23 +172,6 @@ class FuelSystem:
 
     def get_fuel_status(self) -> Dict[str, float]:
         return {tank.name: tank.current_level for tank in self.tanks.values()}
-
-    def send_fuel_status(self):
-        status = self.get_fuel_status()
-        message = MIL_STD_1553B_Message(self.rt_address, 0, status)
-        self.messaging.send_message(message)
-
-    def receive_message(self, message):
-        data = message.data
-        if 'engine_thrust' in data:
-            engine_name = data['engine_name']
-            thrust_percentage = data['engine_thrust']
-            self.set_engine_thrust(engine_name, thrust_percentage)
-        elif 'fuel_transfer' in data:
-            source_tank = data['source_tank']
-            destination_tank = data['destination_tank']
-            amount = data['amount']
-            self.transfer_fuel(source_tank, destination_tank, amount)
 
 class FuelManagementSystem:
     #: Seconds to back off after a failed update pass. Long enough that an

@@ -1,3 +1,0 @@
-"""
-Display-specific message definitions.
-"""

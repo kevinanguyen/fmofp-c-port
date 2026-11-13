@@ -2,11 +2,22 @@
 
 [![FMOFP CI](https://github.com/TubAleeLo/fmofp/actions/workflows/ci.yml/badge.svg)](https://github.com/TubAleeLo/fmofp/actions/workflows/ci.yml)
 
-A Python/PyQt6 **avionics simulation system** for the fictional B20SS military
-aircraft: five radar processors, three display families, a software
-MIL-STD-1553B bus simulation, flight management and flight control systems,
-and ~25 aircraft subsystems, integrated through an event-driven
-async/threading architecture with SQLite persistence.
+An **avionics simulation system** for the fictional B20SS military aircraft:
+five radar processors, the cockpit displays, flight management and flight
+control, and about twenty-five aircraft subsystems on a simulated
+MIL-STD-1553B bus.
+
+> **This branch (`port/cpp`) is the C++ port.** The flight software, everything
+> that decides something about the aircraft, is C++17 under `B20SS/ofp/`: one
+> process per subsystem, talking only over the simulated bus. The displays,
+> the scenario engine, the debug prompt and the tests are Python. The original
+> all-Python application's messaging (`local_messaging/`, the Python
+> `MIL_STD_1553B/` library and the wiring that booted every subsystem as a
+> Python service) was retired when the port was finished; what remains under
+> `B20SS/FMOFP/` is the display classes and the subsystems' logic, which the
+> tests run beside the C++ to prove the two agree. Start with `CLAUDE.md`
+> (the working file) and `B20SS/ofp/README.md`. Sections below that describe
+> the Python system as a running program are history.
 
 ![Weather radar display](B20SS/__ABOUT__/Weather-standby.PNG)
 
@@ -47,13 +58,14 @@ python install.py
 # Option B: plain pip
 pip install -r requirements.txt
 
-# Run the simulation
-python FMOFP/Main.py
+# Build the C++ flight software first (B20SS/ofp/README.md), then run the aircraft:
+python FMOFP/Main.py          # the same as: python -m fmofp_demo
 ```
 
-Configuration lives in the XML files next to `Main.py`
-(`startupConfiguration.xml`, `dbConfig.xml`, `rtAddressConfig.xml`,
-`messageRateConfig.xml`, `queryRateConfig.xml`).
+`Main.py` starts the plant, every C++ partition, the six display windows and
+the bus controller (`fmofp_demo`). The bus's messages are defined in
+`B20SS/icd/fmofp_icd.xml`. The XML files next to `Main.py` configured the
+Python application; the frozen Python modules still read some of them.
 
 ## Running the tests
 
@@ -75,7 +87,10 @@ runner's docstring lists them and why.
 
 | Path | Contents |
 |---|---|
-| `B20SS/FMOFP/` | The application: `Main.py` entry point, `core/`, `Systems/`, `MIL_STD_1553B/`, `Interfaces/` (displays, messaging, scenarios), `local_messaging/`, `storage/`, `Utils/`, `Tests/` |
+| `B20SS/ofp/` | The C++ flight software: the bus, the bus controller, one partition per subsystem, their tests |
+| `B20SS/icd/` | The bus interface definition (`fmofp_icd.xml`) and its tools |
+| `B20SS/fmofp_bus/`, `fmofp_plant/`, `fmofp_display/`, `fmofp_demo/`, `fmofp_scenario/`, `fmofp_cli/` | The Python side of the bus: library and tests, the simulated aircraft, the display terminals, the launcher, the scenario engine, the debug prompt |
+| `B20SS/FMOFP/` | What is kept of the Python application: `Main.py` (starts the demo), `Systems/` (the subsystems' logic, the tests' reference), `Interfaces/` (displays, scenarios), `core/` (the event bus), `storage/`, `Utils/`, `Tests/` |
 | `B20SS/PLANNING.md` | Architecture, per-subsystem status, known-issues ledger, audit history |
 | `B20SS/FMOFP_User_Manual/` | 14-chapter user manual |
 | `B20SS/FMOFP/docs/` | Display/messaging architecture, requirements, and coding-standards docs |

@@ -1,7 +1,6 @@
 import threading
 import time
 import math
-import traceback
 from FMOFP.Utils.logger.sys_logger import get_logger
 from FMOFP.core.event_driven_communication import get_event_bus
 from FMOFP.Systems.flightManagementSys.flightControlSys.flight_control_system import get_flight_control_system
@@ -517,75 +516,6 @@ class flightManagementSystem:
             else:
                 logger.warning(f"Invalid waypoint ID: {waypoint_id}")
                 return False
-
-    def receive_message(self, message):
-        """
-        Process incoming messages from other systems
-
-        This method only handles the receipt of messages and delegates
-        actual processing to the FMS message processor.
-
-        Args:
-            message: The message to process
-
-        Returns:
-            bool: True if message was processed successfully, False otherwise
-        """
-        logger.debug(f"FMS received message: {message}")
-
-        # Import message processor here to avoid circular imports
-        from FMOFP.Systems.flightManagementSys.fms_message_processor import get_fms_message_processor
-
-        # Get or create processor instance with reference to self
-        processor = get_fms_message_processor(self)
-
-        # Delegate processing to the message processor
-        return processor.process_message(message)
-
-    def receive_message_sync(self, message):
-        """
-        Synchronously process an incoming message for the Flight Management System.
-
-        This is used by the RadarMessenger for direct message handling.
-        Required by the messaging system for proper synchronous message handling.
-
-        Args:
-            message: The message to process
-
-        Returns:
-            True if the message was processed successfully, False otherwise
-        """
-        try:
-            logger.info(f"[FMS] Synchronously processing message with ID: {id(message)}")
-
-            # Log message details for debugging
-            if hasattr(message, 'message_type'):
-                logger.info(f"[FMS] Message type: {message.message_type}")
-            if hasattr(message, 'command_type'):
-                logger.info(f"[FMS] Command type: {message.command_type}")
-            if hasattr(message, 'command_name'):
-                logger.info(f"[FMS] Command name: {message.command_name}")
-
-            # Set metadata if not present
-            if not hasattr(message, 'metadata'):
-                message.metadata = {}
-
-            # Mark as processed by FMS
-            if isinstance(message.metadata, dict):
-                if 'processed_by' not in message.metadata:
-                    message.metadata['processed_by'] = []
-
-                if 'flightManagementSystem' not in message.metadata['processed_by']:
-                    message.metadata['processed_by'].append('flightManagementSystem')
-
-            # Process the message using the regular receive_message method
-            # This maintains a single code path for message processing
-            return self.receive_message(message)
-
-        except Exception as e:
-            logger.error(f"[FMS] Error processing message synchronously: {e}")
-            logger.error(traceback.format_exc())
-            return False
 
     def check_health(self):
         """Check the health of the FMS"""

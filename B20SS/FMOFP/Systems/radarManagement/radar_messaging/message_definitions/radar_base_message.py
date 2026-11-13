@@ -170,55 +170,6 @@ class RadarBaseMessage:
             if hasattr(self, field_name):
                 setattr(self, field_name, value)
 
-    def to_mil_std_message(self):
-        """Convert to MIL_STD_1553B_Message for transmission."""
-        from FMOFP.MIL_STD_1553B.mil_std_1553B import MIL_STD_1553B_Message
-        from FMOFP.Systems.radarManagement.radar_messaging.address_utils import (
-            get_rt_subaddress_pair_for_radar
-        )
-        
-        # Get RT/SA addresses based on message type
-        rt_address = None
-        sub_address = None
-        
-        # Try to determine system type from message attributes
-        system_type = self.sending_system
-        if 'weather' in str(self.message_type).lower():
-            system_type = 'weather_radar'
-        elif 'tfr' in str(self.message_type).lower():
-            system_type = 'tfr_radar'
-        elif 'sar' in str(self.message_type).lower():
-            system_type = 'sar_radar'
-        elif 'targeting' in str(self.message_type).lower():
-            system_type = 'targeting_radar'
-        elif 'aewc' in str(self.message_type).lower():
-            system_type = 'aewc_radar'
-            
-        # Use address utilities to get RT/SA pair
-        try:
-            rt_address, sub_address = get_rt_subaddress_pair_for_radar(system_type, 'weather_radar')
-        except Exception:
-            # Fallback to defaults if lookup fails
-            rt_address = 9  # Default radar address
-            sub_address = 1  # Default data subaddress
-        
-        # Convert message to dictionary
-        msg_dict = self.to_dict()
-        
-        # Create MIL_STD_1553B_Message
-        mil_std_msg = MIL_STD_1553B_Message(
-            rt_address=rt_address,
-            sub_address=sub_address,
-            data=msg_dict.get('data', [])
-        )
-        
-        # Copy all metadata fields to MIL_STD_1553B_Message
-        for key, value in msg_dict.items():
-            if key not in ['rt_address', 'sub_address', 'data']:
-                setattr(mil_std_msg, key, value)
-                
-        return mil_std_msg
-
 # Registry for message types
 MESSAGE_REGISTRY: Dict[str, Type[RadarBaseMessage]] = {}
 

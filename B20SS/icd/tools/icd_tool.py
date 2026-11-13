@@ -41,7 +41,9 @@ from pathlib import Path
 ICD_DIR = Path(__file__).resolve().parent.parent
 ICD_XML = ICD_DIR / "fmofp_icd.xml"
 TABLES_MD = ICD_DIR / "ICD_TABLES.md"
-LEGACY_SCHEMAS = ICD_DIR.parent / "FMOFP" / "MIL_STD_1553B" / "message_schemas.py"
+# The old Python bus's message table, kept as the record the legacy check reads. It lived in
+# FMOFP/MIL_STD_1553B/ until that package was retired (unit 29); nothing imports it.
+LEGACY_SCHEMAS = ICD_DIR / "legacy" / "message_schemas.py"
 
 RATES = {"50", "25", "10", "5", "1", "aperiodic"}
 FIELD_TYPES = {"uint", "sint", "enum", "bool", "ssm", "spare"}
@@ -823,7 +825,8 @@ def render(icd):
     w("## Where every legacy message type went")
     w("")
     w(f"All {getattr(icd, 'legacy_count', '?')} `MESSAGE_SCHEMAS` types from "
-      "`FMOFP/MIL_STD_1553B/message_schemas.py`.")
+      "`icd/legacy/message_schemas.py` (the old Python bus's table, `FMOFP/MIL_STD_1553B/message_schemas.py` "
+      "until that package was retired).")
     w("")
     w("| Legacy type | Now |")
     w("|---|---|")

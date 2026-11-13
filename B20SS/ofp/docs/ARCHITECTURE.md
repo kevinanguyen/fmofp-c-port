@@ -10,8 +10,11 @@ repository's root `CLAUDE.md` (the port's state and history).
 FMOFP simulates the avionics of a fictional aircraft, the B20SS. It began as one
 Python program. The flight software, everything that *decides* something about the
 aircraft, is now C++17 under `B20SS/ofp/`. The displays, the simulated world and the
-tests are still Python. The original Python program is kept unchanged under
-`B20SS/FMOFP/` ("frozen"): the C++ is measured against it.
+tests are still Python. The original Python program's logic is kept under
+`B20SS/FMOFP/` ("frozen"): the C++ is measured against it. What that program used to
+talk to itself with (its message router, its own Python bus, the code that booted every
+subsystem as a Python service) was deleted when the port was finished; the subsystems'
+logic and the display classes stayed. `python FMOFP/Main.py` starts the demo.
 
 ## The one rule
 
@@ -166,7 +169,7 @@ changed before you touch either.
 | `B20SS/fmofp_plant/` | The plant |
 | `B20SS/fmofp_display/` | The display terminals and their feeds |
 | `B20SS/fmofp_demo/`, `fmofp_scenario/`, `fmofp_cli/` | The launcher, the scenario engine, the debug prompt |
-| `B20SS/FMOFP/` | The frozen Python application. Read it; do not edit it |
+| `B20SS/FMOFP/` | The frozen Python: the subsystems' logic (`Systems/`) and the display classes (`Interfaces/`). Read it; do not edit it |
 
 ## When something is wrong
 

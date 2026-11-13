@@ -59,11 +59,7 @@ class MissionPlanningSystem:
         except Exception as e:
             logger.warning(f"[MPS] DB unavailable (non-fatal): {e}")
 
-        try:
-            from FMOFP.local_messaging.routing.MessageRoutingService import get_message_routing_service
-            self.message_handler = _MessageHandlerShim(get_message_routing_service())
-        except Exception:
-            self.message_handler = _MessageHandlerShim(None)
+        self.message_handler = _MessageHandlerShim(None)
 
     def set_phase(self, phase: MissionPhase):
         with self.lock:

@@ -481,12 +481,11 @@ def install_plain_radar_displays():
 
 
 def make_mfd(systems_feed):
-    """A MultiFunctionDisplay whose in-process sources are the bus feeds: the old-bus radar handler, the display
-    tree and the weather widget machinery are not started."""
+    """A MultiFunctionDisplay whose in-process sources are the bus feeds: the display tree and the weather widget
+    machinery are not started. (Its old-bus radar handler, which this used to switch off, went with unit 29.)"""
     bootstrap()
     install_system_sources(systems_feed)
     import FMOFP.Interfaces.userInterface.displays.mfd as mfd_module
-    mfd_module.get_radar_message_handler = lambda: None
     install_plain_radar_displays()
     mfd = mfd_module.MultiFunctionDisplay()
     mfd.start()

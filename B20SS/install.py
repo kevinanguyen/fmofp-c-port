@@ -52,11 +52,9 @@ REQUIRED_DIRS = [
     FMOFP_DIR,
     FMOFP_DIR / "Systems",
     FMOFP_DIR / "Interfaces",
-    FMOFP_DIR / "MIL_STD_1553B",
     FMOFP_DIR / "storage",
     FMOFP_DIR / "Utils",
     FMOFP_DIR / "core",
-    FMOFP_DIR / "local_messaging",
 ]
 
 # Config files that must be present
@@ -589,12 +587,7 @@ def verify_installation() -> None:
     core_imports = [
         ("FMOFP.Utils.logger.sys_logger",      "get_logger"),
         ("FMOFP.Utils.common.fetching",         "fetch_fmofp_path"),
-        ("FMOFP.core.system_manager",           "get_system_manager"),
-        ("FMOFP.core.initializer",              "get_initializer"),
         ("FMOFP.storage.DBM",                   "DatabaseManager"),
-        ("FMOFP.MIL_STD_1553B.mil_std_1553B",   "MIL_STD_1553B_Message"),
-        ("FMOFP.local_messaging.routing.radar_to_display_bridge",
-                                                "push_vil_data"),
         ("FMOFP.Systems.radarManagement.weather.weather_radar",
                                                 "weather_radar"),
         ("FMOFP.Systems.radarManagement.targeting.targeting_radar",
@@ -669,14 +662,9 @@ def print_success() -> None:
     print(f"    cd {SCRIPT_DIR}")
     print(f"    python FMOFP{os.sep}Main.py")
     print()
-    print("  Expected startup sequence:")
-    print("    [SYSTEM]   Initializing FMOFP System Manager …")
-    print("    [DATABASE] Loading database configurations …")
-    print("    [1553B]    Initializing MIL-STD-1553B communication …")
-    print("    [RADAR]    Initializing radar management system …")
-    print("    [DISPLAY]  Initializing display management system …")
-    print("    [FMS]      Initializing flight management system …")
-    print("    [SYSTEM]   All systems operational — Ready for operations")
+    print("  That starts the aircraft on the bus (fmofp_demo): the plant, the C++ flight")
+    print("  software, the display windows and the bus controller, one status line a second.")
+    print("  The C++ must be built first: see ofp/README.md.")
     print()
 
 

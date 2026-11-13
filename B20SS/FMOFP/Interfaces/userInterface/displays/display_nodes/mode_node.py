@@ -118,7 +118,7 @@ class ModeNode(DisplayNode):
                                 
                                 # Try to get universal RadarDisplayMode to understand what this value represents
                                 try:
-                                    from FMOFP.local_messaging.radar_display_modes import RadarDisplayMode
+                                    from FMOFP.Interfaces.userInterface.displays.radar.radar_display_modes import RadarDisplayMode
                                     for universal_mode in RadarDisplayMode:
                                         if universal_mode.value == mode_value:
                                             logger.info(f"[MODE_NODE] Found value {mode_value} in RadarDisplayMode as {universal_mode.name}")
@@ -142,14 +142,14 @@ class ModeNode(DisplayNode):
                                 
                                 # Try to get a universal mode value for this name if possible
                                 try:
-                                    from FMOFP.local_messaging.radar_display_modes import RadarDisplayMode
+                                    from FMOFP.Interfaces.userInterface.displays.radar.radar_display_modes import RadarDisplayMode
                                     if hasattr(RadarDisplayMode, current_mode):
                                         universal_mode = getattr(RadarDisplayMode, current_mode)
                                         mode_value = universal_mode.value
                                         logger.info(f"[MODE_NODE] Found universal mode value {mode_value} for {current_mode}")
                                     else:
                                         # Try the radar_mode_converter which has more sophisticated mapping
-                                        from FMOFP.local_messaging.radar_mode_converter import mode_to_value
+                                        from FMOFP.Interfaces.userInterface.displays.radar.radar_mode_converter import mode_to_value
                                         converter_value = mode_to_value(current_mode)
                                         if converter_value is not None:
                                             mode_value = converter_value

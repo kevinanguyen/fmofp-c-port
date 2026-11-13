@@ -1,5 +1,14 @@
 # FMOFP B20SS — Planning & Progress Document
 
+> **On branch `port/cpp` this document is history (November 2026).** It describes the all-Python
+> application. The flight software has since been ported to C++ (`B20SS/ofp/`), and the Python
+> messaging this document describes was deleted with the port's last unit: `FMOFP/local_messaging/`,
+> `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`,
+> `core/system_manager.py` and the other boot modules, the per-subsystem messengers and handlers,
+> the old debug CLI, and the tests of all of those. `FMOFP/Main.py` now starts the aircraft on the bus
+> (`fmofp_demo`). The current architecture is `B20SS/ofp/docs/ARCHITECTURE.md`; the state of the port is
+> `CLAUDE.md` at the repository root. Nothing below was updated.
+
 > **Last updated:** August 21, 2026 (independent live-boot re-verification — see the
 > boxed note at the top of Known Issues: the app had been unable to boot since Aug 12
 > despite green CI; four boot-path defects fixed, boot now verified end-to-end, boot

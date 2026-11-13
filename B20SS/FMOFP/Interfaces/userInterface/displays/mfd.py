@@ -22,7 +22,6 @@ import math
 import traceback
 from enum import Enum
 from typing import Dict, List, Optional, Union
-from FMOFP.local_messaging.routing.handlers.system_message_handlers.RadarMessageHandler import get_radar_message_handler
 from FMOFP.Systems.radarManagement.radar_enums import (
     RadarMode, weather_radarMode, targeting_radarMode,
     tfr_radarMode, sar_radarMode, aewc_radarMode
@@ -72,10 +71,8 @@ class MultiFunctionDisplay(BaseDisplay):
         self.content_margin = 20.0
         self.content_start_x = self.menu_width + self.content_margin
 
-        # Radar data and handler
+        # Radar data (it arrives from the bus through fmofp_display's feeds)
         self.radar_data = RadarData()
-        self.radar_handler = get_radar_message_handler()
-        self._setup_radar_handlers()
 
         # Current radar display instance
         self._current_radar_display = None
@@ -157,44 +154,6 @@ class MultiFunctionDisplay(BaseDisplay):
             logger.error(f"MFD paint error: {str(e)}")
             logger.error(traceback.format_exc())
             raise
-
-    def _setup_radar_handlers(self):
-        """Set up handlers for radar messages"""
-        try:
-            if self.radar_handler and self.radar_handler.async_handler:
-                # Register handlers for different radar message types
-                self.radar_handler.async_handler.register_handler(
-                    "radar_mode_update",  # Changed from RadarStatusMessage to match RadarMessageHandler
-                    self._handle_radar_mode_update  # New handler name
-                )
-                self.radar_handler.async_handler.register_handler(
-                    "weather_radarData",
-                    self._handle_weather_data
-                )
-                self.radar_handler.async_handler.register_handler(
-                    "targeting_radarTrack",
-                    self._handle_target_data
-                )
-                self.radar_handler.async_handler.register_handler(
-                    "tfr_radarElevation",
-                    self._handle_tfr_data
-                )
-                self.radar_handler.async_handler.register_handler(
-                    "sar_radarImagery",
-                    self._handle_sar_data
-                )
-                self.radar_handler.async_handler.register_handler(
-                    "aewc_radarTrack",
-                    self._handle_aewc_data
-                )
-                self.radar_handler.async_handler.register_handler(
-                    "radar_status_update",
-                    self._handle_radar_status
-                )
-                logger.info("Radar message handlers registered")
-        except Exception as e:
-            logger.error(f"Error setting up radar handlers: {str(e)}")
-            logger.error(traceback.format_exc())
 
     def _handle_radar_mode_update(self, data: Dict):
         """Handle radar mode updates"""

@@ -15,9 +15,8 @@ Key features:
 
 import threading
 import time
-from typing import Dict, List, Callable, Union
+from typing import Dict, List, Callable
 from queue import Queue
-from FMOFP.MIL_STD_1553B.mil_std_1553B  import MIL_STD_1553B_Message
 from FMOFP.Utils.logger.sys_logger import get_logger
 
 logger = get_logger()
@@ -99,8 +98,8 @@ class EventBus:
             self._error_count += 1
             return False
 
-    def publish(self, event: Union[Event, MIL_STD_1553B_Message]):
-        """Publish an event or MIL-STD-1553B message."""
+    def publish(self, event: Event):
+        """Publish an event."""
         try:
             # Validate message
             if not self._validate_message(event):
@@ -110,11 +109,7 @@ class EventBus:
             self._event_count += 1
             self._last_event_time = time.time()
 
-            # Log based on message type
-            if isinstance(event, MIL_STD_1553B_Message):
-                logger.info(f"Publishing MIL-STD-1553B message: {event.message_type}")
-            else:
-                logger.info(f"Publishing event to topic: {event.topic}")
+            logger.info(f"Publishing event to topic: {event.topic}")
 
             # Add to queue
             self.event_queue.put(event)
@@ -129,8 +124,6 @@ class EventBus:
         try:
             if isinstance(message, Event):
                 return bool(message.topic and hasattr(message, 'data'))
-            elif isinstance(message, MIL_STD_1553B_Message):
-                return bool(message.message_type and hasattr(message, 'data'))
             else:
                 logger.warning(f"Invalid message type: {type(message)}")
                 return False
@@ -217,12 +210,8 @@ class EventBus:
                 if not self.event_queue.empty():
                     event = self.event_queue.get()
                     try:
-                        if isinstance(event, MIL_STD_1553B_Message):
-                            logger.info(f"Processing MIL-STD-1553B message: {event.message_type}")
-                            self._handle_1553b_message(event)
-                        else:
-                            logger.info(f"Processing event for topic: {event.topic}")
-                            self._handle_event(event)
+                        logger.info(f"Processing event for topic: {event.topic}")
+                        self._handle_event(event)
                         self.event_queue.task_done()
                     except Exception as e:
                         logger.error(f"Error handling event: {e}")
@@ -265,26 +254,6 @@ class EventBus:
                     self._error_count += 1
         else:
             logger.warning(f"No subscribers found for topic: {event.topic}")
-
-    def _handle_1553b_message(self, message: MIL_STD_1553B_Message):
-        """Handle MIL-STD-1553B message."""
-        try:
-            # Route message based on RT address
-            rt_address = message.rt_address
-            if rt_address in self.subscribers:
-                logger.info(f"Found subscribers for RT address: {rt_address}")
-                for callback in self.subscribers[rt_address]:
-                    try:
-                        callback(message)
-                        logger.info(f"Successfully routed message to RT: {rt_address}")
-                    except Exception as e:
-                        logger.error(f"Error routing message to RT {rt_address}: {e}")
-                        self._error_count += 1
-            else:
-                logger.warning(f"No subscribers found for RT address: {rt_address}")
-        except Exception as e:
-            logger.error(f"Error handling 1553B message: {e}")
-            self._error_count += 1
 
     def check_health(self) -> bool:
         """Enhanced health check."""

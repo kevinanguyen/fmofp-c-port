@@ -4191,7 +4191,7 @@ What the sensor data fusion's own sensor managers invented on every one of its 5
 
 ## Where every legacy message type went
 
-All 89 `MESSAGE_SCHEMAS` types from `FMOFP/MIL_STD_1553B/message_schemas.py`.
+All 89 `MESSAGE_SCHEMAS` types from `icd/legacy/message_schemas.py` (the old Python bus's table, `FMOFP/MIL_STD_1553B/message_schemas.py` until that package was retired).
 
 | Legacy type | Now |
 |---|---|

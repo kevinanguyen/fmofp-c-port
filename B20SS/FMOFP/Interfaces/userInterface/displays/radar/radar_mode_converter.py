@@ -12,7 +12,7 @@ from enum import Enum
 from typing import Optional, Tuple, Union, Dict, Any
 
 # Import the RadarDisplayMode enum
-from FMOFP.local_messaging.radar_display_modes import RadarDisplayMode
+from FMOFP.Interfaces.userInterface.displays.radar.radar_display_modes import RadarDisplayMode
 
 # Try to import display-specific enums if available
 try:

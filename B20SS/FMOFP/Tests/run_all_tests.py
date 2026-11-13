@@ -13,27 +13,16 @@ and exits nonzero if ANY suite fails, times out, or crashes.
 Run from B20SS/:  python FMOFP/Tests/run_all_tests.py
 
 Suites deliberately NOT run here, with reasons:
-  - All ten CLI-harness-only suites are gone. They exited 1 by design when run
-    standalone, printing "This test should be run via the user CLI 'test'
-    command", which kept 6,991 lines -- two thirds of the project's test code --
-    out of CI. Story C14.1 removed that blocker with Tests/live_system.py, and
-    C14.2 - C14.7 replaced every one of them with state assertions:
-
-      radar_tests/weather_radar_test.py          }
-      weather_radar_surveillance_mode_test.py    }  test_weather_radar_live.py
-      combined_precipitation_vil_flow_test.py    }
-
-      radar_tests/targeting_radar_test.py        }
-      radar_tests/tfr_radar_test.py              }  test_radar_modes_live.py
-      radar_tests/aewc_radar_test.py             }
-      radar_tests/sar_radar_test.py              }
-
-      fms_system_test.py                         -> test_fms_live.py
-      flight_control_system_test.py              -> test_flight_control_live.py
-      predefined_messages_test.py                -> test_predefined_messages_live.py
-
-    The radar_tests/ package went with them: it held nothing but those five
-    files and a docstring promising "comprehensive tests for all radar systems".
+  - Everything that tested the Python messaging is gone with it (November 2026, the C++ port's unit 29):
+    the live-system suites (test_*_live.py and Tests/live_system.py, which booted the application through
+    core/system_manager.py), the bus and listener suites (test_bus_adapter, test_listener_*,
+    test_send_path_bounds, test_fcs_wire_format), the routing and handler suites (test_request_expiry,
+    test_handler_lock_discipline, test_radar_*, test_blocker_*, test_bridge_and_coordinator,
+    test_precipitation_data_transfer, test_loop_prevention_categories, test_single_definition,
+    test_boundary_exception_handling), and the old CLI's (test_thread_and_cli_resilience,
+    test_health_and_readiness). The flight software is C++ on a simulated bus now and is tested from
+    B20SS/fmofp_bus/tests (run by B20SS/verify.sh), which also runs the Python logic kept here beside the
+    C++ as its reference.
 
   - test_weather_radar_holographic_display: interactive GUI test — enters
     QApplication.exec() and never exits; visual inspection only.
@@ -49,138 +38,29 @@ import time
 # (module path run with -m?, name, timeout seconds)
 SUITES = [
     (True,  "FMOFP.Tests.ci_test_boot_smoke", 300),
-    (True,  "FMOFP.Tests.test_bridge_and_coordinator", 300),
     (True,  "FMOFP.Tests.test_displays_headless", 300),
     (False, "FMOFP/Tests/ci_test_weather_radar.py", 300),
     (False, "FMOFP/Tests/ci_test_scenario_engine.py", 300),
     (True,  "FMOFP.Tests.test_power_fuel_thrust", 300),
     (True,  "FMOFP.Tests.test_hydr_airframe_ecs_fdm_fitness_swcm", 300),
     (True,  "FMOFP.Tests.test_toctou_start_race_regression", 600),
-    (True,  "FMOFP.Tests.test_precipitation_data_transfer", 300),
     (True,  "FMOFP.Tests.test_install_script", 300),
-    (True,  "FMOFP.Tests.test_bus_adapter", 300),
     (True,  "FMOFP.Tests.test_scenario_failure_injection", 300),
     (True,  "FMOFP.Tests.test_db_connection_pool", 300),
-    (True,  "FMOFP.Tests.test_thread_and_cli_resilience", 300),
     (True,  "FMOFP.Tests.test_radar_shutdown_health", 300),
-    (True,  "FMOFP.Tests.test_health_and_readiness", 300),
-    (True,  "FMOFP.Tests.test_listener_retry_and_ports", 300),
     (True,  "FMOFP.Tests.test_data_root", 300),
     (True,  "FMOFP.Tests.test_line_endings", 300),
-    # Production blockers B5/B11/B12: singleton re-initialisation leaking a
-    # thread pool per construction, run-once markers that outlived the process
-    # (so every boot after the first skipped database init and never re-read
-    # the message-rate config), and an import-time filesystem walk that indexed
-    # site-packages on an installed deployment.
-    (True,  "FMOFP.Tests.test_blocker_singleton_and_state", 300),
-    # Production blockers B6/B7/B8: FCS mode change calling a method that does
-    # not exist, FCS control input reading a bool as a dict (after the surface
-    # had already moved), and the radar mode-lookup tables being enum members
-    # rather than dicts, so every lookup by mode name fell back to STANDBY.
-    (True,  "FMOFP.Tests.test_blocker_command_paths", 300),
-    # Production blocker B9: one encoder, five decoders, four different sets of
-    # precipitation scale factors -- severe weather decoded ~79x low and
-    # rendered in the lightest colour band. Round-trip assertions.
-    (True,  "FMOFP.Tests.test_blocker_precip_scale", 300),
-    # The weather radar must not invent severity: precipitation, VIL, storm-cell
-    # and turbulence readings that never arrived used to be substituted with
-    # literals inside real colour bands (intensity 0.7 / rate 20 mm/h, VIL 20.0,
-    # category LIGHT, cell intensity 0), so a degraded return looked measured.
-    # Also covers two defects that made the whole thing moot: the particle draw
-    # path raised AttributeError on self.width() and painted nothing, and the
-    # 'collection' link row shadowed every real point on an exact request_id
-    # lookup.
-    (True,  "FMOFP.Tests.test_weather_radar_truthfulness", 300),
-    # H4: send_request guarded itself with `if not self._can_send_request():` on
-    # an async method. The un-awaited coroutine is always truthy, so the gate
-    # never ran -- losing both the rate limit and, more seriously, the readiness
-    # check that decides whether anything is listening. Adding `await` while
-    # keeping the surrounding `while` would have turned it into an infinite spin.
-    (True,  "FMOFP.Tests.test_radar_send_rate_limit", 300),
     # H17: SystemDatabase.ensure_column_exists had the log prefix "[DBM] "
     # pasted inside its ALTER statement, checked for an existing column with a
     # substring match against the CREATE TABLE text, and swallowed the resulting
     # OperationalError. It added nothing, ever, and said it had.
     (True,  "FMOFP.Tests.test_db_ensure_column", 300),
-    # H2/H16: an accepted connection had no idle timeout, so a peer that
-    # connected and said nothing held its handler for as long as it stayed
-    # connected; and get_listen_endpoint validated the port but passed the host
-    # straight to bind().
-    (True,  "FMOFP.Tests.test_listener_idle_and_bind", 300),
-    # H3: both listeners called handle_connection() inline on the accept thread,
-    # so one held connection stopped every other peer being accepted at all.
-    # Connections are now served on a bounded pool of worker threads.
-    (True,  "FMOFP.Tests.test_listener_concurrency", 420),
-    # H5: RadarMessageHandler.send_request held a threading.Lock across three
-    # awaits, and FMSResponseService.send_response across its callback await. A
-    # thread lock blocks the thread, not the task, so two concurrent calls
-    # deadlocked the event loop outright instead of serialising.
-    (True,  "FMOFP.Tests.test_handler_lock_discipline", 420),
-    # H8/H7: RadarMessageHandler._start_cleanup_timer() had no caller, so
-    # pending requests were never expired or retried and the expiry path's own
-    # bugs had never executed; and FCS/FMS delivered timeout notifications via
-    # asyncio.get_event_loop() from a threading.Timer thread, where it raises.
-    (True,  "FMOFP.Tests.test_request_expiry", 420),
     # The interpreters CI covers and the interpreters a shipped offline
     # install supports were not the same set: PyQt6_sip is not abi3, so the
     # bundled wheel is locked to CPython 3.10 and --offline has no PyPI
     # fallback. CI never caught it because it only runs on ubuntu-latest,
     # where WHEEL_DIRS is empty and that path is never exercised.
     (True,  "FMOFP.Tests.test_offline_install_matrix", 180),
-    # The bus send path could not finish: the block-transfer split produced
-    # chunks that were themselves "large", so any message over 33 frames
-    # recursed forever; the transport socket had no timeout; the caller's
-    # future.result() had none either; and one dispatch site submitted to an
-    # event loop nobody ran, so it burned its full 5 s timeout every call.
-    (True,  "FMOFP.Tests.test_send_path_bounds", 300),
-    # Production blockers B1/B2/B3/B4: a boot failure that hung the process
-    # forever and an error shutdown that exited 0; initialization failures
-    # swallowed so boot continued on a half-built system; coroutine stops
-    # discarded when the loop was halted straight after scheduling them; and an
-    # unbounded EventBus join holding the shared lock.
-    (True,  "FMOFP.Tests.test_blocker_lifecycle", 300),
-    # Story C14.3: four radars swept across every commandable mode against a
-    # live system, plus phase-policy and request-dispatch assertions.
-    (True,  "FMOFP.Tests.test_radar_modes_live", 420),
-    # Story C14.4: FMS mode contract, the FMS->FCS mode mapping, attitude
-    # handling and request dispatch, against a live system.
-    (True,  "FMOFP.Tests.test_fms_live", 420),
-    # Story C14.5: FCS mode vocabulary, control-input saturation and the
-    # one-way FMS -> FCS coupling, against a live system.
-    (True,  "FMOFP.Tests.test_flight_control_live", 420),
-    # Story B3.1: register_category existed nowhere, and five call sites
-    # probed for it -- three logging "does not support category registration"
-    # (exactly 7 times per live boot, the figure the PI risk register
-    # recorded) and two skipping silently, leaving 23 registrations dead.
-    # Category extraction also returned the first match over a SET, so the
-    # same message was categorised differently per PYTHONHASHSEED: measured
-    # 'fcs_status' on 2 of 5 seeds and 'status' on 3.
-    (True,  "FMOFP.Tests.test_loop_prevention_categories", 300),
-    # The radar response services' data_handler slots: set_async_handler
-    # built a PrecipitationDataHandler / VILDataHandler / EchoTopDataHandler
-    # for each of the three weather services and then, 59 lines later,
-    # overwrote all three with the raw SystemDatabase. The two types overlap
-    # on store_precipitation_data, so the path looked alive; but
-    # _store_precipitation_data gates on data_handler._verify_table_exists(),
-    # which SystemDatabase has not got, so every store raised inside the try.
-    # Measured with the table reset first: 14 [PRECIP_STORE] errors and 0
-    # rows before, 0 errors and 14 rows after.
-    (True,  "FMOFP.Tests.test_radar_data_handler_binding", 300),
-    # Story C15: eight except-Exception handlers at the bus send/receive,
-    # routing dispatch and health boundaries logged f"...{e}" and returned a
-    # benign value, so the log recorded that something failed and nothing
-    # about where -- the mechanism behind H6's swallowed AttributeError and
-    # BLOCKER B7's .get() on a bool. They pass exc_info=True now, verified
-    # end to end because SysLogger wraps logging and a dropped kwarg would
-    # have made all eight no-ops.
-    (True,  "FMOFP.Tests.test_boundary_exception_handling", 300),
-    # One definition per thing: prevention.py carried a six-member stand-in
-    # for the 35-member RadarDisplayMode behind an except ImportError, which
-    # narrowed loop prevention to 6 categories of 35 and numbered five of its
-    # six members differently; a third definition under displays/radar/ had
-    # zero importers and a self-contradicting docstring; and the two
-    # display_command_map modules agree with nothing enforcing it.
-    (True,  "FMOFP.Tests.test_single_definition", 120),
     # FuelManagementSystem's worker loop called three methods outside its
     # try, so ONE transient error killed fuel management permanently and
     # silently -- reproduced with a single injected RuntimeError -- while
@@ -204,21 +84,6 @@ SUITES = [
     # in it. verdict_lines() lifts the suite's markers out by pattern
     # wherever they sit in the stream.
     (True,  "FMOFP.Tests.test_runner_reporting", 120),
-    # Story C25.1, the FCS half: the FCS's command words were invented from
-    # a private 0x4000 base rather than derived from the address book, so
-    # 0x4007 decoded to RT address 8 -- Power Management -- and every FCS
-    # mode change and status request went out addressed there. Its data
-    # words had two incompatible encodings, one of them with no callers and
-    # nothing to decode it, and an unrecognised mode or surface was encoded
-    # as a different one rather than refused.
-    (True,  "FMOFP.Tests.test_fcs_wire_format", 180),
-    # Story C14.6: the predefined message facade -- initialisation, the three
-    # accepted radar-mode input forms, rejection, and request-ID contracts.
-    (True,  "FMOFP.Tests.test_predefined_messages_live", 420),
-    # Story C14: runs against a REAL booted application via
-    # Tests/live_system.py, so it needs a longer budget than the unit
-    # suites -- boot plus supervisory-convergence polling.
-    (True,  "FMOFP.Tests.test_weather_radar_live", 420),
 ]
 
 

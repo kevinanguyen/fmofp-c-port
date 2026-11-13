@@ -8,7 +8,7 @@ across system and display boundaries.
 """
 
 from enum import Enum
-from FMOFP.local_messaging.radar_display_modes import RadarDisplayMode
+from FMOFP.Interfaces.userInterface.displays.radar.radar_display_modes import RadarDisplayMode
 
 class BaseDisplayRadarMode(Enum):
     """

@@ -53,6 +53,9 @@ One command starts everything on the bus and shows what crosses it. From `B20SS/
 py -m fmofp_demo
 ```
 
+(`py FMOFP/Main.py`, the old Python application's entry point, runs the same thing since
+that application's messaging was retired.)
+
 It starts the plant (the simulated aircraft with its weather, terrain and
 engines, its air traffic), the five ported partitions, the five display windows and the bus
 controller, runs a short scripted flight (radars on, the thrust lever, the

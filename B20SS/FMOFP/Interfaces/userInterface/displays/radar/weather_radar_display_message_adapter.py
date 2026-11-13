@@ -9,7 +9,7 @@ import time
 from typing import Any, Dict, Union
 
 # Import display-local modules
-from ...messaging.display_message_types import (
+from ..display_message_types import (
     DISPLAY_COMMAND_TYPE_MODE,
     DISPLAY_COMMAND_TYPE_MODE_CHANGE,
     DISPLAY_VIL_DATA,
@@ -17,9 +17,9 @@ from ...messaging.display_message_types import (
     is_precipitation_message,
     is_vil_message
 )
-from ...messaging.display_address_utils import (
-    WEATHER_RADAR_RT_ADDRESS
-)
+# The radar's terminal address: 9 in rtAddressConfig.xml, as it is in the bus ICD. It was looked up
+# through the display's address utilities, retired with the old messaging (the port's unit 29).
+WEATHER_RADAR_RT_ADDRESS = 9
 
 # Import radar enums
 from .radar_enums import weather_radarMode

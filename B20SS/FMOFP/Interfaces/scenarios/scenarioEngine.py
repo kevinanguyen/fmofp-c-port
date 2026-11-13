@@ -223,7 +223,6 @@ class ScenarioEngine:
 
     def _inject_weather(self, p: Dict):
         try:
-            from FMOFP.local_messaging.routing.radar_to_display_bridge import push_cells_data
             cell = {
                 'position':   (float(p.get('x', 0)), float(p.get('y', 0))),
                 'intensity':  float(p.get('intensity', 0.7)),
@@ -233,8 +232,10 @@ class ScenarioEngine:
                 'cell_id':    0,
                 'category':   p.get('category', 'MODERATE'),
             }
-            push_cells_data([cell], str(uuid.uuid4()))
-            logger.debug("[SCENARIO] Injected weather cell")
+            # The cell went to the weather display through the old display bridge, retired with the port's
+            # unit 29. On the bus a scenario's weather cell goes into the plant's sky, where the radar
+            # finds it (fmofp_scenario, PLANT_INJECT_WEATHER).
+            logger.debug(f"[SCENARIO] Weather cell built, no display bridge to push it to: {cell}")
         except Exception as e:
             logger.debug(f"[SCENARIO] weather_cell inject error: {e}")
 

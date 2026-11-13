@@ -25,7 +25,7 @@ py B20SS/icd/tools/icd_tool.py render
 
 ## 1. Scope of v1
 
-Alee asked for v1 to be drafted from `FMOFP/rtAddressConfig.xml` and `FMOFP/MIL_STD_1553B/message_schemas.py`. All 89 message types in `MESSAGE_SCHEMAS` are mapped to a new message, a block stream, a mode code, or an explicit retirement. The full list is at the end of `ICD_TABLES.md`.
+Alee asked for v1 to be drafted from `FMOFP/rtAddressConfig.xml` and `FMOFP/MIL_STD_1553B/message_schemas.py` (kept as `icd/legacy/message_schemas.py` since the old Python bus was retired in unit 29: the tool's legacy check reads it there). All 89 message types in `MESSAGE_SCHEMAS` are mapped to a new message, a block stream, a mode code, or an explicit retirement. The full list is at the end of `ICD_TABLES.md`.
 
 v1 does **not** yet define the data that never crossed the bus. Today that data reaches the displays through `radar_to_display_bridge.py` and direct Python calls:
 - radar product payloads
@@ -623,6 +623,8 @@ Word 3 of every terminal's `TERM_STATUS` holds the ICD version it was built agai
 Changing a layout bumps the major version; adding something bumps the minor. While the ICD is a DRAFT and nothing is deployed against it, a layout may still grow between minor versions (as the FMS status messages did in 1.2); the major version starts counting at the first released version.
 
 ## 10. Problems found in today's bus code
+
+*(History since unit 29, November 2026: the Python bus this section examined, `FMOFP/MIL_STD_1553B/`, and the router beside it, `FMOFP/local_messaging/`, were deleted once every subsystem was on this ICD's bus. Its message table is kept as `icd/legacy/message_schemas.py` for the legacy check.)*
 
 I ran the real codec from `main` @ `0db2621` on test messages. That's `MetadataCodec.encode_metadata` / `decode_metadata`, which `BC_msg.py`, `Messaging.py`, `RT_socket.py`, `RT_msg.py` and the display metadata decoder all call.
 
