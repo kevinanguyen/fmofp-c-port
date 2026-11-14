@@ -27,6 +27,7 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import (AewcMode, SarMode, TargetingMode, TerminalState, TfrMode, TrackFilter,
                                  WeatherMode)
 from fmofp_bus.status import Status
+from fmofp_display import weather_fast
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.radar_feed import RadarFeed
 from fmofp_display.systems_feed import SystemsFeed, TerrainClearance, WeatherSeverity
@@ -110,6 +111,7 @@ class RadarPicture(QWidget):
     def __init__(self, feed, parent=None):
         super().__init__(parent)
         bootstrap()
+        weather_fast.install()  # the weather display's particles painted once a repaint, not once per reading
         from FMOFP.Interfaces.userInterface.displays.radar.tfr_radar_display import TFRRadarDisplay
         from FMOFP.Interfaces.userInterface.displays.radar.weather_radar_display import WeatherRadarDisplay
         from FMOFP.Systems.radarManagement.radar_enums import tfr_radarMode, weather_radarMode
@@ -498,6 +500,7 @@ class MfdWindow(QWidget):
     def __init__(self, terminal, radar_feed=None, systems_feed=None):
         super().__init__()
         bootstrap()
+        weather_fast.install()  # the MFD builds its own weather display for its radar page: the same repair
         from FMOFP.Interfaces.userInterface.displays.radar.radar_display_data_coordinator import (
             get_radar_display_data_coordinator)
         from FMOFP.Systems.radarManagement.radar_enums import (aewc_radarMode, sar_radarMode, targeting_radarMode,

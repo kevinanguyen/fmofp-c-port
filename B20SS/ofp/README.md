@@ -89,6 +89,17 @@ in a thread of the window the radar display missed every poll once the first
 scan arrived. The helper answers the bus and forwards what it hears; the
 window reads a mirror.
 
+The weather picture's particles are painted by `fmofp_display/weather_fast.py`
+since ICD v1.24. The frozen display painted every particle of a kind once per
+reading it drew, about twenty times a repaint, and searched a list of every
+particle's id for each one: a repaint of the radar window took 7 to 30 s and
+its buttons answered between repaints. The display programs now paint one pass
+into an image and lay it down as often as the display asks, which gives the
+same picture (a test holds the two against each other) in about a third of a
+second. The frozen file is not edited: two methods of the class are replaced
+when a window is built. `FMOFP_FROZEN_PARTICLES=1` in the environment keeps the
+frozen drawing, to compare.
+
 ## Running the partitions
 
 Flight control, navigation, flight management, the five radars (weather,

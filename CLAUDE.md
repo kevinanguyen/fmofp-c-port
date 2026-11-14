@@ -149,7 +149,7 @@ person may continue it in their next session; when it is green it is rebased ont
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 305 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine); C++
+- **Tests**: Python 313 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine); C++
   ctest 2/2 (327 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
@@ -184,13 +184,15 @@ person may continue it in their next session; when it is green it is rebased ont
   2026-11-14 with its review of unit 29 on his machine (section 7: the gate green on both builds, the legacy
   suites and the coverage floors too, nothing found that should come back); his answers are awaited. Backlog,
   nobody's yet: the ICD README's section 12. Last session: Kevin's, 2026-11-14 (the check after the port
-  closed, then the test of the finished port as a user runs it); before it Alee's, 2026-11-12 (units 29 and 30
-  closed).
-- **IN PROGRESS (Kevin, 2026-11-14): the five repairs below**, found by the test of 2026-11-14 (Kevin: "fix
-  them all", section 8; the evidence is section 7's entry of that test; the meter does not move; they land as
-  separate commits, each green; the clients' repair takes the ICD to v1.24). **(a), (b), (c) and (e) are
-  repaired** (section 7, "the clients repaired" and "the rain area"); (d) is next. The five as they were found.
-  In unit 28's clients, Kevin's agent's own work: (a) `py -m fmofp_cli` and
+  closed, the test of the finished port as a user runs it, then the repair of what it found); before it
+  Alee's, 2026-11-12 (units 29 and 30 closed). **Alee: after pulling these repairs, build the optimised preset
+  again** (`cmake --build --preset windows-ucrt64-release` from `B20SS/ofp/`): the bus controller changed, and
+  the demo flies the optimised build when there is one (section 6).
+- **Repaired 2026-11-14, all five** (Kevin: "fix them all", section 8): what his agent's test of the finished
+  port found that day. Three commits, each green, ICD v1.24, the meter unmoved: `2cc2a22` the clients (a, b, c),
+  `9780f87` the rain area (e), and the radar window (d) in the commit after it (section 7 has an entry for
+  each). No claim is open. The five as they were found. In unit 28's clients, Kevin's agent's own work:
+  (a) `py -m fmofp_cli` and
   `py -m fmofp_scenario` cannot start beside `py -m fmofp_demo` (exit 2): the demo's dashboard holds the one
   monitor port, so the usage the documents give works only against a bus started without the dashboard, which
   is what the tests do; (b) every new client program numbers its commands from 201 and a terminal ignores a
@@ -952,9 +954,22 @@ Python tests and displays
   Qt.TimerType.PreciseTimer, ...)` grabs (`QWidget.grab().save`) before `exec()`. Coarse timers do not fire in
   the radar window. The MFD builds a radar picture only in its click handler: `QTest.mouseClick` on the menu,
   not `current_page = RADAR`.
-- Before blaming the bus for a sluggish window, time its `paintEvent`: the frozen weather display's
-  `_draw_particles` runs once per storm cell, precipitation item and VIL point, each time over every particle
-  of the type (7-30 s a repaint with a few thousand particles).
+- Before blaming the bus for a sluggish window, time its `paintEvent`, and before guessing why, profile it:
+  `cProfile` over twenty seconds of the radar window put 85 % of a repaint in one line of the frozen
+  `_draw_particles`, `particle['grid_id'] in visible_ids` on a list of six thousand ids, where the eye had
+  blamed the drawing. The frozen method ran once per storm cell, precipitation reading and VIL reading, each
+  time over every particle of the type; `fmofp_display/weather_fast.py` has replaced it in the display
+  programs since v1.24 (`FMOFP_FROZEN_PARTICLES=1` brings the frozen drawing back).
+- A picture that depends on being painted n times over keeps its look when one pass is painted into an image
+  and the image laid down n times: "over" is associative. `test_weather_fast` holds such a repair against the
+  frozen method pixel for pixel, which is what made it safe to replace frozen display code from outside.
+- To lay a device-pixel image down one for one under any screen scale and painter transform: world transform
+  `T(origin) * deviceTransform.inverted() * worldTransform`, then `drawImage` at (0.25, 0.25), so that a
+  rounding error cannot move it a pixel. The image is painted through `deviceTransform * T(-origin)`.
+- The weather display makes every reading's particles anew at each scan: `radar_feed` names the readings by
+  scan and version, and the frozen display makes particles for any name it has not seen. Some ten thousand
+  particles are alive, three generations deep; its own bookkeeping of them (0.27 s an animation step) is what
+  is left of the radar window's time (ICD README section 12).
 - The frozen `StratiformArea.update` adds `3 sin(age/600)` to its stored intensity at every call (and decays
   the stored value at every call near its end); the plant's area has kept the reflectivity it was made with
   since v1.24 (`base_intensity`). A comparison of the plant's weather with the frozen class steps both and
@@ -2114,6 +2129,47 @@ done before this file existed are condensed from the private session notes.
   frozen class, 110 dBZ after a minute and over 2,000 after five; the plant's area within 3 dBZ of its making
   through fifty minutes, its drift equal to the frozen one's, its decay to a fifth; half an hour of the whole
   sky under 70 dBZ). No C++ changed. Meter unchanged, 29.5 / 29.5 = 100 %.
+
+### 2026-11-14 - the radar window: the weather picture's particles painted once a repaint - ICD v1.24 - by Kevin's agent
+- *What*: `fmofp_display/weather_fast.py`, put in place of two methods of the frozen `WeatherRadarDisplay`
+  when the radar window or the MFD window is built (`install()`, called by `RadarPicture` and `MfdWindow`;
+  nothing in the frozen file is edited). `_draw_particles(painter, data_type)` now paints one pass of the
+  type's particles into an image, with the frozen method's own particles, order, culling, colours and
+  gradients, and lays that image down at each call; `draw_radar_elements` counts the repaint. The image is
+  painted again only when a new repaint finds the particles moved, recoloured, added or gone (a fingerprint:
+  their number and the sums of their places, sizes and opacities, the colours, the painter's mapping).
+  `FMOFP_FROZEN_PARTICLES=1` leaves the frozen drawing in place; an error in the new drawing hands the call
+  back to it.
+- *How it was found out*: the first guess, the day's test, blamed the drawing being repeated once per reading.
+  A profile of the window said otherwise: of 22.8 s, 19.4 s were inside `_draw_particles` itself, not in Qt.
+  Each call looks every particle's id up in the list the spatial grid returns, six thousand strings, so a
+  call is quadratic: 0.15 s of searching, 64 calls a repaint. The repetition (69,000 ellipses a repaint) was
+  the other tenth. Painting each particle once would have been the obvious repair and the wrong one: the
+  picture is made by the repetition, a particle painted once is a faint speck (a run with that change showed
+  an almost empty picture). Hence one pass, laid down as often as the frozen display asks: the same
+  compositing, since "over" is associative.
+- *Checked*: offscreen, 11,000 particles and 41 calls on surfaces of scale 1, 1.25 and 2, with and without a
+  moved origin: the frozen method 14 s, the new one 0.09 s, the pictures the same picture (largest difference
+  21 levels on a few dozen pixels, mean 0.009). In the live radar window over a 66 s flight: repaints of
+  0.30 to 0.38 s (7 to 30 s before), the one-second timer firing 60 times in 60 s (9 in 75 before), the MFD's
+  weather page 0.27 s (9.5 s); the bus 3300 frames, 1 overrun with a profiler on the window. With the rain
+  area repaired the weather picture at 60 s is storm cells with their labels and a maximum of 40 dBZ.
+- *What is left, and why it was left*: a repaint and a step of the display's animation now alternate, 0.31 s
+  and 0.27 s. The 0.27 s is the frozen display moving ten thousand particles through its spatial grid, which
+  only the drawing consults, and the ten thousand are three generations: the feed names each reading by scan,
+  so the display makes its particles anew every scan. Both are in the ICD README's section 12. Going further
+  meant changing how the frozen display keeps its particles, not how it paints them.
+- *Warnings / lessons*: section 6's four lines (profile before guessing; a pass laid down n times; the
+  one-for-one image under a scale and a transform; the particles made anew each scan). A first version looked
+  the particles over again whenever its image was a quarter of a second old, which inside a 0.7 s repaint
+  meant four paintings a repaint instead of three at most: the age rule is for callers that never count a
+  repaint and is two seconds now.
+- *Files*: `fmofp_display/weather_fast.py` (new), `fmofp_display/app.py`,
+  `fmofp_bus/tests/test_weather_fast.py` (new), `icd/README.md`, `ofp/README.md`, this file.
+- *Tests and numbers*: `verify.sh icd py` OK: Python 313 OK (was 308: the two drawings against each other at
+  three scales; the painter left as the frozen method leaves it; one painting a repaint, and another only on
+  a change; install, uninstall and the environment switch; the hand-back on an error). No C++ changed. Meter
+  unchanged, 29.5 / 29.5 = 100 %.
 
 ---
 
