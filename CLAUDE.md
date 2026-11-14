@@ -182,8 +182,10 @@ person may continue it in their next session; when it is green it is rebased ont
   nobody's yet: the ICD README's section 12. Last session: Kevin's, 2026-11-14 (the check after the port
   closed, then the test of the finished port as a user runs it); before it Alee's, 2026-11-12 (units 29 and 30
   closed).
-- **Found by the test of 2026-11-14, none fixed, waiting on Kevin's word** (the evidence is section 7's last
-  entry; the meter does not move). In unit 28's clients, Kevin's agent's own work: (a) `py -m fmofp_cli` and
+- **IN PROGRESS (Kevin, 2026-11-14): the five repairs below**, found by the test of 2026-11-14 (Kevin: "fix
+  them all", section 8; the evidence is section 7's entry of that test; the meter does not move; they land as
+  separate commits, each green; the clients' repair takes the ICD to v1.24). In unit 28's clients, Kevin's
+  agent's own work: (a) `py -m fmofp_cli` and
   `py -m fmofp_scenario` cannot start beside `py -m fmofp_demo` (exit 2): the demo's dashboard holds the one
   monitor port, so the usage the documents give works only against a bus started without the dashboard, which
   is what the tests do; (b) every new client program numbers its commands from 201 and a terminal ignores a
@@ -2162,3 +2164,10 @@ done before this file existed are condensed from the private session notes.
 - 2026-11-12, Alee ("Yes, close unit 30"): unit 30 is DONE with the ticket format as a draft; its five open
   questions and the removal of the DRAFT box are carried into the intern-ticket authoring phase, which was
   never in the meter. The port is complete at 29.5 / 29.5.
+- 2026-11-14, Kevin ("fix them all", after his agent's test of the finished port, section 7): the five findings
+  of that test are repaired, the two kept from the Python included: the scenario engine and the debug prompt
+  beside the demo, the clients' command numbering, the prompt's one-shot mode, the radar window's repaint time,
+  the plant's rain area. The last two depart from the frozen Python's behaviour without editing it (section 3
+  step 2: the quirk made the function unusable); each departure gets its row in the ICD README's section 2.
+  The meter does not move: these are repairs to finished units. The smaller slips of that test's list stay as
+  they are, future intern tickets or backlog.
