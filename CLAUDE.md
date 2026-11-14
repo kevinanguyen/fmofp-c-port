@@ -180,7 +180,20 @@ person may continue it in their next session; when it is green it is rebased ont
   2026-11-14 with its review of unit 29 on his machine (section 7: the gate green on both builds, the legacy
   suites and the coverage floors too, nothing found that should come back); his answers are awaited. Backlog,
   nobody's yet: the ICD README's section 12. Last session: Kevin's, 2026-11-14 (the check after the port
-  closed); before it Alee's, 2026-11-12 (units 29 and 30 closed).
+  closed, then the test of the finished port as a user runs it); before it Alee's, 2026-11-12 (units 29 and 30
+  closed).
+- **Found by the test of 2026-11-14, none fixed, waiting on Kevin's word** (the evidence is section 7's last
+  entry; the meter does not move). In unit 28's clients, Kevin's agent's own work: (a) `py -m fmofp_cli` and
+  `py -m fmofp_scenario` cannot start beside `py -m fmofp_demo` (exit 2): the demo's dashboard holds the one
+  monitor port, so the usage the documents give works only against a bus started without the dashboard, which
+  is what the tests do; (b) every new client program numbers its commands from 201 and a terminal ignores a
+  number equal to the last it accepted, so a command repeated from a new prompt, or a second scenario's first
+  command to a terminal, is acknowledged and dropped; (c) `fmofp_cli -c` runs its commands at the first sync,
+  before it has seen the bus ("11 terminals", no status). From the frozen Python, as written: (d) the radar
+  window repaints in 7 to 30 s once the weather radar is on (the weather display draws every particle once per
+  item), so its buttons answer only between repaints; (e) the plant's rain area grows without limit (15 dBZ at
+  the start, over 100 after a minute, the field's 512 after about 140 s), which pegs the weather radar's
+  maximum and puts a saturated mass on the weather picture.
 - **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine, and green on CI's
   older clang-tidy (run 43121089010). If a later run of the `Lint (clang-tidy)` step finds something, fix the
   code or the check list in `ofp/.clang-tidy`, not the step.
@@ -906,6 +919,30 @@ Python tests and displays
   must leave the list too, or the runner fails on a missing module.
 - The real-time demo cannot be judged while a game runs on Alee's machine (again: 6-33 overruns in four runs
   with one running, late starts and 20-40 ms worst answers from C++ partitions and Python terminals alike).
+- `py -m fmofp_demo` binds the monitor port (`port_base + 33`) for its dashboard: nothing else can listen to
+  the bus while it runs, neither `fmofp_cli` and `fmofp_scenario` (exit 2) nor a `Monitor` in a scratch script.
+  The e2e tests start the controller without the dashboard and never meet it. To test a client against the
+  whole aircraft today, start `fmofp_demo.demo.main` from a scratch script with `demo.Monitor` replaced by a
+  stand-in that binds nothing.
+- A terminal takes a command as new only when its `cmd_seq` differs from the last one it accepted
+  (`bus::CommandSequence`), and every `CommandClient` starts at 201: two client programs in a row collide on
+  their first command to the same subaddress, and the controller's acknowledgement says nothing about it. In a
+  test that runs two clients, check the effect on the terminal, not the acknowledgement.
+- `fmofp_cli -c` runs at the first sync; a script that wants status feeds the prompt on stdin with a pause
+  after it starts (a second is enough for every TERM_STATUS).
+- The prompt's `frame` counts the syncs since it attached; the acknowledgement's frame is the controller's own
+  count. They agree only for a client that was listening when the controller started.
+- A picture of a live display window without touching the repository: run `fmofp_display.app.main` from a
+  scratch script with `app.QApplication` replaced by a subclass that arms `QTimer.singleShot(ms,
+  Qt.TimerType.PreciseTimer, ...)` grabs (`QWidget.grab().save`) before `exec()`. Coarse timers do not fire in
+  the radar window. The MFD builds a radar picture only in its click handler: `QTest.mouseClick` on the menu,
+  not `current_page = RADAR`.
+- Before blaming the bus for a sluggish window, time its `paintEvent`: the frozen weather display's
+  `_draw_particles` runs once per storm cell, precipitation item and VIL point, each time over every particle
+  of the type (7-30 s a repaint with a few thousand particles).
+- The plant's weather numbers are only sane early: the rain area's intensity adds `3 sin(age/600)` to itself
+  ten times a second (the frozen `StratiformArea.update`, kept), so a test that reads `PLANT_WEATHER`'s area,
+  `RDR_WX_SCAN.max_reflectivity` or `vil_max` after the first half minute reads the fields' limits.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -1885,6 +1922,101 @@ done before this file existed are condensed from the private session notes.
   and `9a5062d` run 43331626338 green. `a3f01c4` run 43325183135: twelve green, the Linux Python 3.10 leg red on
   `test_weather_radar_live` only ("a mode set against policy is applied first", 1 of 45 suites), the flaky one.
 - *Numbers*: meter 29.5 / 29.5 = 100 %.
+
+### 2026-11-14 - the finished port tested as a user runs it: three defects in unit 28's clients, two faults kept from the Python - by Kevin's agent
+- *What*: Kevin asked whether the port works as expected. Tested on `a09316a` from the outside, as a user or an
+  intern would use it: the gate, the aircraft with its six windows through whole scripted flights, the scenario
+  engine and the debug prompt against the whole aircraft, the intern guide's debugger recipes. Nothing in the
+  repository was changed and nothing was fixed: the findings wait on Kevin's word (section 1).
+- *How*: scratch drivers outside the repository. The display programs were started through a wrapper that
+  saves pictures of each window (section 6) and times the radar window's repaints; the MFD's radar pictures
+  were reached by simulated clicks on its own menu; the launcher was started with its dashboard off the
+  monitor port so that a client could have it; the plant's weather world was stepped offline.
+- *What works*: `verify.sh` OK (icd cpp py load): Python 303 OK in 63 s, ctest 2/2, cppcheck clean, load 107
+  messages, 8612 us. Windowed flights on the optimised build with every scripted event: 40, 50 and 52 s with 0
+  overruns, 95 s (4750 frames) with 2, 104 s (5200 frames) with 7 (3 late starts; worst frame 25.4 ms); 51 of
+  51 scripted commands, 23/23 answering, no window lost. Every window's picture agrees with the bus: the radar
+  window (weather, terrain, the five radars' status line), the PFD, the EICAS (the generator-off event shows
+  GEN FAIL, the countermeasures count down, SYS A/B and the cabin rows filled), the TSD (route, fused tracks,
+  the threat ring), the SMS, and the MFD's NAV, SYSTEMS, COMMS and MISSION pages and its five radar pictures
+  (weather, targeting with six tracks, terrain, the SAR strip, AEWC with twelve tracks). With the monitor port
+  free (165 s headless, no scripted events): the prompt lists 23 terminals; the weather and targeting radars
+  switched on by `send` (acknowledged, the status shows the mode and `last_cmd_seq` 201, six tracks, eight
+  storm cells); `py -m fmofp_scenario trainingScenario.xml --speed 10` exit 0 in 51 s, 16/16 events, 12
+  commands, none unacknowledged, and after it the mission computer has 3 waypoints and phase COMPLETE, the
+  defensive terminal 3 automatic salvos and 6 flares gone, the sky the two injected cells where asked
+  (345.5 deg 41.3 km 56 dBZ; 32.8 deg 36.3 km 44.5 dBZ), the traffic the injected aircraft (RCS 5.00, at the
+  second injection's place moved on by its velocity) and **the targeting radar a track 103 m from it**
+  (UNKNOWN/UNKNOWN, as the ICD README says: the radar has no IFF); the failure scenario run from inside the
+  prompt: 16/16 events, 10 commands, the avionics terminal FAULT with 4 forced faults and 14 LRUs, the mission
+  computer a fourth waypoint. The command port: received 24, queued 24, refused 0, malformed 0. The guide's
+  gdb recipes (a stdin tool, a unit test) and the ticket draft's example run as written here (gdb 18.1).
+- *Defect 1, unit 28*: beside `py -m fmofp_demo`, `py -m fmofp_cli -c frame -c terminals` exits 2 ("cannot
+  open the monitor port 51033 (another listener on it?)") and `py -m fmofp_scenario ... --speed 20` exits 2
+  ("cannot open the monitor or a socket"). The demo's dashboard binds the monitor port and both clients'
+  `BusView` need it. `ofp/README.md`, `ofp/docs/ARCHITECTURE.md` ("`py -m fmofp_cli` with the aircraft
+  running"), section 5.5 and section 2.28 all describe that use, and the e2e tests pass because they start the
+  bus without the dashboard. Ways out, none chosen: the controller copies its monitor stream to every client
+  that asks through the command port (any number of listeners; an ICD change, v1.24); or a second fixed
+  monitor port; or the demo hosts the scenario and the prompt itself.
+- *Defect 2, unit 28*: a command repeated from a new client program is acknowledged and ignored.
+  `CommandClient` numbers from 201 per destination in every process; `bus::CommandSequence::accept` refuses a
+  number equal to the last accepted. Reproduced with three prompt sessions each sending `DEF_CMD
+  command=DISPENSE_CHAFF count=2`: session 1 releases 2; session 2 prints "OK, queued at frame 523 (cmd_seq
+  201)" and releases nothing; in session 3 the first (201) is ignored and the second (202) releases 2; the
+  controller counted all four as queued. In the whole-aircraft run the failure scenario's missile launch
+  (`DEF_CMD` 201, after the training scenario's `DEF_CMD` 201) was dropped the same way: no salvo, with "0 not
+  acknowledged" on the engine's last line. `DEBUGGING.md`'s own recipe (`py -m fmofp_cli ... -c "send COM_CMD
+  ..."`) meets it at the second use: every `-c` run is a new client. It would also collide with the demo's
+  events (201 and up) once defect 1 is fixed. The plant's injections are not affected (it takes every
+  reception as new). Ways out, none chosen: the controller remembers the last words it sent to each receive
+  subaddress and tells a client that asks, so a new client goes on from the last number; or a start drawn from
+  the clock (unlikely to collide, not certain).
+- *Defect 3, unit 28*: `py -m fmofp_cli -c frame -c terminals` against a bus that had run for two minutes:
+  exit 0, "frame 0", "11 terminals", each "(no TERM_STATUS yet)". The one-shot mode runs its commands at the
+  first sync. It should watch one major frame first. Small beside it: the prompt's `frame` is its own count
+  since it attached (59) while its acknowledgements carry the controller's (523).
+- *Kept from the Python 1: the radar window is nearly unusable while the weather radar is on.* Repaints: 3 ms
+  before the first weather data, then 8.4-14.6 s in the first flights and 10.1, 9.8, 16.1, 30.0, 7.0, 9.1 and
+  9.5 s in the last, all of it in `weather.draw_radar_elements` (the terrain half 5-8 ms), with about
+  1,500-2,800 precipitation, 2,600-3,600 VIL and 290-1,060 cell particles; the window's one-second timer fired
+  9 times in 75 s, so a click on a mode button waits for the repaint in progress. The MFD's weather page:
+  9.5 s. The frozen `_draw_particles(painter, data_type)` draws every particle of a type and is called once
+  per storm cell, per precipitation item and per VIL point. Drawing each type once per repaint (an experiment
+  from outside, nothing committed) gave 0.7-2.8 s with peaks of 4.6-7.5 s: the main factor, not the whole of
+  it. The code is `f79831a` (2026-09-28), inside the freeze. The bus does not feel it (the display terminals
+  answer from helper processes), though a window holding a core for 30 s shows in the windowed flights'
+  overruns. A way out without editing the frozen file: subclass the display in `fmofp_display/app.py` as
+  `make_eicas` does.
+- *Kept from the Python 2: the rain area grows without limit.* Frozen `StratiformArea.update` ends
+  `self.intensity = base_intensity + self.intensity_variation` with `base_intensity = self.intensity`, under
+  the comment "Vary by +/- 3 dBZ every 10 minutes": the swing is added to the stored value at every update.
+  The plant steps it ten times a second (the old radar's `_update_interval` was 0.1 s). Offline, four seeds
+  alike: 15-18 dBZ at the start, 38-41 at 30 s, 66-69 at 45 s, 105-108 at 60 s, 218-221 at 90 s, 374-378 at two
+  minutes, 2,220 at five, 35,800 at thirty, while the strongest storm cell stays between 36 and 70. On the
+  bus: `area_intensity` 20.25 at 13 s and 149.2 at 74 s (the field stops at 511.99, reached after about
+  140 s); `RDR_WX_SCAN.max_reflectivity` 36 then 65, its limit, which the radar window's status line also
+  shows from the first minute on in a flight with no scenario; `vil_max` 88.5 then 5,340 (that run had the
+  scenario's two cells in the sky as well). On the weather picture a saturated magenta mass sits on the area
+  from the first minute on and labels read values such as 1270.0. Not in the ICD README's section 2. A kept
+  quirk by section 4.5, or a departure by section 3 step 2 (the weather picture is the demo's most visible
+  one): the humans' call.
+- *Smaller, all in the frozen display code unless said*: the TSD's metrics panel floods red whenever warning
+  contacts are drawn (the red brush is still set at `drawRect`) and its ENERGY value is then red on red; the
+  MFD's terrain page prints "Health: CLEAR" in red beside the radar window's green "Health: NORMAL" (the MFD
+  passes the clearance level as the health and the picture knows only NORMAL and DEGRADED); the PFD's Mach
+  number overlaps the speed tape; "LON -0.0000"; the EICAS and MFD windows are about 2,000 pixels wide because
+  the port's status line is one label (`app.py`); the plant's aircraft reach the velocity field's limit of
+  4096 m/s (the old generator gives each a constant acceleration; they are replaced when they leave range);
+  gdb prints an auto-load notice about `libstdc++-6.dll-gdb.py` that `DEBUGGING.md` does not mention.
+- *Warnings / lessons*: section 6's seven new lines. A green e2e suite said nothing about defect 1 because
+  every test builds its own bus; the documented command had never been run beside the documented launcher.
+  Defect 2 hides behind an acknowledgement that only means "the controller queued it". The numbers with client
+  programs starting beside the aircraft (12 overruns in 8250 frames, 6 of them late starts) and with six
+  windows up are not idle-machine numbers: the reference stays the headless run of this morning (0 overruns).
+- *CI*: `a09316a` run 43633502817 green.
+- *Files*: this file. The drivers and the pictures are in the session scratchpad, not in the repository.
+- *Numbers*: meter unchanged, 29.5 / 29.5 = 100 %.
 
 ---
 
