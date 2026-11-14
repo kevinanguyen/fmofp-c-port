@@ -7,6 +7,9 @@ the plant owns the cells and the area, ages and moves them exactly as that code
 did (its random draws included, from the plant's own generator), and publishes
 them as PLANT_WEATHER once a second. The radar renders what its antenna would
 see from them and processes that volume.
+
+Exactly, but for one thing since ICD v1.24: the rain area's reflectivity, which
+that code let grow without limit (StratiformArea below).
 """
 
 import math
@@ -58,12 +61,23 @@ class StormCell:
 
 
 class StratiformArea:
-    """weather_state_manager.StratiformArea: position, azimuth width deg, range depth km, dBZ."""
+    """weather_state_manager.StratiformArea: position, azimuth width deg, range depth km, dBZ.
+
+    One departure from the Python (ICD v1.24, README section 2). Its update wrote the swing back into the value
+    it swings around: `self.intensity = self.intensity + 3 sin(age / 600)` at every call, under the comment
+    "Vary by +/- 3 dBZ every 10 minutes", and in the last fifth of the life it multiplied the stored value by
+    the decay factor at every call as well. At the plant's ten steps a second a rain area made at 15 to 30 dBZ
+    passed the strongest storm cell there can be (65 dBZ) after 45 s of every flight and 2,000 dBZ after five
+    minutes: the weather radar's maximum stood at its limit and a saturated mass covered the weather picture.
+    The area keeps the reflectivity it was made with (`base_intensity`), and the swing and the decay work on
+    that, as the Python's comments say: 3 dBZ either way, down to a fifth at the end.
+    """
 
     def __init__(self, rng, position, az_width, range_depth, intensity):
         self.position = position
         self.az_width = az_width
         self.range_depth = range_depth
+        self.base_intensity = intensity  # what it was made with: the swing and the decay work on this
         self.intensity = intensity
         self.age = 0.0
         self.lifetime = rng.uniform(3600, 10800)
@@ -74,9 +88,9 @@ class StratiformArea:
         life_fraction = self.age / self.lifetime
         self.intensity_variation = 3.0 * math.sin(self.age / 600)
         if life_fraction > 0.8:
-            base_intensity = self.intensity * (1 - ((life_fraction - 0.8) / 0.2) * 0.8)
+            base_intensity = self.base_intensity * (1 - ((life_fraction - 0.8) / 0.2) * 0.8)
         else:
-            base_intensity = self.intensity
+            base_intensity = self.base_intensity
         self.intensity = base_intensity + self.intensity_variation
         self.position = _drift(self.position, delta_time, wind)
         return self.age < self.lifetime and self.intensity > 5

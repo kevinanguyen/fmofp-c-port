@@ -188,9 +188,9 @@ person may continue it in their next session; when it is green it is rebased ont
   closed).
 - **IN PROGRESS (Kevin, 2026-11-14): the five repairs below**, found by the test of 2026-11-14 (Kevin: "fix
   them all", section 8; the evidence is section 7's entry of that test; the meter does not move; they land as
-  separate commits, each green; the clients' repair takes the ICD to v1.24). **(a), (b) and (c) are repaired**
-  (section 7, "the clients repaired"): the three as they were found, in unit 28's clients, Kevin's agent's own
-  work: (a) `py -m fmofp_cli` and
+  separate commits, each green; the clients' repair takes the ICD to v1.24). **(a), (b), (c) and (e) are
+  repaired** (section 7, "the clients repaired" and "the rain area"); (d) is next. The five as they were found.
+  In unit 28's clients, Kevin's agent's own work: (a) `py -m fmofp_cli` and
   `py -m fmofp_scenario` cannot start beside `py -m fmofp_demo` (exit 2): the demo's dashboard holds the one
   monitor port, so the usage the documents give works only against a bus started without the dashboard, which
   is what the tests do; (b) every new client program numbers its commands from 201 and a terminal ignores a
@@ -955,9 +955,10 @@ Python tests and displays
 - Before blaming the bus for a sluggish window, time its `paintEvent`: the frozen weather display's
   `_draw_particles` runs once per storm cell, precipitation item and VIL point, each time over every particle
   of the type (7-30 s a repaint with a few thousand particles).
-- The plant's weather numbers are only sane early: the rain area's intensity adds `3 sin(age/600)` to itself
-  ten times a second (the frozen `StratiformArea.update`, kept), so a test that reads `PLANT_WEATHER`'s area,
-  `RDR_WX_SCAN.max_reflectivity` or `vil_max` after the first half minute reads the fields' limits.
+- The frozen `StratiformArea.update` adds `3 sin(age/600)` to its stored intensity at every call (and decays
+  the stored value at every call near its end); the plant's area has kept the reflectivity it was made with
+  since v1.24 (`base_intensity`). A comparison of the plant's weather with the frozen class steps both and
+  leaves the area's intensity out: `test_plant_weather` holds the two apart on purpose.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -2090,6 +2091,29 @@ done before this file existed are condensed from the private session notes.
   (327 gtests, was 325: the numbering with its wrap, its refusals and a full queue; the listeners with their
   limit, renewal, stop and expiry), cppcheck clean, load unchanged (107 messages, 8612 us). The lint was not
   run here (no clang-tidy on this machine): CI's step is its check. Meter unchanged, 29.5 / 29.5 = 100 %.
+
+### 2026-11-14 - the rain area: the plant's first repair of a fault kept from the Python - ICD v1.24 - by Kevin's agent
+- *What*: `fmofp_plant/weather.py` `StratiformArea` keeps the reflectivity it was made with (`base_intensity`)
+  and applies the swing of 3 dBZ and the last fifth's decay to that. The frozen class, which the plant had
+  followed line for line, writes the swing back into the stored value at every call (`self.intensity =
+  base_intensity + self.intensity_variation` with `base_intensity = self.intensity`).
+- *Why a departure and not a kept quirk*: section 3 step 2, "unless the quirk makes the function unusable".
+  At the plant's ten steps a second the area passed every storm cell after 45 s and the field's limit of 512
+  dBZ after 140 s, in every flight; the weather radar's maximum, its VIL and the weather picture were the
+  area's and nothing else's from the first minute on. Kevin: fix it (section 8). The row is in the ICD README's
+  section 2 with the numbers.
+- *Warnings / lessons*: no end-to-end test noticed: none reads the weather after the first seconds, where the
+  growth is still small. The area's position, its lifetime draw and every cell are as before, so a seeded
+  flight's sky is the same sky with a sane rain area. The radar's rendering (`weather_model.cpp`) is untouched.
+- *Checked on the bus*: the demo headless for 82 s with the prompt beside it: `area_intensity` 23.84 at 20 s
+  and 24.1 at 73.5 s (149.2 at 74 s before), `RDR_WX_SCAN.max_reflectivity` 36.5 and 40.5 (65, its limit,
+  before); 4100 frames, 0 overruns, worst frame 14.0 ms. Offline, four seeds over thirty minutes: 15 to 21
+  dBZ throughout.
+- *Files*: `fmofp_plant/weather.py`, `fmofp_bus/tests/test_plant_weather.py`, `icd/README.md`, this file.
+- *Tests and numbers*: `verify.sh icd py` OK: Python 308 OK (was 305: the frozen class's growth proven on the
+  frozen class, 110 dBZ after a minute and over 2,000 after five; the plant's area within 3 dBZ of its making
+  through fifty minutes, its drift equal to the frozen one's, its decay to a fifth; half an hour of the whole
+  sky under 70 dBZ). No C++ changed. Meter unchanged, 29.5 / 29.5 = 100 %.
 
 ---
 
