@@ -44,7 +44,8 @@ TEST(Frame, BytesAreBigEndianInTheDocumentedOrder) {
 }
 
 TEST(Frame, RoundTripsWithFlagsAndEveryType) {
-    for (const FrameType type : {FrameType::kBcToRt, FrameType::kRtToBc, FrameType::kMonitor}) {
+    for (const FrameType type : {FrameType::kBcToRt, FrameType::kRtToBc, FrameType::kMonitor, FrameType::kCommand,
+                                 FrameType::kCommandAck, FrameType::kCommandNumbered, FrameType::kMonitorRequest}) {
         Frame f = sample();
         f.type = type;
         f.flags = kFlagParityError;
@@ -109,7 +110,7 @@ TEST(Frame, DecodeRejectsDamagedBytesAndLeavesTheOutputAlone) {
     EXPECT_EQ(Status::kBadMagic, decode_frame(bad.data(), len, untouched));
 
     bad = bytes;
-    bad[2] = 0x07;  // frame type 7 does not exist
+    bad[2] = 0x08;  // frame type 8 does not exist
     EXPECT_EQ(Status::kMalformed, decode_frame(bad.data(), len, untouched));
 
     bad = bytes;

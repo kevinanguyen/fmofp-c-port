@@ -339,7 +339,16 @@ class DisplaysEndToEndTest(unittest.TestCase):
         self.assertIsNotNone(self.eicas.fresh(m.EicasDefStatus, stale_after_s=60.0), "the EICAS's own relay")
         self.assertIsNone(self.tsd.fresh(m.EicasDefStatus, stale_after_s=60.0), "one consumer: not written into the TSD")
         self.assertIsNotNone(self.eicas.latest_block(b.BcastDefRwrContacts)[0], "the contacts block at the EICAS")
-        self.assertEqual(len(defensive["rwr_contacts"]), len(eicas.rwr_contacts()))
+        # The same contacts block by two getters. The two reads are taken together, and again if a block landed
+        # between them: on a slow runner the terminal was still working through what the bus had sent it, and
+        # reads made a few lines apart saw two different blocks (CI run 43642043228: 34 != 49).
+        counts = (0, 1)
+        for _ in range(20):
+            counts = (len(eicas.defensive.get_data()["rwr_contacts"]), len(eicas.rwr_contacts()))
+            if counts[0] == counts[1]:
+                break
+            time.sleep(0.05)
+        self.assertEqual(counts[0], counts[1])
         self.assertIn("DEF chaff 60 flares 30 ECM STANDBY", eicas.status_text())
         # The sensor management terminal: its status by the EICAS's own relay; the fused track count is the block's.
         sensors = eicas.sensors.get_data()

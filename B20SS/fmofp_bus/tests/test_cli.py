@@ -1,8 +1,11 @@
 """The debug CLI: its parsing and output on a fake bus, then its commands against the real controller and the
 plant (the second class needs FMOFP_BC)."""
 
+import contextlib
+import io
 import math
 import os
+import re
 import subprocess
 import tempfile
 import threading
@@ -15,13 +18,14 @@ from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import IffIdentity, MissionCommand, MissionPhase, TargetClass, TerminalState, WeatherCategory
 from fmofp_bus.status import Status
 from fmofp_bus.tests._support import binary_env, free_port_base
+from fmofp_cli.__main__ import main as cli_main
 from fmofp_cli.cli import DebugCli, parse_field
 from fmofp_plant.plant import PlantModel, PlantTerminal
 from fmofp_scenario.scenario import TRAINING
 
 PORT_BASE = free_port_base(59500)
 PLANT_RT = m.PlantSensors.RT
-FRAMES = 300
+FRAMES = 400
 
 TINY_SCENARIO = """<?xml version="1.0" encoding="UTF-8"?>
 <scenario name="CLI check" version="1.0">
@@ -49,14 +53,20 @@ class FakeView:
 
 
 class FakeClient:
+    """Answers as the command port does since v1.24: the controller numbers a command whose cmd_seq is 0 (from
+    101 here) and says which number it gave; the message itself is left as it was."""
+
     def __init__(self):
         self.sent = []
+        self.numbered = 0
 
     def send(self, message, rt=None):
         self.sent.append((message.RT if rt is None else rt, message))
-        if hasattr(message, "cmd_seq") and message.cmd_seq == 0:
-            message.cmd_seq = 201
-        return Acknowledgement(Status.OK, frame=1300, cmd_seq=getattr(message, "cmd_seq", 0))
+        number = getattr(message, "cmd_seq", 0)
+        if hasattr(message, "cmd_seq") and number == 0:
+            self.numbered += 1
+            number = 100 + self.numbered
+        return Acknowledgement(Status.OK, frame=1300, cmd_seq=number)
 
 
 class DebugCliParsingTest(unittest.TestCase):
@@ -78,9 +88,12 @@ class DebugCliParsingTest(unittest.TestCase):
         rt, message = self.client.sent[0]
         self.assertEqual(PLANT_RT, rt)
         self.assertIsInstance(message, m.PlantInjectWeather)
-        self.assertEqual((10.0, -20.5, 5.0, 50.0, WeatherCategory.SEVERE, 201),
+        self.assertEqual((10.0, -20.5, 5.0, 50.0, WeatherCategory.SEVERE, 0),
                          (message.x_km, message.y_km, message.size, message.reflectivity, message.category, message.cmd_seq))
-        self.assertEqual("PLANT_INJECT_WEATHER -> RT 27 SA 22: OK, queued at frame 1300 (cmd_seq 201)", self.lines[-1])
+        self.assertEqual("PLANT_INJECT_WEATHER -> RT 27 SA 22: OK, queued at frame 1300 (cmd_seq 101)", self.lines[-1])
+        self.cli.execute("send PLANT_INJECT_WEATHER x_km=1 cmd_seq=9")
+        self.assertEqual(9, self.client.sent[-1][1].cmd_seq)
+        self.assertEqual("PLANT_INJECT_WEATHER -> RT 27 SA 22: OK, queued at frame 1300 (cmd_seq 9)", self.lines[-1])
         self.cli.execute("send PlantInjectContact contact_id=0x07 is_stealth=true classification=FIGHTER identity=2")
         _, contact = self.client.sent[-1]
         self.assertEqual((7, True, TargetClass.FIGHTER, IffIdentity.HOSTILE),
@@ -112,7 +125,7 @@ class DebugCliParsingTest(unittest.TestCase):
         self.assertEqual([], self.client.sent)
         self.cli.execute("send TERM_CMD rt=plant requested_state=NORMAL")
         rt, message = self.client.sent[-1]
-        self.assertEqual((PLANT_RT, TerminalState.NORMAL, 201), (rt, message.requested_state, message.cmd_seq))
+        self.assertEqual((PLANT_RT, TerminalState.NORMAL, 0), (rt, message.requested_state, message.cmd_seq))
 
     def test_parse_field_types(self):
         self.assertEqual(7, parse_field(m.PlantInjectContact, "contact_id", "7"))
@@ -261,6 +274,16 @@ class DebugCliOnTheBusTest(unittest.TestCase):
             # the plant is test equipment and fills no TERM_STATUS: the controller shows its zeros
             self.assertIn("RT 27 plant          STANDBY      healthy=0 faults=0 icd=0.0", text)
             self.assertIn("answered 0.", text)
+            # A second prompt, as `py -m fmofp_cli -c frame -c terminals` starts one beside this one. It joins a
+            # bus that is already running: it must have the controller's frame count, not a count of its own from
+            # zero, and it must watch the bus before it answers (until v1.24: "frame 0", "(no TERM_STATUS yet)").
+            shot = io.StringIO()
+            with contextlib.redirect_stdout(shot):
+                self.assertEqual(0, cli_main(["--port-base", str(PORT_BASE), "-c", "frame", "-c", "terminals"]))
+            one_shot = shot.getvalue()
+            self.assertGreaterEqual(int(re.search(r"^frame (\d+) \(", one_shot, re.M).group(1)), 60, one_shot)
+            self.assertIn("RT 27 plant          STANDBY      healthy=0 faults=0 icd=0.0", one_shot)
+            self.assertNotIn("no TERM_STATUS yet", one_shot)
             lines.clear()
             cli.execute("status plant")
             self.assertIn("RT 27 (plant) TERM_STATUS: state=STANDBY", lines[0])

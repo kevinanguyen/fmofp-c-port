@@ -339,8 +339,8 @@ int main(int argc, char** argv) {
     }
     if (o.command_port) {
         const fmofp::bc::CommandPortStats& cs = command_port.stats();
-        std::printf("bc: command port: received=%u queued=%u refused=%u malformed=%u\n", cs.received, cs.queued,
-                    cs.refused, cs.malformed);
+        std::printf("bc: command port: received=%u queued=%u refused=%u malformed=%u numbered=%u monitor_requests=%u\n",
+                    cs.received, cs.queued, cs.refused, cs.malformed, cs.numbered, cs.monitor_requests);
         command_port.close();
     }
     if (o.script != nullptr) {

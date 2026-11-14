@@ -1,5 +1,7 @@
 #include <fmofp/bc/bus_controller.hpp>
 
+#include <algorithm>
+
 #include <fmofp/bus/command_word.hpp>
 #include <fmofp/bus/remote_terminal.hpp>
 #include <fmofp/bus/status_word.hpp>
@@ -42,6 +44,7 @@ Status BusController::init(const BcConfig& cfg, const Schedule& schedule) noexce
     stats_ = BcStats{};
     latest_ = {};
     queued_ = 0;
+    listeners_ = {};
 
     const Status s = osal::init();
     if (s != Status::kOk) {
@@ -384,8 +387,42 @@ void BusController::record_transmit_data(std::uint8_t rt, std::uint8_t sa, const
     d.valid = true;
 }
 
+Status BusController::add_monitor_listener(std::uint16_t port, osal::Nanoseconds expires) noexcept {
+    if (port == 0) {
+        return Status::kInvalidArgument;
+    }
+    auto entry = std::find_if(listeners_.begin(), listeners_.end(),
+                              [port](const MonitorListener& l) { return l.port == port; });
+    if (entry == listeners_.end()) {
+        entry = std::find_if(listeners_.begin(), listeners_.end(),
+                             [](const MonitorListener& l) { return l.port == 0; });
+    }
+    if (entry == listeners_.end()) {
+        return Status::kNotReady;
+    }
+    entry->port = port;
+    entry->expires = expires;
+    return Status::kOk;
+}
+
+void BusController::remove_monitor_listener(std::uint16_t port) noexcept {
+    std::replace_if(listeners_.begin(), listeners_.end(),
+                    [port](const MonitorListener& l) { return l.port == port; }, MonitorListener{});
+}
+
+void BusController::expire_monitor_listeners(osal::Nanoseconds time_now) noexcept {
+    std::replace_if(listeners_.begin(), listeners_.end(),
+                    [time_now](const MonitorListener& l) { return l.port != 0 && l.expires <= time_now; },
+                    MonitorListener{});
+}
+
+std::uint8_t BusController::monitor_listener_count() const noexcept {
+    return static_cast<std::uint8_t>(std::count_if(listeners_.begin(), listeners_.end(),
+                                                   [](const MonitorListener& l) { return l.port != 0; }));
+}
+
 void BusController::monitor(const bus::Frame& command, const bus::Frame* reply) noexcept {
-    if (!config_.monitor_enabled) {
+    if (!config_.monitor_enabled && monitor_listener_count() == 0) {
         return;
     }
     // One record per transaction: the command words as sent, then the reply
@@ -407,9 +444,22 @@ void BusController::monitor(const bus::Frame& command, const bus::Frame* reply) 
 
     std::array<std::uint8_t, bus::kMaxFrameBytes> bytes{};
     std::size_t length = 0;
-    if (bus::encode_frame(record, bytes.data(), bytes.size(), length) != Status::kOk ||
-        socket_.send_to(monitor_port(config_), bytes.data(), length) != Status::kOk) {
+    if (bus::encode_frame(record, bytes.data(), bytes.size(), length) != Status::kOk) {
         ++stats_.monitor_failures;
+        return;
+    }
+    if (config_.monitor_enabled && socket_.send_to(monitor_port(config_), bytes.data(), length) != Status::kOk) {
+        ++stats_.monitor_failures;
+    }
+    // The same record to every client that asked for the stream (v1.24).
+    for (const MonitorListener& listener : listeners_) {
+        if (listener.port == 0) {
+            continue;
+        }
+        const Status sent = socket_.send_to(listener.port, bytes.data(), length);
+        if (sent != Status::kOk) {
+            ++stats_.monitor_failures;
+        }
     }
 }
 

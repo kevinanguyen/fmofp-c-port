@@ -109,12 +109,16 @@ person may continue it in their next session; when it is green it is rebased ont
   one unanswered poll in the display e2e on the slow runner, the same code green on the next run, the Linux 3.13
   Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename and Alee), `8d67afd` (this file and
   `B20SS/verify.sh`), `d82173f` (merge of upstream/main `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.23 (`B20SS/icd/fmofp_icd.xml`; the next unit takes v1.24): 26 terminals, 154 message definitions
+- **ICD** v1.24 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.25): 26 terminals, 154 message definitions
   (200 after per-terminal expansion), 50 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
   copies), 9 mode codes, 89/89 legacy types mapped. The bus controller has a **command port** at `port_base + 34`
   since v1.23 (ICD README section 7): a client queues a receive transaction and is acknowledged with the
-  controller's frame count; `fmofp_bus/command_port.py` is the Python client, `fmofp_bus/bus_view.py` the monitor
-  reader both clients use.
+  controller's frame count; `fmofp_bus/command_port.py` is the Python client, `fmofp_bus/bus_view.py` the picture
+  of the bus both clients use. Since v1.24 (the repairs of 2026-11-14, no message changed) the port also
+  **numbers the clients' commands** (a numbered command, frame type 6: `cmd_seq` 101 to 200 per destination,
+  counted by the controller for all clients) and **gives each client its own copy of the monitor stream** (a
+  monitor request, frame type 7: up to four listeners beside the fixed monitor port, three seconds a request);
+  a view's frame count is the controller's own.
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
@@ -145,8 +149,8 @@ person may continue it in their next session; when it is green it is rebased ont
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 303 OK (`fmofp_bus/tests`, about 65 s on Kevin's machine, 67 s on Alee's); C++
-  ctest 2/2 (325 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
+- **Tests**: Python 305 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine); C++
+  ctest 2/2 (327 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
   partition) at 86 % or more against a floor of 80 % (`cmake --build --preset coverage`); `test_timing.py` holds
@@ -184,8 +188,9 @@ person may continue it in their next session; when it is green it is rebased ont
   closed).
 - **IN PROGRESS (Kevin, 2026-11-14): the five repairs below**, found by the test of 2026-11-14 (Kevin: "fix
   them all", section 8; the evidence is section 7's entry of that test; the meter does not move; they land as
-  separate commits, each green; the clients' repair takes the ICD to v1.24). In unit 28's clients, Kevin's
-  agent's own work: (a) `py -m fmofp_cli` and
+  separate commits, each green; the clients' repair takes the ICD to v1.24). **(a), (b) and (c) are repaired**
+  (section 7, "the clients repaired"): the three as they were found, in unit 28's clients, Kevin's agent's own
+  work: (a) `py -m fmofp_cli` and
   `py -m fmofp_scenario` cannot start beside `py -m fmofp_demo` (exit 2): the demo's dashboard holds the one
   monitor port, so the usage the documents give works only against a bus started without the dashboard, which
   is what the tests do; (b) every new client program numbers its commands from 201 and a terminal ignores a
@@ -921,19 +926,27 @@ Python tests and displays
   must leave the list too, or the runner fails on a missing module.
 - The real-time demo cannot be judged while a game runs on Alee's machine (again: 6-33 overruns in four runs
   with one running, late starts and 20-40 ms worst answers from C++ partitions and Python terminals alike).
-- `py -m fmofp_demo` binds the monitor port (`port_base + 33`) for its dashboard: nothing else can listen to
-  the bus while it runs, neither `fmofp_cli` and `fmofp_scenario` (exit 2) nor a `Monitor` in a scratch script.
-  The e2e tests start the controller without the dashboard and never meet it. To test a client against the
-  whole aircraft today, start `fmofp_demo.demo.main` from a scratch script with `demo.Monitor` replaced by a
-  stand-in that binds nothing.
+- The fixed monitor port (`port_base + 33`) has one listener, and `py -m fmofp_demo` binds it for its
+  dashboard. Anything else that wants the bus beside the demo opens `Monitor(port_base, subscribe=True)` (or a
+  `BusView`, which does): the controller copies the stream to it (v1.24). A plain `Monitor(port_base)` in a
+  scratch script still fails beside the demo, and still works in a test that builds its own bus.
 - A terminal takes a command as new only when its `cmd_seq` differs from the last one it accepted
-  (`bus::CommandSequence`), and every `CommandClient` starts at 201: two client programs in a row collide on
-  their first command to the same subaddress, and the controller's acknowledgement says nothing about it. In a
-  test that runs two clients, check the effect on the terminal, not the acknowledgement.
-- `fmofp_cli -c` runs at the first sync; a script that wants status feeds the prompt on stdin with a pause
-  after it starts (a second is enough for every TERM_STATUS).
-- The prompt's `frame` counts the syncs since it attached; the acknowledgement's frame is the controller's own
-  count. They agree only for a client that was listening when the controller started.
+  (`bus::CommandSequence`), whoever sent it. Senders on one subaddress must not count alike: the displays count
+  from 1, the demo's script from 201, the controller numbers its clients' commands from 101 to 200 (v1.24;
+  until then every `CommandClient` started at 201 and two client programs in a row lost a command). An
+  acknowledgement from the command port means "queued", never "acted on": a test of a command checks the
+  terminal.
+- A subscriber must keep reading: its request holds three seconds at the controller and `Monitor.read` repeats
+  it every second (ten times a second until the first is granted, so a view opened before the controller
+  catches its first frames).
+- After a change under `ofp/`, build the optimised preset again as well as the debug one: the demo flies
+  `build/<preset>-release/` when it exists, and `verify.sh` builds only the debug preset. A stale controller
+  beside new Python clients answers MALFORMED to their numbered commands and never serves a monitor request.
+- A full rebuild after an ICD version bump takes about eight minutes at `-O0` on Kevin's machine: `verify.sh`
+  then outlasts a ten-minute tool timeout. Run it in the background and read its output file.
+- A test that reads one changing thing twice (a block's contacts by two getters) reads it twice together and
+  again if the two differ: a slow CI runner's Python terminal is still working through its socket after the
+  controller has stopped (`test_display_e2e`, run 43642043228: 34 != 49 on a documents-only commit).
 - A picture of a live display window without touching the repository: run `fmofp_display.app.main` from a
   scratch script with `app.QApplication` replaced by a subclass that arms `QTimer.singleShot(ms,
   Qt.TimerType.PreciseTimer, ...)` grabs (`QWidget.grab().save`) before `exec()`. Coarse timers do not fire in
@@ -2020,6 +2033,64 @@ done before this file existed are condensed from the private session notes.
 - *Files*: this file. The drivers and the pictures are in the session scratchpad, not in the repository.
 - *Numbers*: meter unchanged, 29.5 / 29.5 = 100 %.
 
+### 2026-11-14 - the clients repaired: a monitor copy for every client, commands numbered by the controller - ICD v1.24 - by Kevin's agent
+- *What*: Kevin's "fix them all" (section 8), first part: the three defects of unit 28's clients. **The bus
+  controller** (`ofp/bc`): `BusController` keeps up to four monitor listeners (`add_monitor_listener`,
+  `remove_monitor_listener`, `expire_monitor_listeners`, `monitor_listener_count`) and `monitor()` sends every
+  record to each as well as to the fixed port, also under `--no-monitor`. `CommandPort` takes two more frame
+  types. Type 7, a monitor request (one word, start or stop), lists the sender's port for three seconds of the
+  OSAL clock, not of frames, so a free-running bus does not outrun a client's once-a-second request. Type 6, a
+  numbered command (the command word, the place of `cmd_seq`, the data), has the controller's next number for
+  the destination written into it: 101 to 200 and round, per RT and subaddress, the first at 101 plus the frame
+  count modulo 100, a refused command using none. The acknowledgement has a fifth word, the number given; the
+  closing line gains `numbered=` and `monitor_requests=`. **The Python side**: `fmofp_bus/monitor.py`
+  `Monitor(port_base, subscribe=True)`; `bus_view.py` subscribes by default, takes its frame from the
+  synchronise word and the controller's answers (`sync_frame`, `nearest_frame`), counts `frames_seen`
+  (`wait_until_watched`); `command_port.py` finds the field's place by encoding the message twice
+  (`sequence_place`), asks for a number when `cmd_seq` is 0, and no longer counts or changes the message;
+  `fmofp_cli` lets the view watch a major frame before `terminals`, `status`, `msgs` and `msg`, has
+  `--fixed-monitor` for a controller without a command port, and says why it sees no bus; `fmofp_scenario` the
+  same, and its engine stops when the frame count goes back (`stop_reason`).
+- *How*: the numbering first. A start drawn from the clock in each client would have made a collision
+  unlikely, not impossible, in a tool whose failure is silent; asking the controller for the last number sent
+  leaves a race between two clients and costs a frame per command. One counter in the controller, in a range
+  nobody else uses, has neither fault. Then the restart: the debugging guide keeps a partition under gdb and
+  starts the controller again and again, and a counter that began at 101 each time would have repeated the
+  number that partition took last whenever one command had been sent; the first number therefore follows the
+  frame count (one time in a hundred it still repeats: ICD README section 12). The monitor copy is a lease
+  because a UDP listener cannot say it died.
+- *Checked beside the real demo* (the optimised build rebuilt): `py -m fmofp_cli -c frame -c terminals` exit
+  0, "frame 465 (9.3 s on the bus)", 23 terminals each with its status; `py -m fmofp_scenario
+  failureScenario.xml --speed 20` exit 0, 16/16 events, 10 commands (AVN_CMD 182 to 185, MSN_CMD 170 to 172);
+  the demo 1500 frames, 0 overruns, worst frame 13.8 ms with both clients listening. The guide's flow, one
+  communications computer kept alive across three controller runs: with `--no-command-port` the prompt lists
+  it under `--fixed-monitor`; two one-shot prompts in a row get 143 and 144 and both commands are acted on;
+  after the controller is started again the first command gets 140 and is acted on.
+- *Warnings / lessons*: section 6's lines on the monitor port, the numbering, the subscriber, the optimised
+  build and the long rebuild. The demo was flying the stale optimised controller until it was rebuilt: the
+  prompt's MALFORMED hint and the guide's table now say so. `transport_test` and `test_transport` both used
+  "type 7 does not exist" as their bad frame: 8 now. Found while here and written into ICD README section 12,
+  not run: a display's command reaches its radar by a 10 Hz relay into the subaddress a scripted or client
+  command also uses, so after such a command the display's standing one, if the user has clicked, is taken
+  again 100 ms later (the sequence rule with two senders, the mirror of defect 2).
+- *CI*: `3797574` run 43642043228 was red on `linux-gcc` in `test_display_e2e` (34 != 49: two reads of the
+  radar warning contacts a block apart; a documents-only commit) and green when the job was run again; the
+  assertion now reads both together (section 6). `4438f60` (the claim) run 43643022544 green.
+- *Files*: `ofp/bc/{include/fmofp/bc/bus_controller.hpp, include/fmofp/bc/command_port.hpp,
+  src/bus_controller.cpp, src/command_port.cpp, src/main.cpp}`, `ofp/bus/{include/fmofp/bus/transport.hpp,
+  src/transport.cpp}`, `ofp/tests/{bus_controller,transport,icd_messages}_test.cpp`,
+  `fmofp_bus/{monitor,bus_view,command_port,transport}.py`, `fmofp_cli/{cli,__main__}.py`,
+  `fmofp_scenario/{engine,__main__}.py`, `fmofp_bus/tests/{test_command_port,test_cli,test_scenario_oracle,
+  test_demo,test_display_e2e,test_transport,test_messages}.py`, `icd/fmofp_icd.xml` + README + generated files,
+  `ofp/README.md`, `ofp/docs/{ARCHITECTURE,DEBUGGING}.md`, this file.
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 305 OK (was 303: `sequence_place` over every
+  command of the ICD, the client leaving the message alone, and `ClientsBesideEachOtherTest`, which runs the
+  communications computer under the controller with a listener on the fixed port, two views and two clients;
+  `test_cli` starts a second prompt beside its first; `test_demo` runs the prompt beside the demo), ctest 2/2
+  (327 gtests, was 325: the numbering with its wrap, its refusals and a full queue; the listeners with their
+  limit, renewal, stop and expiry), cppcheck clean, load unchanged (107 messages, 8612 us). The lint was not
+  run here (no clang-tidy on this machine): CI's step is its check. Meter unchanged, 29.5 / 29.5 = 100 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -2171,3 +2242,10 @@ done before this file existed are condensed from the private session notes.
   step 2: the quirk made the function unusable); each departure gets its row in the ICD README's section 2.
   The meter does not move: these are repairs to finished units. The smaller slips of that test's list stay as
   they are, future intern tickets or backlog.
+- 2026-11-14, Kevin's agent, under Kevin's "fix them all" (told to Kevin; either human may overrule): the
+  clients' repair is ICD v1.24. The bus controller numbers its clients' commands (101 to 200 per destination,
+  one counter for all clients, the first number following the frame count) instead of each client counting
+  from 201; a client's own `cmd_seq`, when it sets one, is sent as it is. A client gets the monitor stream by
+  asking the command port for a copy (up to four clients, three seconds a request), and the fixed monitor port
+  stays as it was for the dashboard and the tests. A view's frame is the controller's count. The prompt waits
+  one major frame before a status command answers.

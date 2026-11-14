@@ -12,7 +12,7 @@ from fmofp_bus.status import Status
 class GeneratedMessagesTest(unittest.TestCase):
     def test_version_and_table(self):
         self.assertEqual(1, m.ICD_MAJOR)
-        self.assertEqual(23, m.ICD_MINOR)
+        self.assertEqual(24, m.ICD_MINOR)
         self.assertEqual(50, len(m.RELAYS))
         self.assertEqual(("PLANT_SENSORS", "FCS_SENSORS", 27, 1, 5, 13, 11, 50, ()), tuple(m.RELAYS[0]))
         broadcast = [r for r in m.RELAYS if r.to_rt == 31]

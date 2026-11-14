@@ -18,7 +18,9 @@ bool valid_type(std::uint8_t raw) noexcept {
            raw == static_cast<std::uint8_t>(FrameType::kRtToBc) ||
            raw == static_cast<std::uint8_t>(FrameType::kMonitor) ||
            raw == static_cast<std::uint8_t>(FrameType::kCommand) ||
-           raw == static_cast<std::uint8_t>(FrameType::kCommandAck);
+           raw == static_cast<std::uint8_t>(FrameType::kCommandAck) ||
+           raw == static_cast<std::uint8_t>(FrameType::kCommandNumbered) ||
+           raw == static_cast<std::uint8_t>(FrameType::kMonitorRequest);
 }
 
 }  // namespace

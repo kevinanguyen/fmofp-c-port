@@ -24,6 +24,11 @@ class FrameType(enum.IntEnum):
     MONITOR = 3
     COMMAND = 4      # a client asks the bus controller to send a receive transaction (command_port.py)
     COMMAND_ACK = 5  # the controller's answer: the outcome and its frame count
+    COMMAND_NUMBERED = 6  # COMMAND, and the controller writes the command's sequence number (v1.24)
+    MONITOR_REQUEST = 7   # a client asks for, or gives up, its own copy of the monitor stream (v1.24)
+
+
+FRAME_TYPES = frozenset(int(t) for t in FrameType)
 
 
 @dataclass
@@ -40,7 +45,7 @@ class Frame:
 
 def encode_frame(frame):
     """(Status, bytes). INVALID_ARGUMENT for too many words or an unknown type."""
-    if len(frame.words) > MAX_FRAME_WORDS or int(frame.type) not in (1, 2, 3, 4, 5):
+    if len(frame.words) > MAX_FRAME_WORDS or int(frame.type) not in FRAME_TYPES:
         return Status.INVALID_ARGUMENT, b""
     header = struct.pack(">HHHH", FRAME_MAGIC, (int(frame.type) << 8) | (frame.flags & 0xFF),
                          frame.transaction & 0xFFFF, len(frame.words))
@@ -56,7 +61,7 @@ def decode_frame(data):
     if magic != FRAME_MAGIC:
         return Status.BAD_MAGIC, None
     type_raw = type_and_flags >> 8
-    if type_raw not in (1, 2, 3, 4, 5):
+    if type_raw not in FRAME_TYPES:
         return Status.MALFORMED, None
     if count > MAX_FRAME_WORDS or len(data) != 2 * (FRAME_HEADER_WORDS + count):
         return Status.BAD_LENGTH, None

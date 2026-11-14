@@ -44,7 +44,7 @@ class FrameTest(unittest.TestCase):
         self.assertEqual((Status.BAD_LENGTH, None), decode_frame(data[:6]))
         self.assertEqual((Status.BAD_LENGTH, None), decode_frame(None))
         self.assertEqual((Status.BAD_MAGIC, None), decode_frame(b"\x00" + data[1:]))
-        self.assertEqual((Status.MALFORMED, None), decode_frame(data[:2] + b"\x07" + data[3:]))
+        self.assertEqual((Status.MALFORMED, None), decode_frame(data[:2] + b"\x08" + data[3:]))
         self.assertEqual((Status.BAD_LENGTH, None), decode_frame(data[:7] + bytes([MAX_FRAME_WORDS + 1]) + data[8:]))
 
 

@@ -28,6 +28,9 @@ enum class BcMode : std::uint8_t {
 
 constexpr std::size_t kMaxTerminals = 31;
 constexpr std::size_t kAperiodicQueueDepth = 16;
+// Clients that may each have their own copy of the monitor stream, beside
+// whoever listens on the fixed monitor port (ICD README section 7, v1.24).
+constexpr std::size_t kMaxMonitorListeners = 4;
 
 struct BcConfig {
     std::uint16_t port_base{51000};
@@ -105,6 +108,17 @@ public:
                                     std::uint8_t capacity, std::uint8_t& count,
                                     std::uint32_t& frame) const noexcept;
 
+    // The monitor stream's extra listeners (v1.24): every monitor record is
+    // also sent to each listener's port on this host until osal::now() passes
+    // the time given, whether or not the fixed monitor port is enabled. Adding
+    // a port that is already listed moves its expiry. kInvalidArgument for
+    // port 0, kNotReady when kMaxMonitorListeners others are listed.
+    [[nodiscard]] Status add_monitor_listener(std::uint16_t port, osal::Nanoseconds expires) noexcept;
+    void remove_monitor_listener(std::uint16_t port) noexcept;
+    // Forgets the listeners whose time has passed. Called once a frame by whoever grants the time.
+    void expire_monitor_listeners(osal::Nanoseconds now) noexcept;
+    [[nodiscard]] std::uint8_t monitor_listener_count() const noexcept;
+
     // One transaction, start to finish: send the command (and data), wait for
     // the reply unless `expect_reply` is false (broadcasts), validate it,
     // record the statistics and copy it to the monitor. Exposed for the
@@ -127,6 +141,10 @@ private:
         std::uint8_t count{0};
         std::array<bus::Word, bus::kMaxDataWords> words{};
     };
+    struct MonitorListener {
+        std::uint16_t port{0};  // 0: a free entry
+        osal::Nanoseconds expires{0};
+    };
 
     [[nodiscard]] Status send_sync() noexcept;
     [[nodiscard]] Status await_reply(bus::Word transaction, bus::Frame& reply) noexcept;
@@ -148,6 +166,7 @@ private:
     std::uint8_t queued_{0};
     std::uint8_t frame_slowest_rt_{bus::kBroadcastRt};  // this frame's slowest answer so far
     osal::Nanoseconds frame_slowest_ns_{0};
+    std::array<MonitorListener, kMaxMonitorListeners> listeners_{};
 };
 
 }  // namespace fmofp::bc

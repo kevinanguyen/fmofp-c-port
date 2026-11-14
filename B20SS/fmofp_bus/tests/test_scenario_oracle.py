@@ -37,14 +37,17 @@ class FakeClient:
     def __init__(self, status=Status.OK):
         self.sent = []
         self.status = status
-        self.seq = 200
+        self.numbered = 0
 
     def send(self, message, rt=None):
+        """As the command port since v1.24: the controller numbers the command (from 101 here) and says which
+        number it gave; the message is left as it was."""
         self.sent.append(message)
-        if hasattr(message, "cmd_seq") and message.cmd_seq == 0:
-            self.seq += 1
-            message.cmd_seq = self.seq
-        return Acknowledgement(self.status, frame=1234, cmd_seq=getattr(message, "cmd_seq", 0))
+        number = getattr(message, "cmd_seq", 0)
+        if hasattr(message, "cmd_seq") and number == 0:
+            self.numbered += 1
+            number = 100 + self.numbered
+        return Acknowledgement(self.status, frame=1234, cmd_seq=number)
 
 
 class SteppingView:
@@ -269,7 +272,7 @@ class EngineClockTest(unittest.TestCase):
         self.assertEqual(["WP-001"], [f.event.event_id for f in fired])
         self.assertIsInstance(fired[0].message, m.MsnCmd)
         self.assertTrue(fired[0].queued)
-        self.assertEqual(201, fired[0].ack.cmd_seq)
+        self.assertEqual(101, fired[0].ack.cmd_seq)
         self.assertEqual(1, len(client.sent))
         status = engine.status()
         self.assertEqual((True, "Basic Training Scenario", 16, 2, 10.0, 1.0, 1, 0),
@@ -330,6 +333,18 @@ class EngineClockTest(unittest.TestCase):
         self.assertTrue(stuck.stopped)
         self.assertFalse(stuck.running)
         self.assertFalse(stuck.complete)
+        self.assertEqual("no frame on the bus for 0.05 s", stuck.stop_reason)
+        self.assertEqual("", engine.stop_reason, "a scenario that ran to its end gave nothing up")
+
+        # The view's frame is the controller's own count (v1.24): when it goes back, the controller was started
+        # again and the scenario's clock went with the old one. The engine stops rather than wait for the count
+        # to come round.
+        restarted = ScenarioEngine(FakeClient(), speed=1.0)
+        restarted.load(TRAINING)
+        firings = restarted.run(SteppingView(frame=5000, step=-3), poll_s=0.001)
+        self.assertEqual(["MSG-001"], [f.event.event_id for f in firings])
+        self.assertTrue(restarted.stopped)
+        self.assertEqual("the bus controller was started again", restarted.stop_reason)
 
     def test_describe_and_the_log_entry(self):
         event = ScenarioEvent("MSG-001", "message", 0.0, {"text": "hi"})

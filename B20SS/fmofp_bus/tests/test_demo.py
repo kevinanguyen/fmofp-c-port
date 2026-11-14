@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 from fmofp_bus.command_word import CommandWord, decode_status_word
@@ -105,12 +106,36 @@ class DemoRunTest(unittest.TestCase):
         log_dir = tempfile.mkdtemp(prefix="fmofp_demo_")
         env = binary_env()
         env["PYTHONIOENCODING"] = "utf-8"
-        result = subprocess.run(
-            [sys.executable, "-m", "fmofp_demo", "--port-base", str(PORT_BASE), "--seconds", "10", "--headless",
-             "--build", build, "--log-dir", log_dir, "--seed", "4"],
-            capture_output=True, text=True, timeout=240, env=env, cwd=B20SS)
-        output = result.stdout + result.stderr
-        self.assertEqual(0, result.returncode, output)
+        # The demo's output goes to a file: a pipe nobody reads while the client below runs would fill.
+        output_path = os.path.join(log_dir, "demo_output.txt")
+        with open(output_path, "w", encoding="utf-8") as sink:
+            demo = subprocess.Popen(
+                [sys.executable, "-m", "fmofp_demo", "--port-base", str(PORT_BASE), "--seconds", "10", "--headless",
+                 "--build", build, "--log-dir", log_dir, "--seed", "4"],
+                stdout=sink, stderr=subprocess.STDOUT, env=env, cwd=B20SS)
+            try:
+                # Beside the running demo, as the documents say to use it: the debug prompt, one shot. Until v1.24
+                # it could not start here at all (the demo's dashboard holds the one fixed monitor port), and
+                # where it could start it answered before it had seen the bus.
+                time.sleep(5.0)
+                client = subprocess.run(
+                    [sys.executable, "-m", "fmofp_cli", "--port-base", str(PORT_BASE), "--wait", "20", "-c", "frame",
+                     "-c", "terminals"], capture_output=True, text=True, timeout=120, env=env, cwd=B20SS)
+            finally:
+                try:
+                    demo.wait(timeout=240)
+                except subprocess.TimeoutExpired:
+                    demo.kill()
+                    demo.wait(timeout=30)
+        with open(output_path, encoding="utf-8", errors="replace") as f:
+            output = f.read()
+        self.assertEqual(0, demo.returncode, output)
+        beside = client.stdout + client.stderr
+        self.assertEqual(0, client.returncode, beside)
+        self.assertRegex(beside, r"frame \d+ \(\d+\.\d s on the bus\)")
+        self.assertIn(": 23 terminals", beside)
+        # Until v1.24 none of the terminals it listed had a status yet. A slow CI runner may miss a poll or two.
+        self.assertLess(beside.count("no TERM_STATUS yet"), 12, beside)
         self.assertIn(">> t=2 s: weather radar on", output)
         self.assertIn(">> t=3 s: terrain-following radar on", output)
         self.assertIn("23/23 answering", output)

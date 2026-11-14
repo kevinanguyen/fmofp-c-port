@@ -186,6 +186,7 @@ class ScenarioEngine:
         self.start_frame = None
         self.frame = None      # the last frame stepped
         self.stopped = False
+        self.stop_reason = ""  # why run() gave up before the last event, if it did
         self.log = []          # Firing, in firing order
         self.on_fire = None    # callable(Firing), if the caller wants each one as it happens
 
@@ -224,6 +225,7 @@ class ScenarioEngine:
         self.start_frame = frame
         self.frame = frame
         self.stopped = False
+        self.stop_reason = ""
         self.log = []
         return True
 
@@ -274,7 +276,9 @@ class ScenarioEngine:
 
     def run(self, view, stall_s=5.0, poll_s=0.002):
         """Starts at the bus's present frame and steps at every new frame until every event fired, stop() is
-        called, or the bus stops advancing for stall_s. Returns the firings."""
+        called, the bus stops advancing for stall_s, or its frame count goes back (the controller was started
+        again: the view's count is the controller's own since v1.24, and the scenario's clock went with the old
+        one). Returns the firings."""
         frame = view.current_frame()
         if not self.start(frame):
             return []
@@ -282,11 +286,16 @@ class ScenarioEngine:
         last_change = time.monotonic()
         while self.running:
             now_frame = view.current_frame()
+            if now_frame < frame:
+                self.stop_reason = "the bus controller was started again"
+                self.stop()
+                break
             if now_frame != frame:
                 frame = now_frame
                 last_change = time.monotonic()
                 self.step(frame)
             elif time.monotonic() - last_change > stall_s:
+                self.stop_reason = f"no frame on the bus for {stall_s:g} s"
                 self.stop()
                 break
             else:

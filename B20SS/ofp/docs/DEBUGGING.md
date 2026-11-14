@@ -192,10 +192,13 @@ What to expect while you are stopped:
   Ctrl-C.
 - **Commands**: to send the partition a command at a known frame, give the controller a script
   (`--script FILE`, lines of `frame rt sa words`; `README.md` shows one), or drop `--no-command-port` and use
-  the debug prompt from `B20SS/`: `py -m fmofp_cli --port-base 52300 -c "send COM_CMD ..."`.
+  the debug prompt from `B20SS/`: `py -m fmofp_cli --port-base 52300 -c "send COM_CMD command=SET_RADIO_VOLUME
+  volume=40"`. The controller numbers each command, so one after another from separate prompts all count, and
+  so does the first one after the controller is started again (the answer says which `cmd_seq` it gave).
 
-To watch the same run from outside while gdb holds the inside: `py -m fmofp_cli --port-base 52300` from
-`B20SS/` (`terminals`, `status 2`, `msg COM_STATUS`).
+To watch the same run from outside while gdb holds the inside: `py -m fmofp_cli --port-base 52300
+--fixed-monitor` from `B20SS/` (`terminals`, `status 2`, `msg COM_STATUS`). `--fixed-monitor` is for the
+controller as started above, with its command port closed; without `--no-command-port` leave it out.
 
 ## 5. When it does not work
 
@@ -206,6 +209,9 @@ To watch the same run from outside while gdb holds the inside: `py -m fmofp_cli 
 | `Function "..." not defined` | The name is wrong (not a guess: `info functions ClassName::`), or the function is in another executable. |
 | The program runs but never stops in `step` on the bus | The controller is not running, has another `--port-base`, or was not given this terminal's `--rt`. |
 | `<optimized out>` | You are in the `-release` build. |
+| gdb starts with `auto-loading has been declined` for `libstdc++-6.dll-gdb.py` | Harmless: gdb did not load the pretty-printers for the standard library, so a `std::array` prints as its raw members. To have them, add the `add-auto-load-safe-path` line the notice shows to the file it names. |
+| The debug prompt says `no bus controller answers on its command port` while the controller runs | The controller was started with `--no-command-port` (as in section 4): add `--fixed-monitor` to the prompt, or start the controller without that option. |
+| The prompt answers `MALFORMED` to `send`, or `terminals` stays empty | The controller is a build from before ICD v1.24: build it again (the debug preset, and the `-release` one if the demo flies it). |
 | The executable does not start from PowerShell or Explorer (a missing DLL) | Run it from the UCRT64 shell, whose `bin` has the compiler's DLLs. |
 | `current stack frame does not contain a variable named 'this'` | You are not in a member function any more (the test body, `main`): `up` / `down` move between frames, `bt` shows them. |
 

@@ -35,6 +35,12 @@ follow the ICD (base 51000: terminal *n* at 51000+*n*, the controller at 51032,
 the monitor at 51033, the command port at 51034); a different `--port-base` lets two
 buses share a machine. The command port is how the scenario engine, the debug CLI and
 the tests queue commands (ICD README section 7); `--no-command-port` leaves it closed.
+Since ICD v1.24 it is also how they listen and how their commands are numbered: the
+monitor port has one listener (the demo's dashboard while the demo runs), so a client
+asks the command port for its own copy of the monitor stream, and the controller
+writes each client command's `cmd_seq` (101 to 200 per destination), because client
+programs that each counted for themselves repeated one another's numbers and a
+terminal drops a command numbered like the last one it took.
 
 With `--report`, `fmofp_bc` also prints where the frames' time went when it stops (unit 30), after its
 statistics: `bc: timing: overruns_late_start=N worst_wake_late_us=N` (the overrun frames
@@ -129,7 +135,9 @@ frame (25 Hz: a second display's copies had pushed the 50 Hz schedule past the
 controller's bus-load budget).
 Anything listening on the monitor port sees every transaction
 (`fmofp_bus.monitor` reads it from Python; `fmofp_bus.block.blocks_from_records`
-reassembles the blocks). The radars do nothing until they are told a mode: a
+reassembles the blocks). One program at a time can hold that port;
+`Monitor(port_base, subscribe=True)` asks the controller for a copy on a port of its
+own instead, beside whoever holds it. The radars do nothing until they are told a mode: a
 `RDR_WX_MODE_CMD` (RT 9, SA 1) for NORMAL and SURVEILLANCE starts the weather
 radar scanning, and `RDR_WX_SCAN` then reports what each 1.2 s sweep found; a
 `RDR_TFR_MODE_CMD` (RT 9, SA 2) for NORMAL and TERRAIN_FOLLOWING with a set
@@ -216,14 +224,14 @@ frame 40:
 ofp/build/<preset>/bc/fmofp_bc --rt 27 --rt 5 --rt 7 --rt 12 --port-base 53000 --script commands.txt
 ```
 
-**The scenario engine and the debug CLI.** Both are Python clients of the controller's command port (ICD README section 7) and need nothing but a running bus. From `B20SS/`, with the aircraft up (`py -m fmofp_demo`, or the processes by hand at the same port base):
+**The scenario engine and the debug CLI.** Both are Python clients of the controller's command port (ICD README section 7) and need nothing but a running bus: they run beside the demo and its dashboard, and beside each other (up to four clients listen at once). From `B20SS/`, with the aircraft up (`py -m fmofp_demo`, or the processes by hand at the same port base):
 
 ```bash
 py -m fmofp_scenario FMOFP/Interfaces/scenarios/trainingScenario.xml --speed 10
 py -m fmofp_cli
 ```
 
-The engine reads the frozen scenario file, times its events by the bus frame (`--speed 10` runs the 510 s scenario in 51 s) and sends each as the bus command its Python injector amounted to: waypoints and phases to the mission computer, threats to the defensive terminal, failures to the avionics terminal, radar contacts and weather cells into the plant's world, where the radars find them; it prints a line per event with the controller's acknowledgement and exits 0 when every command was queued. The CLI is a prompt: `terminals` and `status RT` decode what the monitor has shown of each terminal, `msg ID` the latest message of a kind field by field, `send ID field=value ...` builds any ICD command message and queues it (`send MSN_CMD command=SET_PHASE phase=EGRESS`), `scenario load|events|start|stop|status` drives the engine from the prompt, and `-c COMMAND` runs commands without it. `--port-base` on both selects the bus.
+The engine reads the frozen scenario file, times its events by the bus frame (`--speed 10` runs the 510 s scenario in 51 s) and sends each as the bus command its Python injector amounted to: waypoints and phases to the mission computer, threats to the defensive terminal, failures to the avionics terminal, radar contacts and weather cells into the plant's world, where the radars find them; it prints a line per event with the controller's acknowledgement and exits 0 when every command was queued. The CLI is a prompt: `terminals` and `status RT` decode what the monitor has shown of each terminal, `msg ID` the latest message of a kind field by field, `send ID field=value ...` builds any ICD command message and queues it (`send MSN_CMD command=SET_PHASE phase=EGRESS`; the controller numbers it, and the answer says with which `cmd_seq`), `scenario load|events|start|stop|status` drives the engine from the prompt, and `-c COMMAND` runs commands without it (a status command first watches the bus for one major frame, a second in real time). `--port-base` on both selects the bus; `py -m fmofp_cli --fixed-monitor` reads the fixed monitor port instead, for a controller started with `--no-command-port`. Both need a controller built for ICD v1.24: after a pull that changes `ofp/`, build the optimised preset again too if you have one, because the demo flies it.
 
 **The displays.** Six of the PyQt6 displays run as their own bus terminals
 (`B20SS/fmofp_display`): the radar display, RT 15, which shows the weather and

@@ -4,6 +4,7 @@
 // fmofp_rt_stub do the same from separate processes.
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstddef>
@@ -320,6 +321,7 @@ TEST(BusController, TheCommandPortQueuesWhatAClientSendsAndAnswers) {
     EXPECT_EQ(static_cast<Word>(Status::kOk), ack.words[1]);
     EXPECT_EQ(Word{0}, ack.words[2]);
     EXPECT_EQ(Word{0}, ack.words[3]);
+    EXPECT_EQ(Word{0}, ack.words[4]) << "a plain command is sent as it came: the controller gave it no number";
 
     // The terminal got the data in the frame after.
     std::array<Word, 32> got{};
@@ -358,6 +360,299 @@ TEST(BusController, TheCommandPortQueuesWhatAClientSendsAndAnswers) {
     bc->shutdown();
     port.close();
     client.close();
+}
+
+// A client's side of the command port: one program's socket, its frames out and the frames that come back.
+struct PortClient {
+    fmofp::osal::UdpSocket socket;
+    std::uint16_t to{0};
+    Word transaction{0};
+
+    Status send(fmofp::bus::FrameType type, std::initializer_list<Word> words) {
+        fmofp::bus::Frame frame{};
+        frame.type = type;
+        frame.transaction = ++transaction;
+        std::size_t n = 0;
+        for (const Word w : words) {
+            frame.words[n++] = w;
+        }
+        frame.word_count = static_cast<std::uint8_t>(n);
+        std::array<std::uint8_t, fmofp::bus::kMaxFrameBytes> bytes{};
+        std::size_t length = 0;
+        const Status s = fmofp::bus::encode_frame(frame, bytes.data(), bytes.size(), length);
+        return s != Status::kOk ? s : socket.send_to(to, bytes.data(), length);
+    }
+
+    // The next frame on the socket, kTimeout if none comes in time.
+    Status read(fmofp::bus::Frame& frame, Nanoseconds timeout = 200 * kNsPerMs) {
+        std::array<std::uint8_t, fmofp::bus::kMaxFrameBytes> bytes{};
+        std::size_t length = 0;
+        const Status s = socket.receive(bytes.data(), bytes.size(), length, timeout, nullptr);
+        return s != Status::kOk ? s : fmofp::bus::decode_frame(bytes.data(), length, frame);
+    }
+
+    // Empties the socket; returns how many frames were waiting.
+    unsigned drain() {
+        unsigned n = 0;
+        fmofp::bus::Frame frame{};
+        while (read(frame, 20 * kNsPerMs) == Status::kOk) {
+            ++n;
+        }
+        return n;
+    }
+};
+
+Word receive_command_word(std::uint8_t rt, std::uint8_t sa, std::uint8_t count) {
+    fmofp::bus::CommandWord cw{};
+    cw.rt = rt;
+    cw.transmit = false;
+    cw.subaddress = sa;
+    cw.count_or_mode = count;
+    Word w = 0;
+    EXPECT_EQ(Status::kOk, fmofp::bus::encode_command_word(cw, w));
+    return w;
+}
+
+// v1.24. Two client programs that each counted their own commands gave them the same numbers, and a terminal
+// drops a command numbered like the last one it took. The controller counts for all of them.
+TEST(BusController, TheCommandPortNumbersTheClientsCommandsItself) {
+    using fmofp::bus::FrameType;
+    ASSERT_EQ(Status::kOk, fmofp::osal::init());
+    fmofp::bc::CommandPort port;
+    const auto port_number = static_cast<std::uint16_t>(kPortBase + fmofp::bc::kCommandPortOffset);
+    ASSERT_EQ(Status::kOk, port.open(port_number));
+    PortClient first;
+    PortClient second;
+    first.to = port_number;
+    second.to = port_number;
+    ASSERT_EQ(Status::kOk, first.socket.open(static_cast<std::uint16_t>(kPortBase + 40)));
+    ASSERT_EQ(Status::kOk, second.socket.open(static_cast<std::uint16_t>(kPortBase + 41)));
+
+    StubTerminal a;
+    ASSERT_EQ(Status::kOk, a.start(24));
+    const BcConfig cfg = config({24}, BcMode::kFreeRun);
+    auto bc = make_bc();
+    ASSERT_EQ(Status::kOk, bc->init(cfg, schedule_for(cfg)));
+
+    // The same command from each: two words to RT 24 SA 20, its number wanted in the high byte of the second.
+    const Word to_sa20 = receive_command_word(24, 20, 2);
+    const Word high_byte_of_word_1 = 0x0108;
+    ASSERT_EQ(Status::kOk, first.send(FrameType::kCommandNumbered, {to_sa20, high_byte_of_word_1, 0xCAFE, 0x00EE}));
+    ASSERT_EQ(Status::kOk, second.send(FrameType::kCommandNumbered, {to_sa20, high_byte_of_word_1, 0xCAFE, 0x00EE}));
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+    EXPECT_EQ(2U, port.poll(*bc));
+    fmofp::bus::Frame ack{};
+    ASSERT_EQ(Status::kOk, first.read(ack));
+    EXPECT_EQ(FrameType::kCommandAck, ack.type);
+    ASSERT_EQ(fmofp::bc::kAckWords, ack.word_count);
+    EXPECT_EQ(to_sa20, ack.words[0]);
+    EXPECT_EQ(static_cast<Word>(Status::kOk), ack.words[1]);
+    EXPECT_EQ(Word{101}, ack.words[4]) << "the first for this destination, given at frame 0";
+    ASSERT_EQ(Status::kOk, second.read(ack));
+    EXPECT_EQ(Word{102}, ack.words[4]) << "the other client's command goes on from the first's";
+    EXPECT_EQ(Status::kOk, bc->run_frames(3));
+    wait_for_syncs(a, 3);
+
+    // Another destination starts where the frame count is (frame 3). A place that is not in the data, or that
+    // leaves no eight bits, is refused; a frame with no data word is no command. None of the three uses a number.
+    const Word low_byte_of_word_0 = 0x0000;
+    ASSERT_EQ(Status::kOk,
+              first.send(FrameType::kCommandNumbered, {receive_command_word(24, 21, 1), low_byte_of_word_0, 0xFF00}));
+    ASSERT_EQ(Status::kOk, first.send(FrameType::kCommandNumbered, {to_sa20, 0x0208, 0xCAFE, 0x00EE}));
+    ASSERT_EQ(Status::kOk, first.send(FrameType::kCommandNumbered, {to_sa20, 0x0109, 0xCAFE, 0x00EE}));
+    ASSERT_EQ(Status::kOk, first.send(FrameType::kCommandNumbered, {to_sa20, high_byte_of_word_1}));
+    ASSERT_EQ(Status::kOk, second.send(FrameType::kCommandNumbered, {to_sa20, high_byte_of_word_1, 0xCAFE, 0x00EE}));
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+    EXPECT_EQ(2U, port.poll(*bc));
+    ASSERT_EQ(Status::kOk, first.read(ack));
+    EXPECT_EQ(Word{104}, ack.words[4]);
+    ASSERT_EQ(Status::kOk, first.read(ack));
+    EXPECT_EQ(static_cast<Word>(Status::kInvalidArgument), ack.words[1]);
+    EXPECT_EQ(Word{0}, ack.words[4]);
+    ASSERT_EQ(Status::kOk, first.read(ack));
+    EXPECT_EQ(static_cast<Word>(Status::kInvalidArgument), ack.words[1]);
+    ASSERT_EQ(Status::kOk, first.read(ack));
+    EXPECT_EQ(static_cast<Word>(Status::kMalformed), ack.words[1]);
+    ASSERT_EQ(Status::kOk, second.read(ack));
+    EXPECT_EQ(Word{103}, ack.words[4]) << "the refused commands used no number";
+    EXPECT_EQ(Status::kOk, bc->run_frames(2));
+    wait_for_syncs(a, 5);
+
+    // A hundred numbers, 101 to 200, then round again: never the same number twice in a row.
+    const Word to_sa22 = receive_command_word(24, 22, 1);
+    Word first_number = 0;
+    Word last_number = 0;
+    for (unsigned sent = 0; sent < 101;) {
+        const unsigned batch = std::min(16U, 101U - sent);
+        for (unsigned i = 0; i < batch; ++i) {
+            ASSERT_EQ(Status::kOk, first.send(FrameType::kCommandNumbered, {to_sa22, low_byte_of_word_0, 0x0000}));
+        }
+        (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+        ASSERT_EQ(batch, port.poll(*bc));
+        for (unsigned i = 0; i < batch; ++i, ++sent) {
+            ASSERT_EQ(Status::kOk, first.read(ack));
+            const Word number = ack.words[4];
+            ASSERT_GE(number, Word{fmofp::bc::kFirstClientNumber});
+            ASSERT_LE(number, Word{fmofp::bc::kLastClientNumber});
+            if (sent == 0) {
+                first_number = number;
+            } else {
+                const Word expected = last_number == fmofp::bc::kLastClientNumber
+                                          ? Word{fmofp::bc::kFirstClientNumber}
+                                          : static_cast<Word>(last_number + 1U);
+                ASSERT_EQ(expected, number);
+            }
+            last_number = number;
+        }
+        ASSERT_EQ(Status::kOk, bc->run_frames(1));
+    }
+    EXPECT_EQ(first_number, last_number) << "the hundred-and-first is the first again";
+
+    // No room in the aperiodic queue: the command is refused and its number kept for the next.
+    for (unsigned i = 0; i < 17; ++i) {
+        ASSERT_EQ(Status::kOk, first.send(FrameType::kCommandNumbered, {to_sa22, low_byte_of_word_0, 0x0000}));
+    }
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+    EXPECT_EQ(16U, port.poll(*bc));
+    EXPECT_EQ(0U, port.poll(*bc));
+    for (unsigned i = 0; i < 16; ++i) {
+        ASSERT_EQ(Status::kOk, first.read(ack));
+        last_number = ack.words[4];
+    }
+    ASSERT_EQ(Status::kOk, first.read(ack));
+    EXPECT_EQ(static_cast<Word>(Status::kNotReady), ack.words[1]);
+    EXPECT_EQ(Word{0}, ack.words[4]);
+    ASSERT_EQ(Status::kOk, bc->run_frames(1));
+    ASSERT_EQ(Status::kOk, first.send(FrameType::kCommandNumbered, {to_sa22, low_byte_of_word_0, 0x0000}));
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+    EXPECT_EQ(1U, port.poll(*bc));
+    ASSERT_EQ(Status::kOk, first.read(ack));
+    EXPECT_EQ(last_number == fmofp::bc::kLastClientNumber ? Word{fmofp::bc::kFirstClientNumber}
+                                                           : static_cast<Word>(last_number + 1U),
+              ack.words[4]);
+    ASSERT_EQ(Status::kOk, bc->run_frames(1));
+
+    EXPECT_EQ(126U, port.stats().received);
+    EXPECT_EQ(122U, port.stats().queued);
+    EXPECT_EQ(122U, port.stats().numbered);
+    EXPECT_EQ(3U, port.stats().refused);
+    EXPECT_EQ(1U, port.stats().malformed);
+
+    // What the terminal got: the number in the place asked for, every other bit as the client sent it.
+    a.stop();
+    std::array<Word, 32> got{};
+    std::uint8_t count = 0;
+    bool fresh = false;
+    ASSERT_EQ(Status::kOk, a.process().terminal().get_received(20, got.data(), 32, count, fresh));
+    EXPECT_EQ(2, count);
+    EXPECT_EQ(Word{0xCAFE}, got[0]);
+    EXPECT_EQ(Word{0x67EE}, got[1]) << "103 in the high byte, the low byte kept";
+    ASSERT_EQ(Status::kOk, a.process().terminal().get_received(21, got.data(), 32, count, fresh));
+    EXPECT_EQ(Word{0xFF68}, got[0]) << "104 in the low byte, the high byte kept";
+
+    bc->shutdown();
+    port.close();
+    first.socket.close();
+    second.socket.close();
+}
+
+// v1.24. The fixed monitor port has one listener, and the demo's dashboard is it: the scenario engine and the
+// debug prompt could not start beside it. A client now asks for its own copy.
+TEST(BusController, TheCommandPortGivesEveryListenerItsOwnCopyOfTheMonitor) {
+    using fmofp::bus::FrameType;
+    ASSERT_EQ(Status::kOk, fmofp::osal::init());
+    fmofp::bc::CommandPort port;
+    const auto port_number = static_cast<std::uint16_t>(kPortBase + fmofp::bc::kCommandPortOffset);
+    ASSERT_EQ(Status::kOk, port.open(port_number));
+    std::array<PortClient, fmofp::bc::kMaxMonitorListeners + 1> listeners;
+    for (std::size_t i = 0; i < listeners.size(); ++i) {
+        listeners[i].to = port_number;
+        ASSERT_EQ(Status::kOk, listeners[i].socket.open(static_cast<std::uint16_t>(kPortBase + 40 + i)));
+    }
+
+    StubTerminal a;
+    ASSERT_EQ(Status::kOk, a.start(24));
+    const BcConfig cfg = config({24}, BcMode::kFreeRun);  // the fixed monitor port is off: a listener is served all the same
+    auto bc = make_bc();
+    ASSERT_EQ(Status::kOk, bc->init(cfg, schedule_for(cfg)));
+    EXPECT_EQ(0, bc->monitor_listener_count());
+
+    // As many as the table holds; one more is told there is no room. A request is no command.
+    for (PortClient& listener : listeners) {
+        ASSERT_EQ(Status::kOk, listener.send(FrameType::kMonitorRequest, {fmofp::bc::kMonitorStart}));
+    }
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+    EXPECT_EQ(0U, port.poll(*bc));
+    fmofp::bus::Frame ack{};
+    for (std::size_t i = 0; i < fmofp::bc::kMaxMonitorListeners; ++i) {
+        ASSERT_EQ(Status::kOk, listeners[i].read(ack));
+        EXPECT_EQ(FrameType::kCommandAck, ack.type);
+        ASSERT_EQ(fmofp::bc::kAckWords, ack.word_count);
+        EXPECT_EQ(static_cast<Word>(Status::kOk), ack.words[1]);
+    }
+    ASSERT_EQ(Status::kOk, listeners.back().read(ack));
+    EXPECT_EQ(static_cast<Word>(Status::kNotReady), ack.words[1]);
+    EXPECT_EQ(fmofp::bc::kMaxMonitorListeners, std::size_t{bc->monitor_listener_count()});
+    EXPECT_EQ(listeners.size(), port.stats().monitor_requests);
+    EXPECT_EQ(0U, port.stats().received);
+
+    // A listener that asks again keeps its place: that is how it holds on to the stream.
+    ASSERT_EQ(Status::kOk, listeners[0].send(FrameType::kMonitorRequest, {fmofp::bc::kMonitorStart}));
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+    EXPECT_EQ(0U, port.poll(*bc));
+    ASSERT_EQ(Status::kOk, listeners[0].read(ack));
+    EXPECT_EQ(static_cast<Word>(Status::kOk), ack.words[1]);
+    EXPECT_EQ(fmofp::bc::kMaxMonitorListeners, std::size_t{bc->monitor_listener_count()});
+
+    // Each of them gets the frame's records, the synchronise mode code first; the one refused gets nothing.
+    EXPECT_EQ(Status::kOk, bc->run_frames(1));
+    for (std::size_t i = 0; i < fmofp::bc::kMaxMonitorListeners; ++i) {
+        fmofp::bus::Frame record{};
+        ASSERT_EQ(Status::kOk, listeners[i].read(record));
+        EXPECT_EQ(FrameType::kMonitor, record.type);
+        const fmofp::bus::CommandWord sync = fmofp::bus::decode_command_word(record.words[0]);
+        EXPECT_EQ(fmofp::bus::kBroadcastRt, sync.rt);
+        EXPECT_TRUE(sync.is_mode_code());
+        EXPECT_EQ(fmofp::bus::kModeCodeSynchronizeWithData, sync.count_or_mode);
+    }
+    EXPECT_EQ(0U, listeners.back().drain());
+
+    // One gives the stream up: nothing more for it, the others go on.
+    ASSERT_EQ(Status::kOk, listeners[1].send(FrameType::kMonitorRequest, {fmofp::bc::kMonitorStop}));
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+    EXPECT_EQ(0U, port.poll(*bc));
+    EXPECT_EQ(fmofp::bc::kMaxMonitorListeners - 1, std::size_t{bc->monitor_listener_count()});
+    (void)listeners[1].drain();  // its answer, and what the frame before had sent it
+    (void)listeners[2].drain();
+    EXPECT_EQ(Status::kOk, bc->run_frames(1));
+    EXPECT_EQ(0U, listeners[1].drain());
+    EXPECT_GE(listeners[2].drain(), 1U);
+
+    // A request that is neither start nor stop is refused; one that is not a single word is malformed.
+    ASSERT_EQ(Status::kOk, listeners.back().send(FrameType::kMonitorRequest, {Word{2}}));
+    ASSERT_EQ(Status::kOk, listeners.back().send(FrameType::kMonitorRequest, {Word{1}, Word{1}}));
+    (void)fmofp::osal::sleep_for(5 * kNsPerMs);
+    EXPECT_EQ(0U, port.poll(*bc));
+    ASSERT_EQ(Status::kOk, listeners.back().read(ack));
+    EXPECT_EQ(static_cast<Word>(Status::kInvalidArgument), ack.words[1]);
+    ASSERT_EQ(Status::kOk, listeners.back().read(ack));
+    EXPECT_EQ(static_cast<Word>(Status::kMalformed), ack.words[1]);
+    EXPECT_EQ(fmofp::bc::kMaxMonitorListeners - 1, std::size_t{bc->monitor_listener_count()});
+
+    // A listener that stops asking is forgotten when its time is up; port 0 is nobody.
+    bc->expire_monitor_listeners(now());
+    EXPECT_EQ(fmofp::bc::kMaxMonitorListeners - 1, std::size_t{bc->monitor_listener_count()})
+        << "their time is not up yet";
+    bc->expire_monitor_listeners(now() + fmofp::bc::kMonitorLease + 1);
+    EXPECT_EQ(0, bc->monitor_listener_count());
+    EXPECT_EQ(Status::kInvalidArgument, bc->add_monitor_listener(0, now()));
+
+    a.stop();
+    bc->shutdown();
+    port.close();
+    for (PortClient& listener : listeners) {
+        listener.socket.close();
+    }
 }
 
 TEST(BusController, TheMonitorSeesEveryTransaction) {

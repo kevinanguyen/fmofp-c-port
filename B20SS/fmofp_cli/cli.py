@@ -3,11 +3,16 @@
 Utils/debug/userCLI.py was a click REPL on four threads that reached into the Python objects of the running
 program: `status` printed each subsystem's getters, `send` and `msg` pushed messages through the old messaging
 stack, `test` ran assertion suites against the live program, `scenario` drove the scenario engine. On the bus a
-program has no objects to reach into: everything a terminal says is on the monitor port, and everything an
+program has no objects to reach into: everything a terminal says is on the monitor stream, and everything an
 operator can do is a command through the controller's command port. So `status` decodes the latest TERM_STATUS
 and status messages the monitor has shown, `send` builds any ICD command message from `field=value` pairs and
 queues it, and `scenario` runs fmofp_scenario's engine. The test suites went where the tests are
 (fmofp_bus/tests); `test_1553b` is the bus itself now.
+
+A prompt that has just joined a running bus has seen nothing of it yet. The commands that read the picture
+(terminals, status, msgs, msg) first let the view watch one major frame, in which every terminal's TERM_STATUS
+and the slowest messages come round: until v1.24 `py -m fmofp_cli -c terminals` answered at the first frame, with
+half the terminals and no status.
 """
 
 import dataclasses
@@ -24,15 +29,16 @@ BY_CLASS_NAME = {info.cls.__name__: info.cls for info in m.MESSAGES}
 ID_BY_CLASS = {info.cls: info.id for info in m.MESSAGES}
 
 HELP = """\
-Commands (the bus controller must be running at this port base; status comes from its monitor port, commands go
-through its command port):
-  frame                      the bus frame count and the seconds on the bus
+Commands (the bus controller must be running at this port base; status comes from a copy of its monitor stream,
+commands go through its command port):
+  frame                      the bus controller's frame count and the seconds it has run
   terminals                  every terminal seen: its state, health and when it last answered
   status [RT|name]           one terminal's TERM_STATUS and the latest of each message it transmits
   msgs                       the message ids seen on the bus so far
   msg ID [RT]                the latest message with that id, field by field (TERM_STATUS needs the RT)
   send ID [field=value ...]  a command message to its terminal: fields by name, enums by name or number,
-                             booleans as 1/0, cmd_seq numbered for you; rt=N for a message of every terminal
+                             booleans as 1/0; the bus controller numbers it (cmd_seq) unless you give
+                             cmd_seq=N; rt=N for a message of every terminal
   scenario load FILE         read a scenario (a path, or a name in FMOFP/Interfaces/scenarios)
   scenario events            list its events
   scenario start [speed]     fire it from the present frame, at a time factor (10 runs it ten times faster)
@@ -110,6 +116,8 @@ class DebugCli:
     """The commands over a BusView (status) and a CommandClient (commands). `out` takes each output line."""
 
     PROMPT = "fmofp> "
+    SETTLE_FRAMES = 50      # one major frame: every TERM_STATUS and every 1 Hz message has come round
+    SETTLE_TIMEOUT_S = 5.0  # a bus in real time takes a second for it; a loaded machine longer
 
     def __init__(self, view, client, out=print):
         self.view = view
@@ -118,6 +126,13 @@ class DebugCli:
         self.engine = ScenarioEngine(client)
         self.engine.on_fire = lambda firing: self.out(describe(firing))
         self._scenario_thread = None
+
+    def settle(self):
+        """Before a command reads the picture: lets a view that has just joined a running bus watch one major
+        frame of it. Nothing to wait for when no controller has been seen at all."""
+        wait = getattr(self.view, "wait_until_watched", None)
+        if wait is not None and self.view.current_frame() >= 0:
+            wait(self.SETTLE_FRAMES, self.SETTLE_TIMEOUT_S)
 
     def close(self):
         self.engine.stop()
@@ -155,11 +170,12 @@ class DebugCli:
     def cmd_frame(self, args):
         frame = self.view.current_frame()
         if frame < 0:
-            self.out("no bus controller seen yet (no frame on the monitor port)")
+            self.out("no bus controller seen yet (no frame on the monitor stream)")
         else:
             self.out(f"frame {frame} ({frame / SYNC_HZ:.1f} s on the bus)")
 
     def cmd_terminals(self, args):
+        self.settle()
         snap = self.view.snapshot()
         now = time.monotonic()
         rts = sorted(set(snap["term_status"]) | set(snap["last_poll"]))
@@ -185,6 +201,7 @@ class DebugCli:
         if rt is None:
             raise ValueError(f"no terminal {args[0]!r}: give a number, or one of "
                              f"{', '.join(sorted(TERMINAL_NAMES.values()))}")
+        self.settle()
         snap = self.view.snapshot()
         term = snap["term_status"].get(rt)
         if term is None:
@@ -203,6 +220,7 @@ class DebugCli:
         return None
 
     def cmd_msgs(self, args):
+        self.settle()
         snap = self.view.snapshot()
         ids = sorted(message_id(key) for key in snap["latest"] if not isinstance(key, tuple))
         terms = sorted(snap["term_status"])
@@ -220,6 +238,7 @@ class DebugCli:
         cls = resolve_message(args[0])
         if cls is None:
             raise ValueError(f"unknown message {args[0]!r} (the ids are in icd/ICD_TABLES.md; 'msgs' lists those seen)")
+        self.settle()
         snap = self.view.snapshot()
         if cls is m.TermStatus:
             if len(args) < 2:
@@ -270,6 +289,9 @@ class DebugCli:
             line += f", queued at frame {ack.frame}"
             if ack.cmd_seq:
                 line += f" (cmd_seq {ack.cmd_seq})"
+        elif ack.status.name == "MALFORMED" and getattr(message, "cmd_seq", 1) == 0:
+            line += (" (the bus controller could not read a numbered command: one built before ICD v1.24? "
+                     "rebuild it, or give cmd_seq=N yourself)")
         self.out(line)
 
     # ---- the scenario engine

@@ -106,7 +106,11 @@ Two conventions you will meet in every message:
   `NO_COMPUTED_DATA` means unknown or stale. Zero means failure, so a message that was
   never filled reads as failed, not as a plausible number.
 - **Commands.** A command carries `cmd_seq`. The terminal acts when the number is new
-  and reports the last one it took. Zero means "no command".
+  and reports the last one it took. Zero means "no command". New means different from
+  the last one taken and nothing more, so two senders must not count alike: a display
+  counts its commands from 1, the demo's script from 201, and the bus controller
+  numbers the commands of its clients (the debug prompt, the scenario engine) from 101
+  to 200.
 
 ## Inside a partition
 
