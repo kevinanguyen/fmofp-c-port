@@ -147,7 +147,7 @@ person may continue it in their next session; when it is green it is rebased ont
   debug build (seven runs: 7, 1, 7, 0, 6, 4, 9) and 0-6 on the optimised build (1, 5, 6, 1, 0, 0, and one run of 91
   in which 69 frames started late and every terminal was slow at once: the machine, section 7). Kevin's machine,
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
-  optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
+  optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms, the difference not explained (section 7's last entry). `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
 - **Tests**: Python 313 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine); C++
   ctest 2/2 (327 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
@@ -189,9 +189,13 @@ person may continue it in their next session; when it is green it is rebased ont
   again** (`cmake --build --preset windows-ucrt64-release` from `B20SS/ofp/`): the bus controller changed, and
   the demo flies the optimised build when there is one (section 6).
 - **Repaired 2026-11-14, all five** (Kevin: "fix them all", section 8): what his agent's test of the finished
-  port found that day. Three commits, each green, ICD v1.24, the meter unmoved: `2cc2a22` the clients (a, b, c),
-  `9780f87` the rain area (e), and the radar window (d) in the commit after it (section 7 has an entry for
-  each). No claim is open. The five as they were found. In unit 28's clients, Kevin's agent's own work:
+  port found that day. Three commits, each green here and on CI, ICD v1.24, the meter unmoved: `2cc2a22` the
+  clients (a, b, c), `9780f87` the rain area (e), `bd228a4` the radar window (d) (section 7 has an entry for
+  each). No claim is open. **A sixth was found while repairing and is confirmed on the bus, not repaired, and
+  waits on Kevin's word**: once the user has clicked a mode button in the radar window, the display's command
+  stands on its subaddress and is relayed ten times a second, and the radar takes it again after any scripted
+  or client command to the same radar, which therefore lasts a tenth of a second (ICD README section 12 has
+  the evidence and two ways out). The five as they were found. In unit 28's clients, Kevin's agent's own work:
   (a) `py -m fmofp_cli` and
   `py -m fmofp_scenario` cannot start beside `py -m fmofp_demo` (exit 2): the demo's dashboard holds the one
   monitor port, so the usage the documents give works only against a bus started without the dashboard, which
@@ -2164,12 +2168,47 @@ done before this file existed are condensed from the private session notes.
   the particles over again whenever its image was a quarter of a second old, which inside a 0.7 s repaint
   meant four paintings a repaint instead of three at most: the age rule is for callers that never count a
   repaint and is two seconds now.
+- *CI*: `bd228a4` run 43648913039 all twelve jobs green (the new test on Linux too); `9780f87` run 43646720762
+  and `2cc2a22` run 43646231642 green, the lint and the coverage floors over the new C++ among them.
 - *Files*: `fmofp_display/weather_fast.py` (new), `fmofp_display/app.py`,
   `fmofp_bus/tests/test_weather_fast.py` (new), `icd/README.md`, `ofp/README.md`, this file.
 - *Tests and numbers*: `verify.sh icd py` OK: Python 313 OK (was 308: the two drawings against each other at
   three scales; the painter left as the frozen method leaves it; one painting a repaint, and another only on
   a change; install, uninstall and the environment switch; the hand-back on an error). No C++ changed. Meter
   unchanged, 29.5 / 29.5 = 100 %.
+
+### 2026-11-14 - after the repairs: the optimised build's gate, the whole flight beside the demo, a sixth finding - by Kevin's agent
+- *What*: the checks that close the day's repairs, and one more finding. No code changed in this entry.
+- *The optimised build*: rebuilt for ICD v1.24, then `PRESET=windows-ucrt64-release bash B20SS/verify.sh cpp py
+  load`: OK, ctest 2/2, cppcheck clean, Python 313 OK in 78 s against the optimised binaries, load 8612 us.
+- *The flight that failed in the morning, beside the real demo and its dashboard* (165 s headless, the two
+  radars switched on from the prompt): the prompt lists 23 terminals at the controller's frame; the training
+  scenario from the command line exits 0 with 16/16 events and 12 commands; the injected aircraft is tracked
+  54 m from its place; then the failure scenario from inside the prompt: its missile launch, the command that
+  was dropped in the morning, raises `auto_salvos` from 3 to 4 and `flares_released` from 6 to 8; four faults
+  forced, a fourth waypoint; the one-shot prompt answers "frame 5206 (104.1 s on the bus)" and 23 terminals
+  with their status. The rain area reads 26.3 dBZ at the start and 26.6 after 75 s. The controller numbered
+  all 24 commands and served 109 monitor requests. That run had 9 overruns in 8250 frames, none a late start,
+  spread over eight terminals whose worst answers were 3 to 7 ms: eight client programs were started and
+  stopped beside the aircraft (12 overruns in the same flight in the morning).
+- *What listeners cost*: the demo for 25 s with no client and with four (the most), twice each: 0 overruns in
+  all four, worst frame 14.7 and 13.0 ms against 14.0 and 17.0 ms. Each of the four read about 50,000 records.
+- *The plain demo after the repairs*, four runs of 1500 frames on the optimised build: 0 overruns in each,
+  worst frame 14.9, 13.5, 11.7 and 13.3 ms; the radar computer's worst answer 2.6 to 5.1 ms. The morning's
+  four runs, on a machine that had done nothing yet, gave 7.6 to 8.3 ms and 1.0 to 1.4 ms. **Not explained**:
+  the machine had built and tested for hours by then, and the weather the radar computer works on is no longer
+  saturated; nothing in the controller's frame grew. Worth four runs on a fresh start, on both machines.
+- *The sixth finding*, read from the sequence rule while repairing the numbering and then run
+  (`two senders`, a scratch experiment: the radar computer under the controller, a Python terminal at RT 15
+  holding SURVEILLANCE as number 1 on its transmit subaddress 20, a client sending MAPPING): the client's
+  command is acknowledged at frame 112 with number 113, and the radar reads SURVEILLANCE, `last_cmd_seq` 1, at
+  every look from frame 123 to 215. The display's standing command is taken again at the next relay. So after
+  one click on a radar mode button in the radar window, the demo's scripted events, a scenario and the prompt
+  can no longer change that radar. It is the mirror of the numbering defect (two senders, one receiver that
+  compares with the last number only) and older than unit 28: it came with the radar window and the demo's
+  script. Not repaired: Kevin asked for the five, and the way out is a choice (ICD README section 12).
+- *Files*: `icd/README.md` (section 12), this file.
+- *Tests and numbers*: `verify.sh icd` OK (documents only). Meter unchanged, 29.5 / 29.5 = 100 %.
 
 ---
 
