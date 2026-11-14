@@ -2,7 +2,7 @@
 
 **Read this whole file before doing anything else in this repository.** Two people take
 turns on this fork, Kevin (the owner, GitHub `kevinanguyen`) and Alee (GitHub `TubAleeLo`,
-who also owns the upstream repository this fork came from), each driving Claude (Fable 5.1)
+who also owns the upstream repository this fork came from), each driving Claude (Fable 5.2)
 in their own sessions, on their own machines, at different times. This file is how one
 session hands the work to the next. It is checked in on branch `port/cpp`, Claude Code
 loads it automatically, and **the copy on disk is only as current as the last `git pull`**,
@@ -143,7 +143,7 @@ person may continue it in their next session; when it is green it is rebased ont
   debug build (seven runs: 7, 1, 7, 0, 6, 4, 9) and 0-6 on the optimised build (1, 5, 6, 1, 0, 0, and one run of 91
   in which 69 frames started late and every terminal was slow at once: the machine, section 7). Kevin's machine,
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
-  optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent. `fmofp_bc --report` now says which terminal held each overrun frame up (section
+  optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
 - **Tests**: Python 303 OK (`fmofp_bus/tests`, about 65 s on Kevin's machine, 67 s on Alee's); C++
   ctest 2/2 (325 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
@@ -175,16 +175,20 @@ person may continue it in their next session; when it is green it is rebased ont
   fork: turn them on (Settings > General > Features > Issues) and create the label `intern-ticket`.** (3)
   **Kevin: unit 29 (`49314b2`) was Alee's decision alone; it is one commit, read section 7's entry and say if
   anything should come back.** (4) Whether the release build becomes a second leg of `verify.sh` (today a
-  command, section 5.4). (5) The real-time demo's overruns after unit 29 have not been measured on an idle
-  machine (section 7): fly `py -m fmofp_demo --headless --seconds 30` on Kevin's machine. Backlog, nobody's
-  yet: the ICD README's section 12. Last session: Alee's, 2026-11-12 (units 29 and 30 closed).
+  command, section 5.4). (5) *Done 2026-11-14*: the demo after unit 29, measured on Kevin's idle machine with the optimised
+  build: four runs of 1500 frames, 0 overruns in each (section 7). Kevin's agent put items 1 to 4 to Kevin on
+  2026-11-14 with its review of unit 29 on his machine (section 7: the gate green on both builds, the legacy
+  suites and the coverage floors too, nothing found that should come back); his answers are awaited. Backlog,
+  nobody's yet: the ICD README's section 12. Last session: Kevin's, 2026-11-14 (the check after the port
+  closed); before it Alee's, 2026-11-12 (units 29 and 30 closed).
 - **Lint**: `lint: OK (41 flight sources, no finding)` with clang-tidy 23.1 on Alee's machine, and green on CI's
   older clang-tidy (run 43121089010). If a later run of the `Lint (clang-tidy)` step finds something, fix the
   code or the check list in `ofp/.clang-tidy`, not the step.
 - **Known red in CI that is not ours**: Alee's `test_weather_radar_live` is flaky on the
   Windows and 3.12 Python legs (again on the Windows 3.13 leg of run 41932029106, the Linux 3.13
-  leg of 42435137866, the Windows 3.13 leg of 42729856922 and the Linux 3.14 leg of 42931963850); the two
-  `cpp` jobs are the ones that judge the port.
+  leg of 42435137866, the Windows 3.13 leg of 42729856922, the Linux 3.14 leg of 42931963850 and the Linux 3.10
+  leg of 43325183135). **That test was deleted with the old stack in unit 29** (it is not among the 18 legacy
+  suites), so this red cannot recur; the `cpp` jobs are the ones that judge the port.
 - **Known flaky in our own `cpp` job**: the display e2e runs the bus under `--strict` with
   seven Python terminals; the slow Linux runner answered one poll late in run 42435137866
   (worst frame 48 ms, exit 1, the next run of the same code green). Its poll timeout is 40 ms
@@ -593,7 +597,7 @@ always at 450 kt, the SMS station table painted with the wrong brush.
 - One unit per commit, after `verify.sh` is green. Message: a one-line title naming the
   unit and the ICD version, then paragraphs saying what moved where, what the port settles
   about the Python, what the displays and the demo gained, and the tests, with numbers. End
-  with the attribution line the harness gives you (`Co-Authored-By: Claude Fable 5.1
+  with the attribution line the harness gives you (`Co-Authored-By: Claude Fable 5.2
   <noreply@anthropic.com>` today).
 - Both CI files are edited together (`.github/workflows/ci.yml` and
   `bitbucket-pipelines.yml`): the env vars for new binaries, the apt packages.
@@ -908,6 +912,17 @@ Working on this machine (Kevin's)
   the shared one. Do not create a second working file.
 - MSYS2's `bin` holds its own `python.exe` (3.14, no PyQt6): never put it above the
   python.org install on PATH; `py` is unaffected.
+- `core.autocrlf` is true here: after a pull that changed a generated ICD file, `verify.sh icd` reports it as
+  changed (the checkout wrote CRLF, the generator writes LF) while `git diff` is empty: `git restore` it, as on
+  Alee's machine. An `eol=lf` rule in `.gitattributes` for `icd/ICD_TABLES.md` and `fmofp_bus/icd/*.py` would end
+  it on both machines.
+- A pull that deletes a package removes its tracked files only: after unit 29 the folders of
+  `FMOFP/local_messaging`, `FMOFP/MIL_STD_1553B`, `Interfaces/userInterface/messaging`, `Utils/debug` and
+  `Utils/message_loop_prevention` are still on disk with `__pycache__` in them, and a bare
+  `import FMOFP.local_messaging` succeeds as an empty namespace package. Nothing kept imports those names; the
+  folders can go (ask the machine's owner first: it is a deletion).
+- No clang-tidy here (gdb 18.1 and gcovr are installed): the `lint` target does not exist on this machine and
+  CI's `Lint (clang-tidy)` step is the check.
 
 Working on Alee's machine
 - `py` defaults to the free-threaded `python3.14t` there, which PyQt6 6.8.1 cannot load: the
@@ -1829,6 +1844,47 @@ done before this file existed are condensed from the private session notes.
   not read.
 - *Files*: this file.
 - *Tests and numbers*: `verify.sh icd` OK (documents only). Meter 29.5 / 29.5 = 100 %.
+
+### 2026-11-14 - check after the port closed: units 29 and 30 verified on Kevin's machine - by Kevin's agent
+- *What*: section 0.1 on Kevin's machine: tree clean, the pull brought Alee's nine commits (`cbc1fc1` to
+  `fee4f80`: unit 30's parts 2 to 4, the ticket tracker, unit 29, the closing), every change to this file read,
+  upstream/main still `4c25f52` (nothing to report from it), no `wip/` branch, no pull request. No code changed.
+- *Checked here, on `fee4f80`*: `bash B20SS/verify.sh`: OK (icd cpp py load), Python 303 OK in 59 s, ctest 2/2,
+  cppcheck clean, load 107 messages for 23 terminals, 8612 us. `PRESET=windows-ucrt64-release bash B20SS/verify.sh
+  cpp py load`: OK, the 303 tests green against the optimised binaries in 58 s. The legacy side as CI runs it, from
+  `B20SS/`: `py FMOFP/Tests/ci_test_boot_smoke.py` passes and `py FMOFP/Tests/run_all_tests.py` passes all 18
+  suites. `cmake --build --preset coverage`: OK, 93.8 % of lines (7936 of 8461), every module between 86.8 %
+  (`partitions/ecs`) and 100 % against the floor of 80 %, the same figures as Alee's. The lint was not run: this
+  machine has no clang-tidy (section 6); CI's run of it is green.
+- *The demo after unit 29* (section 1's item 5): the machine idle, the optimised build, 30 s headless with the
+  events, four runs, the first through `py FMOFP/Main.py`: 1500 frames and 0 overruns in each, worst frame 7.7,
+  7.6, 8.3 and 7.7 ms (9.5-11.5 ms on 2026-11-11), 23/23 answering, 19 of 19 scripted commands,
+  `overruns_late_start=0`, every terminal's worst answer under 1.8 ms (the plant 1.4-1.6 ms, the radar computer
+  1.0-1.4 ms). The display logs hold warnings only (the MFD 54, the radar display 323: the frozen display code's
+  own traces, written at WARNING, and the one `WinError 32` of section 6); no error.
+- *Unit 29 reviewed for Kevin* (section 1's item 3), from the commit and from this machine: 263 files deleted, 35
+  modified, 4 moved, none added. In the kept logic modules the functions removed are the old bus's entry points
+  only (`receive_message*`, `_handle_*`, `_send_*`, `_extract_mode_value_from_data`, the weather radar's
+  `_is_vil_request`, `_is_precipitation_request` and `_run_precipitation_data_generator_sync`, the event bus's
+  `_handle_1553b_message`); what was added to them is comments, the imports of the four moved files, one constant
+  (the radar's address, 9), three debug lines and narrower signatures. No kept file imports a deleted package
+  (eleven still name one: comments, docstrings and generated documentation text, each read). Every oracle test
+  passes against the cut modules on both builds, which is the proof that no measured logic moved. Nothing was
+  found that should come back. What Kevin should know before he says so: the user manual still describes the
+  Python application; `py FMOFP/Main.py` is the demo; upstream changes no longer merge.
+- *Warnings / lessons*: the pull left the deleted packages' folders on disk with `__pycache__` in them, and
+  `verify.sh icd` reported `ICD_TABLES.md` as changed with an empty diff (section 6, both under this machine).
+  `a3f01c4`'s red run, which Alee's entry left unread, was `test_weather_radar_live` again (below); that test
+  went with unit 29. For the ticket draft's sixth question: the Python-era tickets are on this fork, as the
+  branches `bug/SSTR-001` to `bug/SSTR-007` (planted faults, with instructor annotations) and `intern-canonical`,
+  and Kevin's machine holds their register and playbook in his private notes. The fork is public, so issues
+  opened on it, like those instructor branches, are readable by anyone, interns included: one more thing for the
+  humans to weigh when they answer where hints and planted faults live.
+- *CI*: `49314b2` (unit 29) run 43362639091 and `fee4f80` (the closing) run 43362946724 all thirteen jobs green
+  (the eight Python legs, the lint, linux-gcc, linux-asan, linux-gcc-release, coverage); `ef5f704` run 43331874982
+  and `9a5062d` run 43331626338 green. `a3f01c4` run 43325183135: twelve green, the Linux Python 3.10 leg red on
+  `test_weather_radar_live` only ("a mode set against policy is applied first", 1 of 45 suites), the flaky one.
+- *Numbers*: meter 29.5 / 29.5 = 100 %.
 
 ---
 
