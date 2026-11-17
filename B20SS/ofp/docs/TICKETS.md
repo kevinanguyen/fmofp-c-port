@@ -141,5 +141,10 @@ The example's output was run as shown, and its side effect was found by running 
 4. **Do interns work by pull request into `port/cpp`**, as section 3 item 7 assumes, or on their own forks, or on
    a training branch that is never merged, so every intern can be given the same ticket?
 5. **Is the level scale (1-3) enough**, or is an estimate in hours wanted as well?
-6. **The Python-era SSTR tickets** are not in this repository. If their format should be followed, or their
-   numbering continued, one of them is needed as a model.
+6. **The Python-era SSTR tickets** are on this fork as branches `bug/SSTR-001` to `bug/SSTR-007` (each a planted
+   defect and an "INSTRUCTOR-ONLY" commit naming it and its fix; found 2026-11-14). All seven are in the frozen
+   Python: SSTR-001 in `radarControl.py`, which the port no longer runs, SSTR-002 to -007 in `mfd.py` and
+   `pfd.py`, which the display windows still embed. Should their format be followed, their numbering continued,
+   and the six display faults reused? **And before tickets live on this fork**: the fork is public, so those
+   instructor commits are readable by interns; they say themselves they must not be in an intern-visible
+   repository.

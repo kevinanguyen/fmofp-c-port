@@ -3,7 +3,12 @@
 The bus controller broadcasts what the displays draw to address 31 (ICD
 v1.7, README section 8); a display accepts the broadcast subaddresses of the
 messages and blocks it watches and ignores the rest. The display's own
-commands sit on its transmit subaddresses for the controller to relay on. DisplayTerminal runs the socket
+commands sit on its transmit subaddresses for the controller to relay on, for a
+second each (ten relays), and are then withdrawn: the same words with cmd_seq 0,
+which is no command. A command left standing would be relayed for ever, and the
+radar takes any number that differs from the last one it accepted, so it would
+take the standing command again right after every scripted or client command to
+the same radar (found on the bus on 2026-11-14, ICD README section 2). DisplayTerminal runs the socket
 loop in a background thread and keeps the latest decoded copy of every message
 and block it is told to watch, with the time it arrived. It answers the
 display's own status message, its mode command (the lighting mode) and
@@ -18,10 +23,12 @@ Qt paint loop would hold the interpreter for longer than a reply may take
 runs a DisplayTerminal in a helper process and mirrors it.
 """
 
+import dataclasses
 import threading
 import time
 
 from fmofp_bus.block import BlockCollector
+from fmofp_bus.bus_view import SYNC_MODULUS, sync_frame
 from fmofp_bus.command_word import BROADCAST_RT
 from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import DisplayMode, TerminalState
@@ -36,6 +43,25 @@ POLL_S = 0.002
 # A state the display can be commanded into (DSP_*_MODE_CMD requested_state).
 COMMANDABLE = (TerminalState.STANDBY, TerminalState.NORMAL, TerminalState.TEST, TerminalState.MAINTENANCE,
                TerminalState.CALIBRATION)
+
+# A command the display sends stays on its transmit subaddress for this many bus frames (a second: ten relays
+# at the commands' 10 Hz), then is withdrawn. Frames are the controller's, read from its synchronise word, so
+# a free-running bus that outruns this loop still gets its ten relays.
+COMMAND_HOLD_FRAMES = 50
+# The displays number their commands 1 to 100. The controller numbers its clients' 101 to 200 and the demo's
+# script starts at 201 (ICD README section 5): a receiver compares with the last number only, so senders on one
+# subaddress must not count alike.
+LAST_COMMAND_SEQ = 100
+
+
+def withdrawn(message):
+    """`message` saying "no command": the same words with cmd_seq 0, or None if it carries no cmd_seq."""
+    payload = getattr(message, "payload", None)
+    if payload is not None and hasattr(payload, "cmd_seq"):
+        return dataclasses.replace(message, payload=dataclasses.replace(payload, cmd_seq=0))
+    if hasattr(message, "cmd_seq"):
+        return dataclasses.replace(message, cmd_seq=0)
+    return None
 
 
 class DisplayTerminal:
@@ -59,6 +85,9 @@ class DisplayTerminal:
         self._block_latest = {}
         self._collectors = {cls: BlockCollector(cls.MAX_PAYLOAD_WORDS) for cls in self.blocks}
         self._pending = []
+        self._standing = {}  # transmit subaddress -> (the command loaded there, the bus frame it was loaded in)
+        self.bus_frame = 0  # the controller's frame count, modulo SYNC_MODULUS, at the last synchronise
+        self.commands_withdrawn = 0
         self._mode_seq = CommandSequence()
         self._mode_requests = []
         self.state = TerminalState.INITIALIZING
@@ -133,12 +162,14 @@ class DisplayTerminal:
 
     # ---- what the display sends ----------------------------------------------------
     def next_command_seq(self):
-        """1..255, wrapping to 1: cmd_seq 0 is no command (ICD README section 5)."""
-        self._command_seq = 1 if self._command_seq >= 255 else self._command_seq + 1
+        """1..100, wrapping to 1: cmd_seq 0 is no command, and the other senders count above 100 (ICD README
+        section 5)."""
+        self._command_seq = 1 if self._command_seq >= LAST_COMMAND_SEQ else self._command_seq + 1
         return self._command_seq
 
     def send(self, message):
-        """Loads a transmit message (a DSP_RDR_*_CMD) for the controller to relay on; it stays loaded."""
+        """Loads a transmit message (a DSP_RDR_*_CMD) for the controller to relay on. It stays loaded for
+        COMMAND_HOLD_FRAMES bus frames and is then withdrawn (cmd_seq 0)."""
         with self._lock:
             self._pending.append(message)
 
@@ -162,6 +193,7 @@ class DisplayTerminal:
             return
         self.syncs += 1
         self.last_sync_word = word
+        self.bus_frame = sync_frame(word)
         now = time.monotonic()
         with self._lock:
             for cls in self.receives:
@@ -187,9 +219,23 @@ class DisplayTerminal:
             status, words = message.encode()
             if status in (Status.OK, Status.CLAMPED):
                 term.set_transmit(message.SUBADDRESS, words)
+                if withdrawn(message) is not None:
+                    self._standing[message.SUBADDRESS] = (message, self.bus_frame)
+        self._withdraw_held_commands(term)
         if self.state == TerminalState.INITIALIZING:
             self.state = TerminalState.NORMAL
         self._load_status()
+
+    def _withdraw_held_commands(self, term):
+        """A command that has stood for COMMAND_HOLD_FRAMES bus frames is replaced by its no-command form."""
+        for subaddress, (message, loaded) in list(self._standing.items()):
+            if (self.bus_frame - loaded) % SYNC_MODULUS < COMMAND_HOLD_FRAMES:
+                continue
+            status, words = withdrawn(message).encode()
+            if status in (Status.OK, Status.CLAMPED):
+                term.set_transmit(subaddress, words)
+                self.commands_withdrawn += 1
+            del self._standing[subaddress]
 
     def _command(self, command):
         if not self._mode_seq.accept(command.cmd_seq):

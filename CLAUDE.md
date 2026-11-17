@@ -149,7 +149,7 @@ person may continue it in their next session; when it is green it is rebased ont
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms, the difference not explained (section 7's last entry). `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 313 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine); C++
+- **Tests**: Python 316 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
   ctest 2/2 (327 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
@@ -183,18 +183,20 @@ person may continue it in their next session; when it is green it is rebased ont
   build: four runs of 1500 frames, 0 overruns in each (section 7). Kevin's agent put items 1 to 4 to Kevin on
   2026-11-14 with its review of unit 29 on his machine (section 7: the gate green on both builds, the legacy
   suites and the coverage floors too, nothing found that should come back); his answers are awaited. Backlog,
-  nobody's yet: the ICD README's section 12. Last session: Kevin's, 2026-11-14 (the check after the port
-  closed, the test of the finished port as a user runs it, then the repair of what it found); before it
-  Alee's, 2026-11-12 (units 29 and 30 closed). Alee's machine rebuilt the optimised preset and ran both gates and the lint on the repairs on 2026-11-16
+  nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-17 (the sixth finding repaired; an analysis of the
+  repository, section 7); before it Kevin's, 2026-11-14 (the test of the finished port and its repairs).
+  **Found by that analysis, for both humans**: the instructor branches `bug/SSTR-001` to `-007` (each an
+  "INSTRUCTOR-ONLY" commit naming the planted bug and its fix, whose own message says it "MUST NOT be
+  included in ... any intern-visible repository") are on this fork, which is public and is the chosen
+  intern tracker (section 7). Alee's machine rebuilt the optimised preset and ran both gates and the lint on the repairs on 2026-11-16
   (section 7: all green; its demo timing not measurable that day).
 - **Repaired 2026-11-14, all five** (Kevin: "fix them all", section 8): what his agent's test of the finished
   port found that day. Three commits, each green here and on CI, ICD v1.24, the meter unmoved: `2cc2a22` the
   clients (a, b, c), `9780f87` the rain area (e), `bd228a4` the radar window (d) (section 7 has an entry for
-  each). No claim is open. **A sixth was found while repairing and is confirmed on the bus, not repaired, and
-  waits on Kevin's word**: once the user has clicked a mode button in the radar window, the display's command
-  stands on its subaddress and is relayed ten times a second, and the radar takes it again after any scripted
-  or client command to the same radar, which therefore lasts a tenth of a second (ICD README section 12 has
-  the evidence and two ways out). The five as they were found. In unit 28's clients, Kevin's agent's own work:
+  each). No claim is open. **A sixth, found while repairing, is repaired too** (Alee: "Yes, repair it", 2026-11-16,
+  section 8): a radar window command used to stand on its subaddress for good, so the radar took it again
+  after any scripted or client command to the same radar; the display now withdraws it after a second
+  (`cmd_seq` 0) and numbers 1 to 100 (ICD README sections 2 and 5, section 7). The five as they were found. In unit 28's clients, Kevin's agent's own work:
   (a) `py -m fmofp_cli` and
   `py -m fmofp_scenario` cannot start beside `py -m fmofp_demo` (exit 2): the demo's dashboard holds the one
   monitor port, so the usage the documents give works only against a bus started without the dashboard, which
@@ -714,7 +716,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (303 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (316 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -933,6 +935,10 @@ Python tests and displays
   `BusController.AQueuedCommandReachesTheTerminalNextFrame` are real-time unit tests: run right after a full
   rebuild on a busy machine they failed once on Alee's (2 overruns, a 36.6 ms frame, a 21.7 ms late wake;
   `run_frames` status 7) and passed four times in a row minutes later. Rerun `ctest` before reading the code.
+- Two senders on one command subaddress need a number range each and a command that does not stand: a
+  receiver compares with the last number only. The displays withdraw their commands after fifty bus frames,
+  counted from the synchronise word (not from their own loop, which a free-running bus outruns).
+  `test_display_command_e2e` fails with the withdrawal switched off: keep it that way when it changes.
 - The real-time demo cannot be judged while a game runs on Alee's machine (again: 6-33 overruns in four runs
   with one running, late starts and 20-40 ms worst answers from C++ partitions and Python terminals alike).
 - The fixed monitor port (`port_base + 33`) has one listener, and `py -m fmofp_demo` binds it for its
@@ -2239,6 +2245,56 @@ done before this file existed are condensed from the private session notes.
 - *Files*: this file.
 - *Tests and numbers*: above. Meter unchanged, 29.5 / 29.5 = 100 %.
 
+### 2026-11-16/17 - the radar window's standing command repaired; an analysis of the repository - by Alee's agent
+- *What, the repair* (Alee: "Yes, repair it"): the sixth finding of 2026-11-14. `fmofp_display/terminal.py`:
+  a command loaded on a display's transmit subaddress is withdrawn after `COMMAND_HOLD_FRAMES` (50) bus frames,
+  counted from the controller's synchronise word (`sync_frame`), by loading the same words with `cmd_seq` 0
+  (`withdrawn()`); the displays number their commands 1 to 100 (`LAST_COMMAND_SEQ`; 1 to 255 before), below the
+  controller's 101 to 200 and the scripts' 201 up; `terminal_process.py` follows. Python only: no C++, no
+  message, layout or frame type changed, so the ICD's version stays v1.24. ICD README: a section 2 row, a
+  paragraph on several senders in section 5, the section 12 item struck (what is left of it: a display window
+  started again counts from 1 again).
+- *How*: the hold was first counted in the display loop's syncs and changed to the controller's frames: a
+  free-running bus in a test outruns the Python loop, so a count of syncs is not a second of bus.
+  `fmofp_bus/tests/test_display_command_e2e.py` (port base 61500): the real radar computer and controller with a
+  display terminal at RT 15 that asks for SURVEILLANCE before the bus starts and the controller's script sending
+  MAPPING (201) at frame 150. It checks the display's command is relayed at least eight times and withdrawn
+  before frame 130, the radar in SURVEILLANCE with `last_cmd_seq` 1 before the script and in MAPPING with 201 at
+  every look from frame 170. Run with the withdrawal switched off it fails ("299 not less than 130": the command
+  never withdrawn), so it would have caught the fault. Two unit tests for `withdrawn()` and the numbering.
+- *Warnings / lessons*: the price, written in the ICD README: a radar computer started more than a second after
+  a click does not find it, and the user clicks again. The gate run of 2026-11-16 was red on two timing tests
+  (`test_demo`, `test_scenario_e2e`'s acknowledgement within 25 frames: 48) with a game using most of the CPU;
+  it was not counted, and the gate was run again on 2026-11-17 on a quiet machine.
+- *The analysis* (Alee: "pull from the repo and preform an in-depth analysis"), read and measured on `8a1ea01`
+  plus the repair:
+  - **Size**: C++ 33,800 lines (flight code: bus 1,458, controller 1,858, OSAL 446, partitions 19,979, the radar
+    computer 5,766 of them; tests 10,062, 327 gtests); the port's Python 21,800 lines in six packages, 60 test
+    modules; the frozen Python 282 files, 83,900 lines, of which 79 modules are needed by nothing the port runs
+    and import nothing deleted (left in by unit 29's rule: dead weight, not broken).
+  - **The C++ against its own rules**: in the 83 flight files no `new`/`delete`, `malloc`, `std::vector`,
+    `std::string`, `std::map`, `std::function`, `throw`/`try`/`catch`, `dynamic_cast`/`typeid`, console output,
+    `#pragma`, `NOLINT` or TODO outside comments; the lint and cppcheck clean.
+  - **CI**: 77 runs of `port/cpp` since 2026-10-11, 52 green. Every red since 2026-11-12 is gone with its cause:
+    the flaky `test_weather_radar_live` (deleted in unit 29) and one apt hang on the runner; the last red of the
+    port's own tests was `linux-gcc`'s "Python bus library" step, nine times in all, each a timing assertion on
+    the slow runner, the last on 2026-11-10. Green runs take 5.4 to 8.3 minutes.
+  - **Stale documents**: ICD README section 12 still lists "Retiring `radar_to_display_bridge.py` and the
+    in-process messaging stack" (done in unit 29) and "The HUD as a terminal" (unit 27 struck); 13 of the user
+    manual's 17 chapters and `FMOFP/docs/` describe the deleted Python messaging and boot; the ticket draft's
+    sixth question says the SSTR tickets are not in the repository, and they are, as branches.
+  - **The instructor branches are public** (above, section 1). `bug/SSTR-001` to `-007` each end in an
+    "INSTRUCTOR-ONLY" commit that names the planted defect and its fix; the fork is public and was chosen
+    (2026-11-12) as the intern tickets' tracker. Moving or deleting those branches is the owner's (Kevin's)
+    call; nothing was changed. The seven faults are all in frozen Python: SSTR-001 in `radarControl.py`, which
+    the port no longer runs, SSTR-002 to -007 in `mfd.py` and `pfd.py`, which the display windows still embed.
+  - **Open, waiting on people**: Kevin's four items of section 1 (issues on the fork, his word on unit 29, the
+    ticket questions, the release build as a gate leg); the demo's timing after the repairs, unexplained on
+    Kevin's machine and not measurable on Alee's; the user manual.
+- *Files*: `fmofp_display/{terminal,terminal_process}.py`, `fmofp_bus/tests/test_display_command_e2e.py` (new),
+  `icd/README.md`, this file.
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load) on 2026-11-17 with the machine quiet: Python 316 OK in 83 s (was 313: the e2e and the two unit tests above), ctest 2/2 (327 gtests), cppcheck clean, load 107 messages, 8612 us; the Python suite against the optimised build 316 OK in 80 s; `lint: OK (41 flight sources, no finding)`. Two 30 s headless flights on the optimised build: 1500 frames each, 3 overruns each (worst frame 20.3 and 20.6 ms, late starts 1 and 0), 23/23 answering, the prompt beside the first listing 23 terminals. Kevin's machine stays the timing reference (0 overruns). Meter unchanged, 29.5 / 29.5 = 100 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -2397,3 +2453,8 @@ done before this file existed are condensed from the private session notes.
   asking the command port for a copy (up to four clients, three seconds a request), and the fixed monitor port
   stays as it was for the dashboard and the tests. A view's frame is the controller's count. The prompt waits
   one major frame before a status command answers.
+- 2026-11-16, Alee ("Yes, repair it"): the sixth finding of 2026-11-14 is repaired by the first way out the ICD
+  README offered: a display withdraws its command after a second (the same words with `cmd_seq` 0), and the
+  displays number 1 to 100. The second way (separate subaddresses for the two senders) was not taken: it changes
+  the ICD and every radar's receive table for the same result. Decided by the agent while building, and told to
+  Alee: the hold is fifty bus frames from the synchronise word.

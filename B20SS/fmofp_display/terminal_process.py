@@ -26,7 +26,7 @@ import time
 
 from fmofp_bus.icd.enums import DisplayMode, TerminalState
 from fmofp_bus.status import Status
-from fmofp_display.terminal import POLL_S, STALE_AFTER_S, DisplayTerminal
+from fmofp_display.terminal import LAST_COMMAND_SEQ, POLL_S, STALE_AFTER_S, DisplayTerminal
 
 START_TIMEOUT_S = 20.0  # a fresh interpreter importing the bus library on a loaded CI machine
 PARENT_CHECK_LOOPS = 250  # the helper checks its parent is alive every this many socket polls (~0.5 s)
@@ -233,12 +233,14 @@ class TerminalProcess:
 
     # ---- what the display sends ----------------------------------------------------
     def next_command_seq(self):
-        """1..255, wrapping to 1: cmd_seq 0 is no command (ICD README section 5)."""
-        self._command_seq = 1 if self._command_seq >= 255 else self._command_seq + 1
+        """1..100, wrapping to 1: cmd_seq 0 is no command, and the other senders count above 100 (ICD README
+        section 5)."""
+        self._command_seq = 1 if self._command_seq >= LAST_COMMAND_SEQ else self._command_seq + 1
         return self._command_seq
 
     def send(self, message):
-        """Loads a transmit message (a DSP_RDR_*_CMD) for the controller to relay on; it stays loaded."""
+        """Loads a transmit message (a DSP_RDR_*_CMD) for the controller to relay on; the terminal withdraws it
+        after a second of bus (terminal.py)."""
         if self._commands is not None:
             self._commands.send(("send", message))
 
