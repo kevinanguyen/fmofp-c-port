@@ -185,9 +185,8 @@ person may continue it in their next session; when it is green it is rebased ont
   suites and the coverage floors too, nothing found that should come back); his answers are awaited. Backlog,
   nobody's yet: the ICD README's section 12. Last session: Kevin's, 2026-11-14 (the check after the port
   closed, the test of the finished port as a user runs it, then the repair of what it found); before it
-  Alee's, 2026-11-12 (units 29 and 30 closed). **Alee: after pulling these repairs, build the optimised preset
-  again** (`cmake --build --preset windows-ucrt64-release` from `B20SS/ofp/`): the bus controller changed, and
-  the demo flies the optimised build when there is one (section 6).
+  Alee's, 2026-11-12 (units 29 and 30 closed). Alee's machine rebuilt the optimised preset and ran both gates and the lint on the repairs on 2026-11-16
+  (section 7: all green; its demo timing not measurable that day).
 - **Repaired 2026-11-14, all five** (Kevin: "fix them all", section 8): what his agent's test of the finished
   port found that day. Three commits, each green here and on CI, ICD v1.24, the meter unmoved: `2cc2a22` the
   clients (a, b, c), `9780f87` the rain area (e), `bd228a4` the radar window (d) (section 7 has an entry for
@@ -930,6 +929,10 @@ Python tests and displays
   are about to delete from the frozen code.
 - The legacy runner (`FMOFP/Tests/run_all_tests.py`) takes its suites from a list in the file: a deleted test
   must leave the list too, or the runner fails on a missing module.
+- `BusControllerGate.RealTimeFramesHoldTwentyMillisecondsWithoutOverruns` and
+  `BusController.AQueuedCommandReachesTheTerminalNextFrame` are real-time unit tests: run right after a full
+  rebuild on a busy machine they failed once on Alee's (2 overruns, a 36.6 ms frame, a 21.7 ms late wake;
+  `run_frames` status 7) and passed four times in a row minutes later. Rerun `ctest` before reading the code.
 - The real-time demo cannot be judged while a game runs on Alee's machine (again: 6-33 overruns in four runs
   with one running, late starts and 20-40 ms worst answers from C++ partitions and Python terminals alike).
 - The fixed monitor port (`port_base + 33`) has one listener, and `py -m fmofp_demo` binds it for its
@@ -2209,6 +2212,32 @@ done before this file existed are condensed from the private session notes.
   script. Not repaired: Kevin asked for the five, and the way out is a choice (ICD README section 12).
 - *Files*: `icd/README.md` (section 12), this file.
 - *Tests and numbers*: `verify.sh icd` OK (documents only). Meter unchanged, 29.5 / 29.5 = 100 %.
+
+### 2026-11-16 - check after Kevin's repairs: both builds and the lint on Alee's machine - by Alee's agent
+- *What*: section 0.1 on Alee's machine: tree clean, the pull brought Kevin's seven commits (`a09316a` to
+  `a1ea8a9`: his check of the closed port, his test of it as a user, the five repairs, ICD v1.24), every change
+  to this file read, upstream/main still `4c25f52`, no `wip/` branch, no pull request, issues still switched
+  off on the fork. Alee asked for an analysis; no code changed.
+- *Checked here, on `a1ea8a9`*: the optimised preset rebuilt, as section 1 asked. `verify.sh` on the debug
+  build: icd OK; ctest failed once right after the full rebuild, on the two real-time controller tests
+  (section 6), and passed four times in a row once the machine was quiet; then `cpp py load` OK, Python 313 OK
+  in 92 s, cppcheck clean, load 8612 us. `PRESET=windows-ucrt64-release ... cpp py load`: OK, 313 OK in 97 s.
+  **The lint, which Kevin's machine cannot run**: `lint: OK (41 flight sources, no finding)` with clang-tidy
+  23.1 over the new controller code. Read by eye: the command port checks the address (RT and subaddress 1 to
+  30) before it indexes its table of last numbers, so a client's bad command word cannot reach outside it.
+- *Beside the demo*: `py -m fmofp_cli -c frame -c terminals` while `py -m fmofp_demo --headless` flew: exit 0,
+  23 terminals listed, the controller counted 3 monitor requests: defect 1's repair holds here.
+- *The demo's timing, not a measurement*: three headless flights of 1500 frames on the optimised build gave 19,
+  21 and 245 overruns (late starts 4, 4 and 221; a wake 494 ms late in the third), 23/23 answering in each, with
+  a browser open and something else stalling the machine. Kevin's runs of 0 stay the reference. One thing worth
+  his four fresh runs: in the two flights that did not stall, the radar computer was the slowest terminal in 7
+  and 13 of the overrun frames (worst answer 19 and 46 ms), the same terminal whose worst answer rose on his
+  machine after the repairs (2.6 to 5.1 ms from 1.0 to 1.4). Unverified here: whether the rain area's repair
+  gave the weather processing more to do (the sky is no longer one saturated mass).
+- *CI*: `a1ea8a9` run 43650801466, `bd228a4` run 43648913039 and `9780f87` run 43646720762 green (recorded by
+  Kevin for the last two).
+- *Files*: this file.
+- *Tests and numbers*: above. Meter unchanged, 29.5 / 29.5 = 100 %.
 
 ---
 
