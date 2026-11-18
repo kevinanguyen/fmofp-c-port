@@ -157,8 +157,9 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 29.5 of 29.5 units = **100 %** (section 2): **the port is done** (2026-11-12). Every unit is
-  DONE or STRUCK. What comes next is not in the number: the intern-ticket authoring phase, which starts with
+- **Meter**: 29.5 of 30.5 units = **96.7 %** (section 2). The port of units 1-30 was done on 2026-11-12;
+  unit 31 (the EICAS's crew alert rules to C++, Alee's "Crew alerts first", 2026-11-18) is open. Every other
+  unit is DONE or STRUCK. What comes next is not in the number: the intern-ticket authoring phase, which starts with
   the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
@@ -172,7 +173,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: unit 31, crew alerting, `IN PROGRESS (Alee, 2026-11-18)`; no `wip/` branch yet. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -241,7 +242,7 @@ person may continue it in their next session; when it is green it is rebased ont
 
 ## 2. The units (progress meter)
 
-Percentage = done weight / 29.5. Weights are rough equal-effort units; change one only with
+Percentage = done weight / 30.5. Weights are rough equal-effort units; change one only with
 a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <date>)`,
 `DONE <date>` (with the section 7 entry), `STRUCK <date>` (with the decision in section 8).
 
@@ -277,8 +278,23 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 28 | Scenario engine + debug CLI on the bus | 1.5 | DONE 2026-11-10 |
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | DONE 2026-11-12 |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | DONE 2026-11-12 (the ticket format a draft, its questions carried to the ticket phase: section 8) |
+| 31 | Crew alerting: the EICAS's alert rules to C++ (a new terminal, RT 26) | 1 | IN PROGRESS (Alee, 2026-11-18) |
 
-**Done: 29.5 / 29.5 = 100 %.** Open: none.
+**Done: 29.5 / 30.5 = 96.7 %.** Open: unit 31.
+
+### 2.31 Crew alerting (RT 26), 1
+
+Added 2026-11-18 (Alee, section 8). The frozen `eicas.py` decides the crew's alert list itself, in the display
+process: `_compute_alerts` (engine, fuel, hydraulic, electrical, the maximum-thrust advisory), the GCAS and
+performance rows `_poll_data` appends, `_compute_defensive_alerts`, `_compute_sensor_alerts` and
+`_compute_weather_alerts`: 59 alerts, each a fixed text and severity, some with a number in the text. Plan: a
+crew alerting partition (`ofp/partitions/cas`, RT 26, free) hears what the rules read (the broadcasts the EICAS
+hears, and its own relays of DEF_STATUS, SNS_STATUS, PWR_STATUS and HYD_STATUS), decides the list in the
+Python's order and publishes it as `CAS_ALERTS` (one bit an alert, the numbers the texts carry), relayed to the
+EICAS alone; the display window draws that list instead of computing its own (the frozen file not edited).
+Oracle: the frozen methods, called on a stand-in `self`, beside `fmofp_cas_tool`. Departures to weigh: the HYD A
+and B rows judge the hydraulics terminal's pressures (the display judges its own g-load model, re-applied too
+late in the bus window); what the window shows while the alert computer is silent.
 
 The terminal addresses are fixed in the ICD's terminal table (`fmofp_icd.xml`, `<terminals>`):
 RT 1 avionics, 2 comms, 3 engine, 4 ECS, 5 FCS, 6 mission, 7 nav, 8 power, 9 radar, 10 sensor
@@ -2584,3 +2600,8 @@ done before this file existed are condensed from the private session notes.
   Kevin (unit 29, the instructor branches, issues on the fork, the optimised build as a gate leg, the five
   ticket questions) are recommendations in section 7, not decisions: they are decided when Kevin answers, and
   the ticket questions when both humans have.
+- 2026-11-18, Alee ("let's just focus on what code can be converted into CPP code", then "Crew alerts first"):
+  a unit 31 is added to the meter, weight 1: the EICAS's crew alert rules move from the display process to a C++
+  crew alerting partition (section 2.31). The total becomes 30.5, the meter 29.5 / 30.5 = 96.7 % until it lands.
+  The other candidate found that day, a stores management computer for the SMS (ICD README section 12), is not
+  added yet.
