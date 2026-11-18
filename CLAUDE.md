@@ -189,9 +189,9 @@ person may continue it in their next session; when it is green it is rebased ont
   settings and a deletion); the optimised build as a leg of the gate (about a minute and a half more); and an
   answer proposed for each of the five ticket questions. (6) *Done 2026-11-17*: the worst frame after the
   repairs is explained (the Load line above). Backlog,
-  nobody's yet: the ICD README's section 12. Last session: Kevin's, 2026-11-17 (Alee's repair checked here, the
-  worst frame explained, a first-start failure repaired, section 7); before it Alee's, 2026-11-16/17 (the sixth
-  finding repaired; an analysis of the repository, section 7).
+  nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-18 (Kevin's `d334684` checked on his
+  machine, section 7); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
+  first-start failure repaired, section 7).
   **Repaired 2026-11-17**: `py -m fmofp_demo` failed on its first start on a fresh clone (the frozen logger's
   folder, raced for by six display programs: seven first starts of seven on new checkouts); the display programs
   make the folder first (`fmofp_display.app.bootstrap`, ICD README section 2, section 7).
@@ -2390,6 +2390,29 @@ done before this file existed are condensed from the private session notes.
   one process, the folder made so that the frozen logger finds it, a second program finding it there), ctest
   2/2 (327 gtests), cppcheck clean, load 107 messages, 8612 us. No C++ changed. Meter unchanged,
   29.5 / 29.5 = 100 %.
+
+### 2026-11-18 - Kevin's first-start repair checked on Alee's machine - by Alee's agent
+- *What*: section 0.1: tree clean, the pull brought Kevin's `d334684` (the demo's first start on a fresh clone
+  repaired, the worst frame after the repairs explained, his recommendations to himself), every change to this
+  file read, upstream/main still `4c25f52`, no `wip/` branch. Alee asked for an analysis; no code changed.
+- *Checked here*: `PY_PYTHON=3.14 bash B20SS/verify.sh` on `d334684`: OK (icd cpp py load), Python 319 OK in
+  85 s, ctest 2/2, cppcheck clean, load 8612 us. The repair on a fresh checkout, as section 6 says to prove it:
+  a new worktree of `d334684` (no `FMOFP/logs`), `py -m fmofp_demo --headless --seconds 12` with the main tree's
+  optimised build: exit 0, 23/23 answering, 11 of 11 scripted commands, the folder made. Its 82 overruns in 600
+  frames (worst 61 ms, the EICAS's worst answer 37 ms) are not a measurement: a fresh checkout compiles every
+  Python module on its first start, and this machine is not the timing reference.
+- *Read*: only the display programs import FMOFP's logger (the plant, the demo, the scenario engine and the
+  prompt import nothing of `FMOFP`), so the six display programs are the only racers and `bootstrap` covers them
+  all. `test_display_bootstrap` replays the race on the frozen method itself.
+- *Kevin's recommendations to himself* (his section 7 entry) agree with the analysis of 2026-11-17 on the
+  instructor branches: save them, then delete them from the public fork, before issues go on. Still awaited:
+  all seven are on `origin` today (`git ls-remote --heads origin`).
+- *Warnings*: `git worktree remove --force` on a scratch worktree left `.git/worktrees/fresh1/` behind
+  ("Permission denied", OneDrive), as the rebase does (section 6); the worktree itself is gone from the list.
+- *CI*: `d334684`, `5822802`, `8a1ea01` and the run before them green (public Actions API: four of four,
+  6.7-7.3 min).
+- *Files*: this file.
+- *Tests and numbers*: above. Meter unchanged, 29.5 / 29.5 = 100 %.
 
 ---
 
