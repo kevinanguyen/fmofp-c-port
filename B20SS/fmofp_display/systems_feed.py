@@ -69,12 +69,17 @@ BuiltInTestController without reading a result, so the stand-in keeps an empty
 test list (the display invents nothing) and the window sets the rows from
 bit_results() each tick: one row per self test, with its worst component's
 status. avionics_data() is the LRU monitor's summary for the status line.
+From v1.25 the crew alert list is the crew alerting terminal's (RT 26): eicas.py
+decided it in its own poll; CAS_ALERTS, relayed as EICAS_CAS_ALERTS, carries one
+bit per alert, and cas_alerts() rebuilds the display's alert dictionaries from
+it (fmofp_bus/cas_alerts.py); the window puts them in place of its own.
 """
 
 import math
 import time
 from types import SimpleNamespace
 
+from fmofp_bus import cas_alerts
 from fmofp_bus.icd import blocks as b
 from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import Ssm
@@ -508,6 +513,15 @@ class SystemsFeed:
         readings.update(self.hydraulic_readings())
         readings.update(self.ecs_readings())
         return readings
+
+    def cas_alerts(self):
+        """The crew alert list (v1.25): the crew alerting terminal's (RT 26) decision, relayed as EICAS_CAS_ALERTS,
+        as the frozen EICAS's alert dictionaries in its order; while the terminal is not heard, one caution saying
+        so (fmofp_bus.cas_alerts.SILENT_TEXT), never an empty list that would read as no alerts."""
+        message = self.terminal.fresh(m.EicasCasAlerts, self.stale_after_s)
+        if message is None or not message.payload.computed:
+            return cas_alerts.silent_list(self.clock())
+        return cas_alerts.alert_list(message.payload, self.clock())
 
     def hydraulic_readings(self):
         """The hydraulic rows: SYS A the primary system's pressure, SYS B the backup's, from the relayed HYD_STATUS

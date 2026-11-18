@@ -615,7 +615,7 @@ def eicas_terminal(port_base):
                            receives=(m.BcastFmsFlightData, m.BcastFmsStatus, m.BcastFcsGcasAlerts, m.BcastFcsPerfStatus,
                                      m.BcastEngEngineStatus, m.BcastEngFuelStatus, m.BcastRdrWxScan,
                                      m.EicasDefStatus, m.EicasSnsStatus, m.EicasPwrStatus, m.EicasHydStatus,
-                                     m.EicasEcsStatus, m.EicasAvnStatus),
+                                     m.EicasEcsStatus, m.EicasAvnStatus, m.EicasCasAlerts),
                            blocks=(b.BcastRdrFusedTracks, b.BcastDefRwrContacts))
 
 
@@ -624,17 +624,35 @@ def make_eicas(systems_feed):
     monitor, the engine control unit, the built-in test controller, the defensive, sensor and fusion services and
     the weather radar it polls ten times a second all answer from the feed's stand-ins. Its hydraulic rows A and
     B belong to the hydraulics terminal (v1.22): the display's own g-load model of them, a stand-in from before
-    the terminal existed, is overwritten with the terminal's readings right after each poll."""
+    the terminal existed, is overwritten with the terminal's readings right after each poll. Its alert list belongs
+    to the crew alerting terminal (v1.25): the display's own rules are switched off and the list is put in place,
+    under the display's lock, right after each poll."""
     bootstrap()
     install_system_sources(systems_feed)
     import FMOFP.Interfaces.userInterface.displays.eicas as eicas_module
 
     class BusEicas(eicas_module.EICASDisplay):
+        # The rules eicas.py ran in its poll are the crew alerting terminal's now (RT 26, ICD README section 2).
+        def _compute_alerts(self, thrust):
+            return []
+
+        def _compute_defensive_alerts(self):
+            return []
+
+        def _compute_sensor_alerts(self):
+            return []
+
+        def _compute_weather_alerts(self):
+            return []
+
         def _poll_data(self):
             super()._poll_data()
             readings = systems_feed.hydraulic_readings()
             if readings:
                 self.set_system_readings(**readings)
+            alerts = systems_feed.cas_alerts()
+            with self._lock:
+                self._alerts = alerts
 
     eicas = BusEicas()
     eicas.start()

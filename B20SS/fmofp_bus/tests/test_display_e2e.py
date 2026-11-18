@@ -14,7 +14,7 @@ what the Qt windows would draw.
 
 Needs FMOFP_BC, FMOFP_FCS, FMOFP_NAV, FMOFP_FMS, FMOFP_RADAR, FMOFP_ENGINE, FMOFP_MISSION, FMOFP_COMMS,
 FMOFP_DEFENSIVE, FMOFP_SENSOR, FMOFP_POWER, FMOFP_SURFACES, FMOFP_ECS, FMOFP_HYDRAULICS, FMOFP_AIRFRAME and
-FMOFP_FDM, FMOFP_AVIONICS (CI sets them).
+FMOFP_FDM, FMOFP_AVIONICS, FMOFP_CAS (CI sets them).
 """
 
 import math
@@ -46,7 +46,7 @@ FRAMES = 420  # the SAR's first picture: a fix, 150 frames of integration, 134 f
 SYNC_MODE_CODE = 17
 BINARIES = ("FMOFP_FCS", "FMOFP_NAV", "FMOFP_FMS", "FMOFP_RADAR", "FMOFP_ENGINE", "FMOFP_MISSION", "FMOFP_COMMS",
             "FMOFP_DEFENSIVE", "FMOFP_SENSOR", "FMOFP_POWER", "FMOFP_SURFACES", "FMOFP_ECS", "FMOFP_HYDRAULICS",
-            "FMOFP_AIRFRAME", "FMOFP_FDM", "FMOFP_AVIONICS")
+            "FMOFP_AIRFRAME", "FMOFP_FDM", "FMOFP_AVIONICS", "FMOFP_CAS")
 
 
 class PlantThread(threading.Thread):
@@ -129,7 +129,7 @@ class DisplaysEndToEndTest(unittest.TestCase):
                      str(m.DspEicasStatus.RT), str(m.DspTsdStatus.RT), str(m.DspSmsStatus.RT), str(m.MsnStatus.RT),
                      str(m.ComStatus.RT), str(m.DefStatus.RT), str(m.SnsStatus.RT), str(m.PwrStatus.RT),
                      str(m.FsfStatus.RT), str(m.EcsStatus.RT), str(m.HydStatus.RT), str(m.AfrStatus.RT),
-                     str(m.FdmStatus.RT), str(m.AvnStatus.RT)]
+                     str(m.FdmStatus.RT), str(m.AvnStatus.RT), str(m.CasAlerts.RT)]
         args = [os.environ["FMOFP_BC"]]
         for rt in terminals:
             args += ["--rt", rt]
@@ -249,10 +249,10 @@ class DisplaysEndToEndTest(unittest.TestCase):
                          broadcast)
         # A stream with one consumer is that consumer's own relay (v1.15): the MFD's targeting, AEWC and SAR
         # pictures, the TSD's energy metrics and the EICAS's defensive (v1.17), sensor (v1.18), power (v1.19),
-        # hydraulics and ECS (v1.22) and avionics (v1.20, SA 8) statuses arrive unicast; nothing else is written into
-        # a display.
+        # hydraulics and ECS (v1.22) and avionics (v1.20, SA 8) statuses and the crew alerts (v1.25, SA 9) arrive
+        # unicast; nothing else is written into a display.
         own = {m.DspMfdStatus.RT: {17, 20, 21, 22, 23, 26, 27}, m.DspTsdStatus.RT: {1},
-               m.DspEicasStatus.RT: {1, 3, 4, 6, 7, 8}}
+               m.DspEicasStatus.RT: {1, 3, 4, 6, 7, 8, 9}}
         for rt in (m.DspRadarStatus.RT, m.DspPfdStatus.RT, m.DspMfdStatus.RT, m.DspEicasStatus.RT, m.DspTsdStatus.RT,
                    m.DspSmsStatus.RT):
             unicast = {r.command.subaddress for _, r in framed
@@ -400,6 +400,15 @@ class DisplaysEndToEndTest(unittest.TestCase):
         self.assertIsNotNone(self.eicas.fresh(m.EicasAvnStatus, stale_after_s=60.0), "the EICAS's own relay")
         self.assertIsNone(self.tsd.fresh(m.EicasAvnStatus, stale_after_s=60.0), "one consumer: not written into the TSD")
         self.assertIn("AVN ", eicas.status_text())
+        # The crew alerting terminal (v1.25): the list by the EICAS's own relay, decided from the whole aircraft.
+        cas = self.eicas.fresh(m.EicasCasAlerts, stale_after_s=60.0)
+        self.assertIsNotNone(cas, "the EICAS's own relay")
+        self.assertEqual((TerminalState.NORMAL, True), (cas.payload.state, cas.payload.computed))
+        self.assertTrue(cas.payload.hyd_c_unknown, "no third hydraulic system")
+        self.assertFalse(cas.payload.fuel_qty_unknown or cas.payload.elec_bus_volts_unknown, cas.payload)
+        texts = [a["text"] for a in SystemsFeed(self.eicas, stale_after_s=60.0).cas_alerts()]
+        self.assertIn("HYD C  PRESSURE UNKNOWN", texts)
+        self.assertNotIn("CAS  ALERTS UNKNOWN", texts)
         eicas_status = self.transmitted(framed, m.DspEicasStatus, 100, FRAMES)
         self.assertEqual(TerminalState.NORMAL, eicas_status[-1][1].state)
         # The targeting radar, commanded from the radar display: its status and tracks reach the MFD's targeting page,

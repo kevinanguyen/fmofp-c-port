@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.24 (DRAFT, 2026-11-14). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.25 (DRAFT, 2026-11-18). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -30,10 +30,11 @@
 | 21 | `flightsurfaces` | Flight surfaces - the ten control surfaces and their motion | existing | Systems/flightSurfaces/flightSurfaceService.py | Ported in v1.21 (fmofp_surfaces). FlightSurfaceService's ten surfaces (two ailerons, two elevators, the rudder, two flaps, two slats, the speedbrake), each moved toward its command at its slew rate within its limits every minor frame (the Python's 50 Hz loop), under the service's own commands: the ailerons and elevators follow the sensed roll and pitch and the slats the angle of attack (_sync_from_fcc, which read the flight control computer's data dictionary, the sensed flight state the plant publishes: PLANT_SENSORS relayed as FSF_SENSORS), and the flaps, speedbrake, rudder and trim follow FSF_CMD (set_flaps, set_speedbrake, set_rudder, set_trim). FSF_POSITIONS carries the measured positions, FSF_STATUS the flap detent, the trim and the health. It does not follow the flight control computer's FCS_SURFACE_CMD, which the Python's service never read either (README section 2) |
 | 22 | `defensive` | Defensive systems - RWR, chaff, flare, ECM | new | Systems/defensiveSys/defensiveService.py | Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17) |
 | 23 | `flightdatamonitoring` | Flight data monitoring - the flight data recorder and its storage | existing | Systems/flightDataMonitoring/fdmControl.py | Ported in v1.22 (fmofp_fdm). FlightDataMonitoring's 2 Hz recording loop: fdmsConfig.xml's flight data recorder takes the time, altitude and airspeed from the FMS flight data it hears by broadcast (31/25) into a ring of 512 records (the Python logged the number 123 for every parameter), the cockpit voice recorder has nothing to record on the bus, and FDM_CMD ejects a storage card (which, as in the Python, stops nothing). Nothing consumes FDM_STATUS yet; the dump is unit 28's |
+| 26 | `crewalerting` | Crew alerting - the EICAS's warning, caution and advisory list | new | Interfaces/userInterface/displays/eicas.py (_compute_alerts, _poll_data's GCAS and performance rows, _compute_defensive_alerts, _compute_sensor_alerts, _compute_weather_alerts) | Added in v1.25 (fmofp_cas). The frozen EICAS decided its alert list in the display process; the crew alerting terminal decides it from what those rules read: the broadcasts the EICAS hears (FMS status, GCAS alerts, flight envelope, engine and fuel status, the weather scan, the fused tracks and the radar warning contacts) and its own relays of DEF_STATUS, SNS_STATUS, PWR_STATUS and HYD_STATUS. CAS_ALERTS reaches the EICAS by relay (EICAS_CAS_ALERTS), which draws it |
 | 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD). From v1.22 it also invents the cabin environment ECSControl had no sensors for (PLANT_CABIN, twice a second), the hydraulic pressures HydraulicSystemController read as a constant (PLANT_HYDRAULICS, once a second) and the airframe sensor readings AirframeSystemManager had no source for (PLANT_AIRFRAME, once a second). From v1.23 it takes the scenario engine's injections into the world: a radar contact into its traffic (PLANT_INJECT_CONTACT) and a storm cell into its weather (PLANT_INJECT_WEATHER) |
 | 31 | `broadcast` | Broadcast address - every terminal that accepts a subaddress hears it | reserved |  | Not a terminal: MIL-STD-1553B address 31. A message or block here is the far end of a relay, stored by the terminals its listeners attribute names, each of which accepts that subaddress for broadcast (README section 8); nothing else stores it and nobody answers it. Added in v1.7 |
 
-RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
+RT 31 is broadcast. Unused: 24, 25, 28, 29, 30.
 
 ## Message summary
 
@@ -125,6 +126,7 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`EICAS_HYD_STATUS`](#eicas_hyd_status) | 14 | 6 | R | 4 | 5 | Hydraulics status, for the EICAS | DRAFT |
 | [`EICAS_ECS_STATUS`](#eicas_ecs_status) | 14 | 7 | R | 10 | 5 | Environmental control status, for the EICAS | DRAFT |
 | [`EICAS_AVN_STATUS`](#eicas_avn_status) | 14 | 8 | R | 18 | 5 | Avionics status, for the EICAS | DRAFT |
+| [`EICAS_CAS_ALERTS`](#eicas_cas_alerts) | 14 | 9 | R | 13 | 5 | Crew alerts, for the EICAS | DRAFT |
 | [`DSP_EICAS_MODE_CMD`](#dsp_eicas_mode_cmd) | 14 | 13 | R | 1 | aperiodic | EICAS mode command | DRAFT |
 | [`DSP_EICAS_STATUS`](#dsp_eicas_status) | 14 | 13 | T | 2 | 1 | EICAS status | DRAFT |
 | [`DSP_RADAR_MODE_CMD`](#dsp_radar_mode_cmd) | 15 | 14 | R | 1 | aperiodic | Weather radar display mode command | DRAFT |
@@ -162,6 +164,12 @@ RT 31 is broadcast. Unused: 24, 25, 26, 28, 29, 30.
 | [`FDM_MODE_CMD`](#fdm_mode_cmd) | 23 | 10 | R | 1 | aperiodic | Flight data monitoring mode command | DRAFT |
 | [`FDM_STATUS`](#fdm_status) | 23 | 10 | T | 8 | 1 | Flight data monitoring status | DRAFT |
 | [`FDM_CMD`](#fdm_cmd) | 23 | 11 | R | 1 | aperiodic | Flight data monitoring command | DRAFT |
+| [`CAS_DEF_STATUS`](#cas_def_status) | 26 | 1 | R | 6 | 5 | Defensive systems status, for the crew alerting terminal | DRAFT |
+| [`CAS_SNS_STATUS`](#cas_sns_status) | 26 | 3 | R | 5 | 5 | Sensor management status, for the crew alerting terminal | DRAFT |
+| [`CAS_PWR_STATUS`](#cas_pwr_status) | 26 | 4 | R | 16 | 5 | Power management status, for the crew alerting terminal | DRAFT |
+| [`CAS_HYD_STATUS`](#cas_hyd_status) | 26 | 6 | R | 4 | 5 | Hydraulics status, for the crew alerting terminal | DRAFT |
+| [`CAS_ALERTS`](#cas_alerts) | 26 | 10 | T | 13 | 5 | Crew alerts | DRAFT |
+| [`CAS_MODE_CMD`](#cas_mode_cmd) | 26 | 11 | R | 1 | aperiodic | Crew alerting mode command | DRAFT |
 | [`PLANT_SENSORS`](#plant_sensors) | 27 | 1 | T | 11 | 50 | Sensed flight state from the plant | DRAFT |
 | [`PLANT_GPS`](#plant_gps) | 27 | 2 | T | 25 | 1 | GPS pseudoranges from the plant | DRAFT |
 | [`PLANT_WEATHER`](#plant_weather) | 27 | 3 | T | 32 | 1 | Weather truth from the plant | DRAFT |
@@ -249,25 +257,25 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`RDR_TFR_GUIDANCE`](#rdr_tfr_guidance) | [`FCS_TERRAIN`](#fcs_terrain) | 8 | 10 |
 | [`PLANT_TERRAIN`](#plant_terrain) | `RDR_TFR_TERRAIN` | block: 4 + 32 per frame | 25 |
 | [`RDR_WX_STATUS`](#rdr_wx_status) | [`BCAST_RDR_WX_STATUS`](#bcast_rdr_wx_status) (broadcast, heard by RT 13, 15) | 2 | 5 |
-| [`RDR_WX_SCAN`](#rdr_wx_scan) | [`BCAST_RDR_WX_SCAN`](#bcast_rdr_wx_scan) (broadcast, heard by RT 13, 14, 15) | 10 | 5 |
+| [`RDR_WX_SCAN`](#rdr_wx_scan) | [`BCAST_RDR_WX_SCAN`](#bcast_rdr_wx_scan) (broadcast, heard by RT 13, 14, 15, 26) | 10 | 5 |
 | [`RDR_TFR_STATUS`](#rdr_tfr_status) | [`BCAST_RDR_TFR_STATUS`](#bcast_rdr_tfr_status) (broadcast, heard by RT 13, 15) | 2 | 5 |
 | [`RDR_TFR_GUIDANCE`](#rdr_tfr_guidance) | [`BCAST_RDR_TFR_GUIDANCE`](#bcast_rdr_tfr_guidance) (broadcast, heard by RT 13, 15) | 8 | 10 |
 | [`RDR_WX_PRODUCTS`](#rdr_wx_products) | `BCAST_RDR_WX_PRODUCTS` (broadcast, heard by RT 13, 15) | block: 4 + 32 per frame | 25 |
 | [`RDR_TFR_ELEVATION`](#rdr_tfr_elevation) | `BCAST_RDR_TFR_ELEVATION` (broadcast, heard by RT 13, 15) | block: 4 + 32 per frame | 25 |
-| [`FCS_GCAS_ALERTS`](#fcs_gcas_alerts) | [`BCAST_FCS_GCAS_ALERTS`](#bcast_fcs_gcas_alerts) (broadcast, heard by RT 13, 14) | 4 | 5 |
-| [`FCS_PERF_STATUS`](#fcs_perf_status) | [`BCAST_FCS_PERF_STATUS`](#bcast_fcs_perf_status) (broadcast, heard by RT 13, 14) | 4 | 1 |
+| [`FCS_GCAS_ALERTS`](#fcs_gcas_alerts) | [`BCAST_FCS_GCAS_ALERTS`](#bcast_fcs_gcas_alerts) (broadcast, heard by RT 13, 14, 26) | 4 | 5 |
+| [`FCS_PERF_STATUS`](#fcs_perf_status) | [`BCAST_FCS_PERF_STATUS`](#bcast_fcs_perf_status) (broadcast, heard by RT 13, 14, 26) | 4 | 1 |
 | [`FMS_FLIGHT_DATA`](#fms_flight_data) | [`BCAST_FMS_FLIGHT_DATA`](#bcast_fms_flight_data) (broadcast, heard by RT 3, 6, 9, 11, 13, 14, 16, 23) | 21 | 10 |
-| [`FMS_STATUS`](#fms_status) | [`BCAST_FMS_STATUS`](#bcast_fms_status) (broadcast, heard by RT 11, 14, 16, 17) | 3 | 5 |
+| [`FMS_STATUS`](#fms_status) | [`BCAST_FMS_STATUS`](#bcast_fms_status) (broadcast, heard by RT 11, 14, 16, 17, 26) | 3 | 5 |
 | [`FMS_ATTITUDE_STATUS`](#fms_attitude_status) | [`BCAST_FMS_ATTITUDE_STATUS`](#bcast_fms_attitude_status) (broadcast, heard by RT 11, 16) | 8 | 10 |
 | [`FMS_CONTROL_STATUS`](#fms_control_status) | [`ENG_FMS_CONTROL`](#eng_fms_control) | 3 | 5 |
 | [`PLANT_ENGINE`](#plant_engine) | [`ENG_ENGINE_IN`](#eng_engine_in) | 19 | 10 |
 | [`ENG_THRUST_CMD`](#eng_thrust_cmd) | [`PLANT_THRUST_CMD`](#plant_thrust_cmd) | 3 | 10 |
-| [`ENG_ENGINE_STATUS`](#eng_engine_status) | [`BCAST_ENG_ENGINE_STATUS`](#bcast_eng_engine_status) (broadcast, heard by RT 5, 13, 14) | 20 | 5 |
-| [`ENG_FUEL_STATUS`](#eng_fuel_status) | [`BCAST_ENG_FUEL_STATUS`](#bcast_eng_fuel_status) (broadcast, heard by RT 13, 14) | 7 | 1 |
+| [`ENG_ENGINE_STATUS`](#eng_engine_status) | [`BCAST_ENG_ENGINE_STATUS`](#bcast_eng_engine_status) (broadcast, heard by RT 5, 13, 14, 26) | 20 | 5 |
+| [`ENG_FUEL_STATUS`](#eng_fuel_status) | [`BCAST_ENG_FUEL_STATUS`](#bcast_eng_fuel_status) (broadcast, heard by RT 13, 14, 26) | 7 | 1 |
 | [`PLANT_TRAFFIC`](#plant_traffic) | `RDR_TRAFFIC` | block: 4 + 32 per frame | 25 |
 | [`RDR_TGT_STATUS`](#rdr_tgt_status) | [`BCAST_RDR_TGT_STATUS`](#bcast_rdr_tgt_status) (broadcast, heard by RT 13, 15) | 4 | 5 |
 | [`RDR_TGT_TRACKS`](#rdr_tgt_tracks) | `MFD_RDR_TGT_TRACKS` | block: 4 + 32 per frame | 25 |
-| [`RDR_FUSED_TRACKS`](#rdr_fused_tracks) | `BCAST_RDR_FUSED_TRACKS` (broadcast, heard by RT 14, 16, 22) | block: 4 + 32 per frame | 25 |
+| [`RDR_FUSED_TRACKS`](#rdr_fused_tracks) | `BCAST_RDR_FUSED_TRACKS` (broadcast, heard by RT 14, 16, 22, 26) | block: 4 + 32 per frame | 25 |
 | [`FMS_ENERGY`](#fms_energy) | [`TSD_FMS_ENERGY`](#tsd_fms_energy) | 6 | 1 |
 | [`RDR_AEWC_STATUS`](#rdr_aewc_status) | [`BCAST_RDR_AEWC_STATUS`](#bcast_rdr_aewc_status) (broadcast, heard by RT 13, 15) | 3 | 5 |
 | [`RDR_AEWC_TRACKS`](#rdr_aewc_tracks) | `MFD_RDR_AEWC_TRACKS` | block: 4 + 32 per frame | 10 |
@@ -280,7 +288,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`MSN_PLAN`](#msn_plan) | `BCAST_MSN_PLAN` (broadcast, heard by RT 13, 16) | block: 4 + 32 per frame | 10 |
 | [`PLANT_ESM`](#plant_esm) | [`DEF_ESM`](#def_esm) | 26 | 5 |
 | [`DEF_STATUS`](#def_status) | [`EICAS_DEF_STATUS`](#eicas_def_status) | 6 | 5 |
-| [`DEF_RWR_CONTACTS`](#def_rwr_contacts) | `BCAST_DEF_RWR_CONTACTS` (broadcast, heard by RT 14, 16) | block: 4 + 32 per frame | 25 |
+| [`DEF_RWR_CONTACTS`](#def_rwr_contacts) | `BCAST_DEF_RWR_CONTACTS` (broadcast, heard by RT 14, 16, 26) | block: 4 + 32 per frame | 25 |
 | [`PLANT_ESM`](#plant_esm) | [`SNS_ESM`](#sns_esm) | 26 | 5 |
 | [`PLANT_SENSOR_SCAN`](#plant_sensor_scan) | `SNS_SCAN` | block: 4 + 32 per frame | 25 |
 | [`SNS_STATUS`](#sns_status) | [`EICAS_SNS_STATUS`](#eicas_sns_status) | 5 | 5 |
@@ -295,6 +303,11 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`HYD_STATUS`](#hyd_status) | [`EICAS_HYD_STATUS`](#eicas_hyd_status) | 4 | 5 |
 | [`ECS_STATUS`](#ecs_status) | [`EICAS_ECS_STATUS`](#eicas_ecs_status) | 10 | 5 |
 | [`AVN_STATUS`](#avn_status) | [`EICAS_AVN_STATUS`](#eicas_avn_status) | 18 | 5 |
+| [`DEF_STATUS`](#def_status) | [`CAS_DEF_STATUS`](#cas_def_status) | 6 | 5 |
+| [`SNS_STATUS`](#sns_status) | [`CAS_SNS_STATUS`](#cas_sns_status) | 5 | 5 |
+| [`PWR_STATUS`](#pwr_status) | [`CAS_PWR_STATUS`](#cas_pwr_status) | 16 | 5 |
+| [`HYD_STATUS`](#hyd_status) | [`CAS_HYD_STATUS`](#cas_hyd_status) | 4 | 5 |
+| [`CAS_ALERTS`](#cas_alerts) | [`EICAS_CAS_ALERTS`](#eicas_cas_alerts) | 13 | 5 |
 
 ## Mode codes
 
@@ -3645,6 +3658,147 @@ The scenario engine's weather_cell event (v1.23). scenarioEngine._inject_weather
 | 3 | 15-0 | `size` | uint | LSB 1/10 km, range 0 to 6553.5 | The cell's radius; the scenario's default was 5 |
 | 4 | 15-0 | `intensity` | uint | LSB 1/1000, range 0 to 1 | The 0-1 intensity of the Python's cell dictionary, for the record (default 0.7) |
 | 5 | 15-0 | `reflectivity` | uint | LSB 1/10 dBZ, range 0 to 100 | Peak reflectivity, the plant cell's intensity (default 45) |
+
+### CAS_ALERTS
+
+**Crew alerts** — RT 26 · SA 10 · transmit (terminal to bus) · 13 words · 5 Hz
+
+The terminal's state and command handling, and the crew's alert list as the frozen eicas.py built it in its 10 Hz poll: one bit per alert, set while its rule holds, in the list's order (fmofp_bus/cas_alerts.py has the texts; README section 2 the departures), the counts by severity, and the numbers the texts carry. Each input counts as heard for 100 frames (the displays' two seconds). The profile power is the FMS's flight mode's (NORMAL's 0.7 while the FMS is not heard, as the EICAS's feed gave it), so the EGT and thrust rules always run.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last CAS_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last CAS_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13 | `computed` | bool |  | 1 = the list has been computed at least once since the terminal started |
+| 1 | 12-1 | `spare_1` | spare |  |  |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0) |
+| 2 | 15-10 | `warning_count` | uint | raw counts | Alerts set with severity WARNING |
+| 2 | 9-4 | `caution_count` | uint | raw counts | Alerts set with severity CAUTION |
+| 2 | 3-0 | `advisory_count` | uint | raw counts | Alerts set with severity ADVISORY |
+| 3 | 15 | `eng_egt_high` | bool |  | WARNING: ENG  EGT HIGH |
+| 3 | 14 | `eng_egt_caution` | bool |  | CAUTION: ENG  EGT CAUTION |
+| 3 | 13 | `eng_egt_unknown` | bool |  | CAUTION: ENG  EGT UNKNOWN |
+| 3 | 12 | `eng_oil_press_lo` | bool |  | WARNING: ENG  OIL PRESSURE LO |
+| 3 | 11 | `eng_oil_press_low` | bool |  | CAUTION: ENG  OIL PRESS LOW |
+| 3 | 10 | `eng_oil_press_unknown` | bool |  | CAUTION: ENG  OIL PRESS UNKNOWN |
+| 3 | 9 | `eng_oil_temp_high` | bool |  | WARNING: ENG  OIL TEMP HIGH |
+| 3 | 8 | `eng_oil_temp_unknown` | bool |  | CAUTION: ENG  OIL TEMP UNKNOWN |
+| 3 | 7 | `eng_vibration_high` | bool |  | CAUTION: ENG  VIBRATION HIGH |
+| 3 | 6 | `eng_vib_unknown` | bool |  | CAUTION: ENG  VIB UNKNOWN |
+| 3 | 5 | `fuel_qty_unknown` | bool |  | CAUTION: FUEL QTY UNKNOWN |
+| 3 | 4 | `fuel_quantity_low` | bool |  | WARNING: FUEL  QUANTITY LOW |
+| 3 | 3 | `fuel_quantity_caution` | bool |  | CAUTION: FUEL  QUANTITY CAUTION |
+| 3 | 2 | `fuel_balance_unknown` | bool |  | CAUTION: FUEL  BALANCE UNKNOWN |
+| 3 | 1 | `fuel_imbalance` | bool |  | CAUTION: FUEL  IMBALANCE |
+| 3 | 0 | `hyd_a_unknown` | bool |  | CAUTION: HYD A  PRESSURE UNKNOWN |
+| 4 | 15 | `hyd_a_low` | bool |  | WARNING: HYD A  PRESSURE LOW |
+| 4 | 14 | `hyd_a_reduced` | bool |  | CAUTION: HYD A  PRESS REDUCED |
+| 4 | 13 | `hyd_b_unknown` | bool |  | CAUTION: HYD B  PRESSURE UNKNOWN |
+| 4 | 12 | `hyd_b_low` | bool |  | WARNING: HYD B  PRESSURE LOW |
+| 4 | 11 | `hyd_b_reduced` | bool |  | CAUTION: HYD B  PRESS REDUCED |
+| 4 | 10 | `hyd_c_unknown` | bool |  | CAUTION: HYD C  PRESSURE UNKNOWN |
+| 4 | 9 | `hyd_c_low` | bool |  | WARNING: HYD C  PRESSURE LOW |
+| 4 | 8 | `hyd_c_reduced` | bool |  | CAUTION: HYD C  PRESS REDUCED |
+| 4 | 7 | `elec_gen_1_unknown` | bool |  | CAUTION: ELEC  GEN 1 UNKNOWN |
+| 4 | 6 | `elec_gen_1_fault` | bool |  | WARNING: ELEC  GEN 1 FAULT |
+| 4 | 5 | `elec_gen_2_unknown` | bool |  | CAUTION: ELEC  GEN 2 UNKNOWN |
+| 4 | 4 | `elec_gen_2_fault` | bool |  | WARNING: ELEC  GEN 2 FAULT |
+| 4 | 3 | `elec_bus_volts_unknown` | bool |  | CAUTION: ELEC  BUS VOLTS UNKNOWN |
+| 4 | 2 | `elec_main_bus_lo` | bool |  | CAUTION: ELEC  MAIN BUS LO |
+| 4 | 1 | `eng_max_continuous_thrust` | bool |  | ADVISORY: ENG  MAX CONTINUOUS THRUST |
+| 4 | 0 | `fcs_pull_up` | bool |  | WARNING: FCS  PULL UP  VS {gcas_vertical_speed:.0f} fpm |
+| 5 | 15 | `fcs_sink_rate` | bool |  | WARNING: FCS  SINK RATE  {gcas_vertical_speed:.0f} fpm |
+| 5 | 14 | `fcs_terrain` | bool |  | WARNING: FCS  TERRAIN  {gcas_terrain_clearance:.0f} ft clearance |
+| 5 | 13 | `fcs_alt_low` | bool |  | CAUTION: FCS  ALT LOW  {gcas_altitude:.0f} ft |
+| 5 | 12 | `perf_g_force` | bool |  | WARNING: PERF G_FORCE EXCEED |
+| 5 | 11 | `perf_angle_of_attack` | bool |  | WARNING: PERF ANGLE_OF EXCEED |
+| 5 | 10 | `perf_roll` | bool |  | WARNING: PERF ROLL EXCEED |
+| 5 | 9 | `perf_pitch` | bool |  | WARNING: PERF PITCH EXCEED |
+| 5 | 8 | `perf_vertical_speed` | bool |  | WARNING: PERF VERTICAL EXCEED |
+| 5 | 7 | `rwr_high_pri_threats` | bool |  | WARNING: RWR  {rwr_high_priority} HIGH-PRI THREAT(S) |
+| 5 | 6 | `rwr_threat_contacts` | bool |  | CAUTION: RWR  {rwr_hostile} THREAT CONTACT(S) |
+| 5 | 5 | `cmds_chaff_depleted` | bool |  | WARNING: CMDS  CHAFF DEPLETED |
+| 5 | 4 | `cmds_chaff_low` | bool |  | CAUTION: CMDS  CHAFF LOW ({chaff_remaining}) |
+| 5 | 3 | `cmds_flares_depleted` | bool |  | WARNING: CMDS  FLARES DEPLETED |
+| 5 | 2 | `cmds_flares_low` | bool |  | CAUTION: CMDS  FLARES LOW ({flares_remaining}) |
+| 5 | 1 | `ew_ecm_active` | bool |  | ADVISORY: EW   ECM ACTIVE |
+| 5 | 0 | `sensor_system_fault` | bool |  | WARNING: SENSOR  SYSTEM FAULT |
+| 6 | 15 | `sensor_degraded_mode` | bool |  | CAUTION: SENSOR  DEGRADED MODE |
+| 6 | 14 | `fusion_hostile_tracks` | bool |  | WARNING: FUSION  {fused_hostile} HOSTILE TRACKS |
+| 6 | 13 | `fusion_hostile_track` | bool |  | CAUTION: FUSION  {fused_hostile} HOSTILE TRACK(S) |
+| 6 | 12 | `wx_microburst` | bool |  | WARNING: WX   MICROBURST ALERT |
+| 6 | 11 | `wx_severe_windshear` | bool |  | WARNING: WX   SEVERE WINDSHEAR |
+| 6 | 10 | `wx_moderate_windshear` | bool |  | CAUTION: WX   MODERATE WINDSHEAR |
+| 6 | 9 | `wx_windshear_ahead` | bool |  | ADVISORY: WX   WINDSHEAR AHEAD |
+| 6 | 8 | `wx_extreme_turbulence` | bool |  | WARNING: WX   EXTREME TURBULENCE |
+| 6 | 7 | `wx_severe_turbulence` | bool |  | WARNING: WX   SEVERE TURBULENCE |
+| 6 | 6 | `wx_moderate_turbulence` | bool |  | CAUTION: WX   MODERATE TURBULENCE |
+| 6 | 5 | `wx_light_turbulence` | bool |  | ADVISORY: WX   LIGHT TURBULENCE |
+| 6 | 4-0 | `spare_alerts` | spare |  |  |
+| 7 | 15-8 | `chaff_remaining` | uint | raw counts | DEF_STATUS's, for CMDS CHAFF LOW (60, the full load, while it is not heard) |
+| 7 | 7-0 | `flares_remaining` | uint | raw counts | DEF_STATUS's, for CMDS FLARES LOW (30 while it is not heard) |
+| 8 | 15-8 | `rwr_high_priority` | uint | raw counts | Hostile radar warning contacts of priority 1 |
+| 8 | 7-0 | `rwr_hostile` | uint | raw counts | Hostile radar warning contacts |
+| 9 | 15-8 | `fused_hostile` | uint | raw counts | Fused air tracks assessed HOSTILE |
+| 9 | 7-0 | `spare_9` | spare |  |  |
+| 10 | 15-0 | `gcas_vertical_speed` | sint | LSB 1 ft/min, range -30000 to 30000 | FCS_GCAS_ALERTS's, for the FCS rows' texts |
+| 11 | 15-0 | `gcas_altitude` | uint | LSB 1 ft, range 0 to 65535 |  |
+| 12 | 15-0 | `gcas_terrain_clearance` | sint | LSB 1 ft, range -32768 to 32767 |  |
+
+### CAS_MODE_CMD
+
+**Crew alerting mode command** — RT 26 · SA 11 · receive (bus to terminal) · 1 words · aperiodic
+
+At subaddress 11, not the usual 10: the terminal listens to the flight envelope broadcast at 31/10, and a terminal's own receive subaddresses must be broadcast numbers it never hears (README section 8).
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### CAS_DEF_STATUS
+
+**Defensive systems status, for the crew alerting terminal** — RT 26 · SA 1 · receive (bus to terminal) · 6 words · 5 Hz
+
+DEF_STATUS relayed (its second relay): the countermeasures and the ECM mode of the defensive alerts. The radar warning contacts are the broadcast block's.
+
+Same layout as [`DEF_STATUS`](#def_status).
+
+### CAS_SNS_STATUS
+
+**Sensor management status, for the crew alerting terminal** — RT 26 · SA 3 · receive (bus to terminal) · 5 words · 5 Hz
+
+SNS_STATUS relayed (its second relay): the health of the sensor alerts.
+
+Same layout as [`SNS_STATUS`](#sns_status).
+
+### CAS_PWR_STATUS
+
+**Power management status, for the crew alerting terminal** — RT 26 · SA 4 · receive (bus to terminal) · 16 words · 5 Hz
+
+PWR_STATUS relayed (its second relay): the generator and the main bus voltage of the electrical alerts.
+
+Same layout as [`PWR_STATUS`](#pwr_status).
+
+### CAS_HYD_STATUS
+
+**Hydraulics status, for the crew alerting terminal** — RT 26 · SA 6 · receive (bus to terminal) · 4 words · 5 Hz
+
+HYD_STATUS relayed (its second relay): the primary and backup pressures the HYD A and HYD B alerts judge (README section 2).
+
+Same layout as [`HYD_STATUS`](#hyd_status).
+
+### EICAS_CAS_ALERTS
+
+**Crew alerts, for the EICAS** — RT 14 · SA 9 · receive (bus to terminal) · 13 words · 5 Hz
+
+CAS_ALERTS relayed to the EICAS, its one consumer (section 8): the alert window's list.
+
+Same layout as [`CAS_ALERTS`](#cas_alerts).
 
 ## Block payloads
 

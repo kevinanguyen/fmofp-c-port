@@ -109,8 +109,8 @@ person may continue it in their next session; when it is green it is rebased ont
   one unanswered poll in the display e2e on the slow runner, the same code green on the next run, the Linux 3.13
   Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename and Alee), `8d67afd` (this file and
   `B20SS/verify.sh`), `d82173f` (merge of upstream/main `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.24 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.25): 26 terminals, 154 message definitions
-  (200 after per-terminal expansion), 50 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
+- **ICD** v1.25 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.26): 27 terminals, 161 message definitions
+  (209 after per-terminal expansion), 55 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
   copies), 9 mode codes, 89/89 legacy types mapped. The bus controller has a **command port** at `port_base + 34`
   since v1.23 (ICD README section 7): a client queues a receive transaction and is acknowledged with the
   controller's frame count; `fmofp_bus/command_port.py` is the Python client, `fmofp_bus/bus_view.py` the picture
@@ -118,18 +118,19 @@ person may continue it in their next session; when it is green it is rebased ont
   **numbers the clients' commands** (a numbered command, frame type 6: `cmd_seq` 101 to 200 per destination,
   counted by the controller for all clients) and **gives each client its own copy of the monitor stream** (a
   monitor request, frame type 7: up to four listeners beside the fixed monitor port, three seconds a request);
-  a view's frame count is the controller's own.
+  a view's frame count is the controller's own. v1.25 adds the crew alerting terminal (RT 26, unit 31).
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
   systems (RT 22), sensor management (RT 10), power management (RT 8), flight surfaces
   (RT 21), environmental control (RT 4), hydraulics (RT 19), airframe systems (RT 20), flight
   data monitoring (RT 23), avionics (RT 1: LRU health, built-in tests, fitness, software
-  configuration); the bus controller `fmofp_bc`, which also writes `AVN_BUS_HEALTH` for RT 1 once
+  configuration), crew alerting (RT 26: the EICAS's warning, caution and advisory list, unit 31); the bus
+  controller `fmofp_bc`, which also writes `AVN_BUS_HEALTH` for RT 1 once
   a second and takes the clients' commands on its command port (`--no-command-port` closes it); tools
   `fmofp_nav_tool`, `fmofp_radar_tool`, `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool`,
   `fmofp_sensor_tool`, `fmofp_power_tool`, `fmofp_surfaces_tool`, `fmofp_utilities_tool`,
-  `fmofp_avionics_tool` (stdin oracles for the Python tests).
+  `fmofp_avionics_tool`, `fmofp_cas_tool` (stdin oracles for the Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
   random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
   ground scene, the RF environment, the ESM intercepts, the sensor scans, the electrical
@@ -141,25 +142,25 @@ person may continue it in their next session; when it is green it is rebased ont
   as bus commands through the command port, timed by the bus frame) and **the debug CLI** `py -m fmofp_cli [-c CMD]`
   (`fmofp_cli/`: `terminals`, `status`, `msg` from the monitor, `send ID field=value` of any ICD command, the
   `scenario` commands); the bus library `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: 23 terminals, 107 scheduled messages, worst minor frame 8612 us of the 10000 us budget (the
-  schedule's estimate). The real-time demo, thirty seconds headless with the scripted events, 1500 frames, 23/23
+- **Load**: 24 terminals, 109 scheduled messages, worst minor frame 8680 us of the 10000 us budget (the
+  schedule's estimate; 23 terminals and 8612 us before unit 31). The numbers below are from before unit 31. The real-time demo, thirty seconds headless with the scripted events, 1500 frames, 23/23
   answering: on Alee's machine 26-42 overruns before unit 30's first part and, after it (2026-11-11), 0-9 on the
   debug build (seven runs: 7, 1, 7, 0, 6, 4, 9) and 0-6 on the optimised build (1, 5, 6, 1, 0, 0, and one run of 91
   in which 69 frames started late and every terminal was slow at once: the machine, section 7). Kevin's machine,
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms. **That rise was the machine that afternoon, not the repairs** (measured 2026-11-17, section 7): the code before the repairs and each step after them, flown in turn with two fixed plant seeds, thirty flights: 0 overruns in every one, the five versions' median worst frame 6.8 to 7.6 ms (7.0 before the repairs, 7.4 at the head), the radar computer's mean answer 40 us and its worst 1.0 to 1.6 ms for every version; the one flight flown while the desktop was busy read 18.9 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 319 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
-  ctest 2/2 (327 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
+- **Tests**: Python 325 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
+  ctest 2/2 (344 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
   partition) at 86 % or more against a floor of 80 % (`cmake --build --preset coverage`); `test_timing.py` holds
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 29.5 of 30.5 units = **96.7 %** (section 2). The port of units 1-30 was done on 2026-11-12;
-  unit 31 (the EICAS's crew alert rules to C++, Alee's "Crew alerts first", 2026-11-18) is open. Every other
-  unit is DONE or STRUCK. What comes next is not in the number: the intern-ticket authoring phase, which starts with
+- **Meter**: 30.5 of 30.5 units = **100 %** (section 2). Units 1-30 were done on 2026-11-12; unit 31 (the
+  EICAS's crew alert rules to C++, Alee's "Crew alerts first") on 2026-11-18. Every unit is DONE or STRUCK.
+  The other candidate found that day, a stores management computer for the SMS, is not in the meter (section 8). What comes next is not in the number: the intern-ticket authoring phase, which starts with
   the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
@@ -173,7 +174,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: unit 31, crew alerting, `IN PROGRESS (Alee, 2026-11-18)`; no `wip/` branch yet. **Waiting on the humans, outside the
+- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -191,7 +192,7 @@ person may continue it in their next session; when it is green it is rebased ont
   answer proposed for each of the five ticket questions. (6) *Done 2026-11-17*: the worst frame after the
   repairs is explained (the Load line above). Backlog,
   nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-18 (Kevin's `d334684` checked on his
-  machine, section 7); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
+  machine; unit 31, crew alerting, added and done, section 7); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
   first-start failure repaired, section 7).
   **Repaired 2026-11-17**: `py -m fmofp_demo` failed on its first start on a fresh clone (the frozen logger's
   folder, raced for by six display programs: seven first starts of seven on new checkouts); the display programs
@@ -278,13 +279,14 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 28 | Scenario engine + debug CLI on the bus | 1.5 | DONE 2026-11-10 |
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | DONE 2026-11-12 |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | DONE 2026-11-12 (the ticket format a draft, its questions carried to the ticket phase: section 8) |
-| 31 | Crew alerting: the EICAS's alert rules to C++ (a new terminal, RT 26) | 1 | IN PROGRESS (Alee, 2026-11-18) |
+| 31 | Crew alerting: the EICAS's alert rules to C++ (a new terminal, RT 26) | 1 | DONE 2026-11-18 |
 
-**Done: 29.5 / 30.5 = 96.7 %.** Open: unit 31.
+**Done: 30.5 / 30.5 = 100 %.** Open: none.
 
 ### 2.31 Crew alerting (RT 26), 1
 
-Added 2026-11-18 (Alee, section 8). The frozen `eicas.py` decides the crew's alert list itself, in the display
+DONE 2026-11-18 (section 7, ICD v1.25). Added the same day (Alee, section 8). The plan below is what was built, with the two departures it named (ICD README section 2).
+The frozen `eicas.py` decides the crew's alert list itself, in the display
 process: `_compute_alerts` (engine, fuel, hydraulic, electrical, the maximum-thrust advisory), the GCAS and
 performance rows `_poll_data` appends, `_compute_defensive_alerts`, `_compute_sensor_alerts` and
 `_compute_weather_alerts`: 59 alerts, each a fixed text and severity, some with a number in the text. Plan: a
@@ -742,7 +744,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (319 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (325 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -965,6 +967,13 @@ Python tests and displays
   receiver compares with the last number only. The displays withdraw their commands after fifty bus frames,
   counted from the synchronise word (not from their own loop, which a free-running bus outruns).
   `test_display_command_e2e` fails with the withdrawal switched off: keep it that way when it changes.
+- A partition that hears a broadcast at subaddress 10 cannot take its mode command at 10 (one receive buffer
+  per subaddress): the crew alerting terminal hears the flight envelope at 31/10, so `CAS_MODE_CMD` is SA 11.
+- An oracle of a display's methods needs no QApplication when the methods touch no Qt: call them unbound on a
+  `SimpleNamespace` holding the attributes they read (`EICASDisplay._compute_alerts(fake, thrust)`,
+  `GCAS._evaluate(None, ...)`).
+- An alert bit named like a count field collides in the ICD tool (`rwr_high_priority`): name the bit for the
+  alert (`rwr_high_pri_threats`).
 - The real-time demo cannot be judged while a game runs on Alee's machine (again: 6-33 overruns in four runs
   with one running, late starts and 20-40 ms worst answers from C++ partitions and Python terminals alike).
 - The fixed monitor port (`port_base + 33`) has one listener, and `py -m fmofp_demo` binds it for its
@@ -2430,6 +2439,49 @@ done before this file existed are condensed from the private session notes.
 - *Files*: this file.
 - *Tests and numbers*: above. Meter unchanged, 29.5 / 29.5 = 100 %.
 
+### 2026-11-18 - unit 31 crew alerting (RT 26) - ICD v1.25 - by Alee's agent
+- *What*: Alee asked what code could still be converted to C++ and chose "Crew alerts first". The frozen `eicas.py`
+  decided the crew's alert list in the display process; it is now `ofp/partitions/cas` (`CrewAlerting`: the pure
+  rules `evaluate(AlertInputs)`, decision for decision as `_compute_alerts`, `_poll_data`'s GCAS and performance rows,
+  `_compute_defensive_alerts`, `_compute_sensor_alerts` and `_compute_weather_alerts` made them, 59 alerts in the
+  list's order; the gathering of the inputs from the bus, each heard for 100 frames; `fmofp_cas`, `fmofp_cas_tool`).
+  ICD v1.25: terminal RT 26; `CAS_ALERTS` (SA 10, 13 words, 5 Hz: one bit per alert, the counts by severity, the
+  numbers the texts carry) → `EICAS_CAS_ALERTS` (14/9); `CAS_MODE_CMD` at SA 11 (RT 26 hears 31/10); second relays
+  of `DEF_STATUS`, `SNS_STATUS`, `PWR_STATUS`, `HYD_STATUS` (26/1, 3, 4, 6); RT 26 a listener of six broadcasts and
+  the fused tracks and radar warning blocks. `fmofp_bus/cas_alerts.py` holds the texts; the EICAS window switches the
+  display's own rules off and draws the list (`app.make_eicas`, `SystemsFeed.cas_alerts`). Demo: a `CAS nW nC nA`
+  dashboard field; the CLI names RT 26 `cas`.
+- *How*: scoped from the frozen file and the window's feed (what each rule read on the bus), claimed (`c55ff8c`),
+  ICD by script from the alert table, C++ tables generated once from the same table (the enum order checked against
+  it). `test_cas_oracle.py`: the frozen methods called unbound on a stand-in `self`, the frozen GCAS `_evaluate` and
+  `PerformanceMonitor._check_envelope` for their rows, 400 generated states on and around every threshold, the C++
+  answer turned into texts through a CAS_ALERTS payload encoded and decoded: equal text for text and in order, every
+  alert met; the profile power against the feed's table; two quirk tests. `test_cas_e2e.py` (port base 62500): the
+  plant (primary pressure held at 2450 psi), FCS, FMS, engine, hydraulics, power, defensive and CAS under the real
+  controller with COMBAT, the generator held at zero, 55 chaff released and a priority-1 threat injected; the list at
+  the EICAS's bus half. Feed, render, display e2e, demo and message tests extended; 17 gtests.
+- *Departures* (ICD README section 2): HYD A and B judge the hydraulics terminal's pressures (the window's alerts had
+  judged the display's own g-load model, which the window re-applied the terminal's readings over only after the
+  poll); while the alert computer is not heard the window shows one caution, `CAS  ALERTS UNKNOWN`, not an empty list.
+  Kept: the EGT judged is the thrust model's (350 + 4.5 x thrust), the GEN rows are the one generator, SYS C unknown.
+- *Warnings / lessons*: section 6's three lines. **A `git restore` of the generated ICD files reverted the real v1.25
+  regeneration** (the line-ending advice of section 6 applies only when `git diff` is empty): the first suite run
+  against the optimised build failed 14 tests on ICD 24 against 25 and loaded 317 tests; regenerated, it passed. One
+  edit script hung on an inline heredoc (section 4.8 stands). cppcheck asked for `std::find_if` in `main.cpp`.
+- *Files*: `ofp/partitions/cas/{include/fmofp/cas/crew_alerting.hpp, src/crew_alerting.cpp, src/main.cpp,
+  tools/cas_tool.cpp}`, `ofp/partitions/CMakeLists.txt`, `ofp/tests/{crew_alerting_test.cpp, icd_messages_test.cpp,
+  CMakeLists.txt}`, `fmofp_bus/{cas_alerts.py, bus_view.py}`, `fmofp_display/{app.py, systems_feed.py}`,
+  `fmofp_demo/demo.py`, `icd/fmofp_icd.xml` + README + generated files, `ofp/README.md`, `ofp/docs/ARCHITECTURE.md`,
+  `verify.sh`, both CI files, `_support.py`, the tests (`test_cas_oracle.py`, `test_cas_e2e.py`, `test_messages.py`,
+  `test_display_feeds.py`, `test_display_render.py`, `test_display_e2e.py`, `test_demo.py`).
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 325 OK (was 319), ctest 2/2 (344 gtests), cppcheck
+  clean; the optimised build built and the whole suite 325 OK against it; `lint: OK (42 flight sources, no
+  finding)`; load 109 messages for 24 terminals, worst minor frame 8680 us (was 8612 for 23). Headless demo 30 s,
+  optimised: 1500 frames, 24/24 answering on every line, 19 of 19 scripted commands, CAS 0W 3C before the SAM at
+  18 s, 1W after it, 1A from ECM ACTIVE at 19 s; the crew alerting terminal's mean answer 114 us, worst 2.2 ms, the
+  slowest in no overrun frame; 15 overruns, the plant (worst 45 ms) and the EICAS the slowest in them, on this machine
+  (not the reference: Kevin's). Meter 30.5 / 30.5 = 100 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -2605,3 +2657,9 @@ done before this file existed are condensed from the private session notes.
   crew alerting partition (section 2.31). The total becomes 30.5, the meter 29.5 / 30.5 = 96.7 % until it lands.
   The other candidate found that day, a stores management computer for the SMS (ICD README section 12), is not
   added yet.
+- 2026-11-18, Alee's agent, under Alee's "Crew alerts first" (told to Alee; either human may overrule): unit 31 as
+  planned in section 2.31. The rules are the frozen ones, decision for decision; two departures: the HYD A and B
+  alerts judge the hydraulics terminal's pressures (the window's alerts had judged the display's own g-load model,
+  re-applied too late), and the window shows one caution, `CAS  ALERTS UNKNOWN`, while the alert computer is not
+  heard. The terminal is RT 26, its list `CAS_ALERTS` relayed to the EICAS alone; the four single-consumer statuses
+  it reads get second relays, not broadcasts (the load allowed it: 8680 us). ICD v1.25.

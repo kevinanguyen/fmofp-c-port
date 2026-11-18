@@ -8,7 +8,7 @@
   bits="11-8" means (word >> 8) & 0xF. A field may span two consecutive words
   (word="3-4" bits="31-0", most significant word first) for one 32-bit value.
 -->
-<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="24" status="DRAFT" date="2026-11-14">
+<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="25" status="DRAFT" date="2026-11-18">
   <revision version="1.0-draft" date="2026-10-04" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">First draft, derived from FMOFP/rtAddressConfig.xml and FMOFP/MIL_STD_1553B/message_schemas.py.</revision>
   <revision version="1.0-draft.2" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 1-3: display addresses accepted; BIT merged into avionics (RT 1), FM fitness and SW configuration folded in as well; bus controller confirmed as its own process. RT 24-26 freed.</revision>
   <revision version="1.0-draft.3" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 4-10: UDP transport accepted; legacy WEATHER mode dropped as unnecessary; every TBD value defined from the code that uses it; heading and yaw are true. Command parameters nothing consumed were removed.</revision>
@@ -583,6 +583,7 @@
     <terminal rt="21" id="flightsurfaces" name="Flight surfaces - the ten control surfaces and their motion" status="existing" source="Systems/flightSurfaces/flightSurfaceService.py" note="Ported in v1.21 (fmofp_surfaces). FlightSurfaceService's ten surfaces (two ailerons, two elevators, the rudder, two flaps, two slats, the speedbrake), each moved toward its command at its slew rate within its limits every minor frame (the Python's 50 Hz loop), under the service's own commands: the ailerons and elevators follow the sensed roll and pitch and the slats the angle of attack (_sync_from_fcc, which read the flight control computer's data dictionary, the sensed flight state the plant publishes: PLANT_SENSORS relayed as FSF_SENSORS), and the flaps, speedbrake, rudder and trim follow FSF_CMD (set_flaps, set_speedbrake, set_rudder, set_trim). FSF_POSITIONS carries the measured positions, FSF_STATUS the flap detent, the trim and the health. It does not follow the flight control computer's FCS_SURFACE_CMD, which the Python's service never read either (README section 2)"/>
     <terminal rt="22" id="defensive" name="Defensive systems - RWR, chaff, flare, ECM" status="new" source="Systems/defensiveSys/defensiveService.py" note="Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17)"/>
     <terminal rt="23" id="flightdatamonitoring" name="Flight data monitoring - the flight data recorder and its storage" status="existing" source="Systems/flightDataMonitoring/fdmControl.py" note="Ported in v1.22 (fmofp_fdm). FlightDataMonitoring's 2 Hz recording loop: fdmsConfig.xml's flight data recorder takes the time, altitude and airspeed from the FMS flight data it hears by broadcast (31/25) into a ring of 512 records (the Python logged the number 123 for every parameter), the cockpit voice recorder has nothing to record on the bus, and FDM_CMD ejects a storage card (which, as in the Python, stops nothing). Nothing consumes FDM_STATUS yet; the dump is unit 28's"/>
+    <terminal rt="26" id="crewalerting" name="Crew alerting - the EICAS's warning, caution and advisory list" status="new" source="Interfaces/userInterface/displays/eicas.py (_compute_alerts, _poll_data's GCAS and performance rows, _compute_defensive_alerts, _compute_sensor_alerts, _compute_weather_alerts)" note="Added in v1.25 (fmofp_cas). The frozen EICAS decided its alert list in the display process; the crew alerting terminal decides it from what those rules read: the broadcasts the EICAS hears (FMS status, GCAS alerts, flight envelope, engine and fuel status, the weather scan, the fused tracks and the radar warning contacts) and its own relays of DEF_STATUS, SNS_STATUS, PWR_STATUS and HYD_STATUS. CAS_ALERTS reaches the EICAS by relay (EICAS_CAS_ALERTS), which draws it"/>
     <terminal rt="27" id="plant" name="Plant model - the simulated aircraft and world (test equipment, not aircraft software)" status="new" source="Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process" note="Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD). From v1.22 it also invents the cabin environment ECSControl had no sensors for (PLANT_CABIN, twice a second), the hydraulic pressures HydraulicSystemController read as a constant (PLANT_HYDRAULICS, once a second) and the airframe sensor readings AirframeSystemManager had no source for (PLANT_AIRFRAME, once a second). From v1.23 it takes the scenario engine's injections into the world: a radar contact into its traffic (PLANT_INJECT_CONTACT) and a storm cell into its weather (PLANT_INJECT_WEATHER)"/>
     <terminal rt="31" id="broadcast" name="Broadcast address - every terminal that accepts a subaddress hears it" status="reserved" note="Not a terminal: MIL-STD-1553B address 31. A message or block here is the far end of a relay, stored by the terminals its listeners attribute names, each of which accepts that subaddress for broadcast (README section 8); nothing else stores it and nobody answers it. Added in v1.7"/>
   </terminals>
@@ -1137,26 +1138,26 @@
     <message id="BCAST_RDR_WX_STATUS" rt="31" sa="1" dir="R" words="2" rate="5" title="Weather radar status, broadcast to the displays" layout_of="RDR_WX_STATUS" listeners="13 15">
       <doc>One RT-to-RT transfer heard by every listener (README section 8): the radar display (RT 15) and the MFD (RT 13) draw the mode the radar reports. Until v1.7 each display had a copy of its own (DSP_RDR_*, MFD_RDR_*), which cost the bus a transfer per display. The broadcast map is program-wide: subaddresses 1-10 are the radar and flight-control band, 25-27 the flight-management band, clear of every display's own subaddress (11-17).</doc>
     </message>
-    <message id="BCAST_RDR_WX_SCAN" rt="31" sa="2" dir="R" words="10" rate="5" title="Weather radar scan summary, broadcast to the displays" layout_of="RDR_WX_SCAN" listeners="13 14 15"/>
+    <message id="BCAST_RDR_WX_SCAN" rt="31" sa="2" dir="R" words="10" rate="5" title="Weather radar scan summary, broadcast to the displays" layout_of="RDR_WX_SCAN" listeners="13 14 15 26"/>
     <message id="BCAST_RDR_TFR_STATUS" rt="31" sa="3" dir="R" words="2" rate="5" title="Terrain-following radar status, broadcast to the displays" layout_of="RDR_TFR_STATUS" listeners="13 15"/>
     <message id="BCAST_RDR_TFR_GUIDANCE" rt="31" sa="4" dir="R" words="8" rate="10" title="Terrain-following guidance, broadcast to the displays" layout_of="RDR_TFR_GUIDANCE" listeners="13 15">
       <doc>The clearance readout and the commanded altitude the terrain pictures draw. The FCS keeps its own unicast copy (FCS_TERRAIN): flight-critical data is not taken from a transfer nobody acknowledges.</doc>
     </message>
-    <message id="BCAST_FCS_GCAS_ALERTS" rt="31" sa="5" dir="R" words="4" rate="5" title="GCAS alerts, broadcast to the displays" layout_of="FCS_GCAS_ALERTS" listeners="13 14">
+    <message id="BCAST_FCS_GCAS_ALERTS" rt="31" sa="5" dir="R" words="4" rate="5" title="GCAS alerts, broadcast to the displays" layout_of="FCS_GCAS_ALERTS" listeners="13 14 26">
       <doc>The MFD's systems page rows and the EICAS's FCS rows and alert list (v1.9); any display that shows the alerts later (HUD) adds itself to the listeners.</doc>
     </message>
-    <message id="BCAST_FCS_PERF_STATUS" rt="31" sa="10" dir="R" words="4" rate="1" title="Flight envelope monitoring, broadcast to the displays" layout_of="FCS_PERF_STATUS" listeners="13 14"/>
+    <message id="BCAST_FCS_PERF_STATUS" rt="31" sa="10" dir="R" words="4" rate="1" title="Flight envelope monitoring, broadcast to the displays" layout_of="FCS_PERF_STATUS" listeners="13 14 26"/>
     <message id="BCAST_FMS_FLIGHT_DATA" rt="31" sa="25" dir="R" words="21" rate="10" title="FMS flight data, broadcast" layout_of="FMS_FLIGHT_DATA" listeners="3 6 9 11 13 14 16 23">
       <doc>What the PFD draws and the MFD's mission page reads; the HUD will listen too. From v1.8 the engine computer (RT 3) listens as well: its autothrottle holds the airspeed in it. From v1.13 the radar computer (RT 9) listens: the synthetic aperture radar places its pictures by the position and heading in it.</doc>
     </message>
-    <message id="BCAST_FMS_STATUS" rt="31" sa="26" dir="R" words="3" rate="5" title="FMS status, broadcast to the displays" layout_of="FMS_STATUS" listeners="11 14 16 17">
+    <message id="BCAST_FMS_STATUS" rt="31" sa="26" dir="R" words="3" rate="5" title="FMS status, broadcast to the displays" layout_of="FMS_STATUS" listeners="11 14 16 17 26">
       <doc>The PFD's and the TSD's tactical strips, the EICAS's profile power and, from v1.14, the SMS's master arm (the weapons state), ECM cell (the countermeasures state) and signature (the stealth bit).</doc>
     </message>
     <message id="BCAST_FMS_ATTITUDE_STATUS" rt="31" sa="27" dir="R" words="8" rate="10" title="Attitude command status, broadcast to the displays" layout_of="FMS_ATTITUDE_STATUS" listeners="11 16"/>
-    <message id="BCAST_ENG_ENGINE_STATUS" rt="31" sa="18" dir="R" words="20" rate="5" title="Engine status, broadcast" layout_of="ENG_ENGINE_STATUS" listeners="5 13 14">
+    <message id="BCAST_ENG_ENGINE_STATUS" rt="31" sa="18" dir="R" words="20" rate="5" title="Engine status, broadcast" layout_of="ENG_ENGINE_STATUS" listeners="5 13 14 26">
       <doc>The engine band of the broadcast map, 18-19 (v1.8). The MFD's systems and engine pages draw it; the flight control computer takes the total fuel flow for FCS_PERF_STATUS's fuel efficiency; the EICAS's engine panel draws it too (v1.9).</doc>
     </message>
-    <message id="BCAST_ENG_FUEL_STATUS" rt="31" sa="19" dir="R" words="7" rate="1" title="Fuel status, broadcast" layout_of="ENG_FUEL_STATUS" listeners="13 14"/>
+    <message id="BCAST_ENG_FUEL_STATUS" rt="31" sa="19" dir="R" words="7" rate="1" title="Fuel status, broadcast" layout_of="ENG_FUEL_STATUS" listeners="13 14 26"/>
     <message id="BCAST_RDR_TGT_STATUS" rt="31" sa="24" dir="R" words="4" rate="5" title="Targeting radar status, broadcast to the displays" layout_of="RDR_TGT_STATUS" listeners="13 15">
       <doc>The tracks band of the broadcast map, 20-24 (v1.10): the targeting radar's status for the MFD's targeting page and the radar display's control panel, and the two track blocks.</doc>
     </message>
@@ -2145,6 +2146,111 @@
       <field name="intensity" word="4" bits="15-0" type="uint" lsb="1/1000" min="0" max="1" doc="The 0-1 intensity of the Python's cell dictionary, for the record (default 0.7)"/>
       <field name="reflectivity" word="5" bits="15-0" type="uint" lsb="1/10" units="dBZ" min="0" max="100" doc="Peak reflectivity, the plant cell's intensity (default 45)"/>
     </message>
+    <!-- ===== RT 26 crew alerting (v1.25): the EICAS's alert rules on the bus ===== -->
+    <message id="CAS_ALERTS" rt="26" sa="10" dir="T" words="13" rate="5" title="Crew alerts">
+      <doc>The terminal's state and command handling, and the crew's alert list as the frozen eicas.py built it in its 10 Hz poll: one bit per alert, set while its rule holds, in the list's order (fmofp_bus/cas_alerts.py has the texts; README section 2 the departures), the counts by severity, and the numbers the texts carry. Each input counts as heard for 100 frames (the displays' two seconds). The profile power is the FMS's flight mode's (NORMAL's 0.7 while the FMS is not heard, as the EICAS's feed gave it), so the EGT and thrust rules always run.</doc>
+      <field name="state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="last_cmd_seq" word="0" bits="7-0" type="uint" doc="cmd_seq of the last CAS_MODE_CMD processed (see Command sequence rule)"/>
+      <field name="cmd_rejected" word="1" bits="15" type="bool" doc="1 = the last CAS_MODE_CMD was rejected"/>
+      <field name="mode_transition" word="1" bits="14" type="bool" doc="1 = a commanded mode change is still in progress"/>
+      <field name="computed" word="1" bits="13" type="bool" doc="1 = the list has been computed at least once since the terminal started"/>
+      <field name="spare_1" word="1" bits="12-1" type="spare"/>
+      <field name="healthy" word="1" bits="0" type="bool" doc="1 = healthy (legacy health_status, bit 0)"/>
+      <field name="warning_count" word="2" bits="15-10" type="uint" doc="Alerts set with severity WARNING"/>
+      <field name="caution_count" word="2" bits="9-4" type="uint" doc="Alerts set with severity CAUTION"/>
+      <field name="advisory_count" word="2" bits="3-0" type="uint" doc="Alerts set with severity ADVISORY"/>
+      <field name="eng_egt_high" word="3" bits="15" type="bool" doc="WARNING: ENG  EGT HIGH"/>
+      <field name="eng_egt_caution" word="3" bits="14" type="bool" doc="CAUTION: ENG  EGT CAUTION"/>
+      <field name="eng_egt_unknown" word="3" bits="13" type="bool" doc="CAUTION: ENG  EGT UNKNOWN"/>
+      <field name="eng_oil_press_lo" word="3" bits="12" type="bool" doc="WARNING: ENG  OIL PRESSURE LO"/>
+      <field name="eng_oil_press_low" word="3" bits="11" type="bool" doc="CAUTION: ENG  OIL PRESS LOW"/>
+      <field name="eng_oil_press_unknown" word="3" bits="10" type="bool" doc="CAUTION: ENG  OIL PRESS UNKNOWN"/>
+      <field name="eng_oil_temp_high" word="3" bits="9" type="bool" doc="WARNING: ENG  OIL TEMP HIGH"/>
+      <field name="eng_oil_temp_unknown" word="3" bits="8" type="bool" doc="CAUTION: ENG  OIL TEMP UNKNOWN"/>
+      <field name="eng_vibration_high" word="3" bits="7" type="bool" doc="CAUTION: ENG  VIBRATION HIGH"/>
+      <field name="eng_vib_unknown" word="3" bits="6" type="bool" doc="CAUTION: ENG  VIB UNKNOWN"/>
+      <field name="fuel_qty_unknown" word="3" bits="5" type="bool" doc="CAUTION: FUEL QTY UNKNOWN"/>
+      <field name="fuel_quantity_low" word="3" bits="4" type="bool" doc="WARNING: FUEL  QUANTITY LOW"/>
+      <field name="fuel_quantity_caution" word="3" bits="3" type="bool" doc="CAUTION: FUEL  QUANTITY CAUTION"/>
+      <field name="fuel_balance_unknown" word="3" bits="2" type="bool" doc="CAUTION: FUEL  BALANCE UNKNOWN"/>
+      <field name="fuel_imbalance" word="3" bits="1" type="bool" doc="CAUTION: FUEL  IMBALANCE"/>
+      <field name="hyd_a_unknown" word="3" bits="0" type="bool" doc="CAUTION: HYD A  PRESSURE UNKNOWN"/>
+      <field name="hyd_a_low" word="4" bits="15" type="bool" doc="WARNING: HYD A  PRESSURE LOW"/>
+      <field name="hyd_a_reduced" word="4" bits="14" type="bool" doc="CAUTION: HYD A  PRESS REDUCED"/>
+      <field name="hyd_b_unknown" word="4" bits="13" type="bool" doc="CAUTION: HYD B  PRESSURE UNKNOWN"/>
+      <field name="hyd_b_low" word="4" bits="12" type="bool" doc="WARNING: HYD B  PRESSURE LOW"/>
+      <field name="hyd_b_reduced" word="4" bits="11" type="bool" doc="CAUTION: HYD B  PRESS REDUCED"/>
+      <field name="hyd_c_unknown" word="4" bits="10" type="bool" doc="CAUTION: HYD C  PRESSURE UNKNOWN"/>
+      <field name="hyd_c_low" word="4" bits="9" type="bool" doc="WARNING: HYD C  PRESSURE LOW"/>
+      <field name="hyd_c_reduced" word="4" bits="8" type="bool" doc="CAUTION: HYD C  PRESS REDUCED"/>
+      <field name="elec_gen_1_unknown" word="4" bits="7" type="bool" doc="CAUTION: ELEC  GEN 1 UNKNOWN"/>
+      <field name="elec_gen_1_fault" word="4" bits="6" type="bool" doc="WARNING: ELEC  GEN 1 FAULT"/>
+      <field name="elec_gen_2_unknown" word="4" bits="5" type="bool" doc="CAUTION: ELEC  GEN 2 UNKNOWN"/>
+      <field name="elec_gen_2_fault" word="4" bits="4" type="bool" doc="WARNING: ELEC  GEN 2 FAULT"/>
+      <field name="elec_bus_volts_unknown" word="4" bits="3" type="bool" doc="CAUTION: ELEC  BUS VOLTS UNKNOWN"/>
+      <field name="elec_main_bus_lo" word="4" bits="2" type="bool" doc="CAUTION: ELEC  MAIN BUS LO"/>
+      <field name="eng_max_continuous_thrust" word="4" bits="1" type="bool" doc="ADVISORY: ENG  MAX CONTINUOUS THRUST"/>
+      <field name="fcs_pull_up" word="4" bits="0" type="bool" doc="WARNING: FCS  PULL UP  VS {gcas_vertical_speed:.0f} fpm"/>
+      <field name="fcs_sink_rate" word="5" bits="15" type="bool" doc="WARNING: FCS  SINK RATE  {gcas_vertical_speed:.0f} fpm"/>
+      <field name="fcs_terrain" word="5" bits="14" type="bool" doc="WARNING: FCS  TERRAIN  {gcas_terrain_clearance:.0f} ft clearance"/>
+      <field name="fcs_alt_low" word="5" bits="13" type="bool" doc="CAUTION: FCS  ALT LOW  {gcas_altitude:.0f} ft"/>
+      <field name="perf_g_force" word="5" bits="12" type="bool" doc="WARNING: PERF G_FORCE EXCEED"/>
+      <field name="perf_angle_of_attack" word="5" bits="11" type="bool" doc="WARNING: PERF ANGLE_OF EXCEED"/>
+      <field name="perf_roll" word="5" bits="10" type="bool" doc="WARNING: PERF ROLL EXCEED"/>
+      <field name="perf_pitch" word="5" bits="9" type="bool" doc="WARNING: PERF PITCH EXCEED"/>
+      <field name="perf_vertical_speed" word="5" bits="8" type="bool" doc="WARNING: PERF VERTICAL EXCEED"/>
+      <field name="rwr_high_pri_threats" word="5" bits="7" type="bool" doc="WARNING: RWR  {rwr_high_priority} HIGH-PRI THREAT(S)"/>
+      <field name="rwr_threat_contacts" word="5" bits="6" type="bool" doc="CAUTION: RWR  {rwr_hostile} THREAT CONTACT(S)"/>
+      <field name="cmds_chaff_depleted" word="5" bits="5" type="bool" doc="WARNING: CMDS  CHAFF DEPLETED"/>
+      <field name="cmds_chaff_low" word="5" bits="4" type="bool" doc="CAUTION: CMDS  CHAFF LOW ({chaff_remaining})"/>
+      <field name="cmds_flares_depleted" word="5" bits="3" type="bool" doc="WARNING: CMDS  FLARES DEPLETED"/>
+      <field name="cmds_flares_low" word="5" bits="2" type="bool" doc="CAUTION: CMDS  FLARES LOW ({flares_remaining})"/>
+      <field name="ew_ecm_active" word="5" bits="1" type="bool" doc="ADVISORY: EW   ECM ACTIVE"/>
+      <field name="sensor_system_fault" word="5" bits="0" type="bool" doc="WARNING: SENSOR  SYSTEM FAULT"/>
+      <field name="sensor_degraded_mode" word="6" bits="15" type="bool" doc="CAUTION: SENSOR  DEGRADED MODE"/>
+      <field name="fusion_hostile_tracks" word="6" bits="14" type="bool" doc="WARNING: FUSION  {fused_hostile} HOSTILE TRACKS"/>
+      <field name="fusion_hostile_track" word="6" bits="13" type="bool" doc="CAUTION: FUSION  {fused_hostile} HOSTILE TRACK(S)"/>
+      <field name="wx_microburst" word="6" bits="12" type="bool" doc="WARNING: WX   MICROBURST ALERT"/>
+      <field name="wx_severe_windshear" word="6" bits="11" type="bool" doc="WARNING: WX   SEVERE WINDSHEAR"/>
+      <field name="wx_moderate_windshear" word="6" bits="10" type="bool" doc="CAUTION: WX   MODERATE WINDSHEAR"/>
+      <field name="wx_windshear_ahead" word="6" bits="9" type="bool" doc="ADVISORY: WX   WINDSHEAR AHEAD"/>
+      <field name="wx_extreme_turbulence" word="6" bits="8" type="bool" doc="WARNING: WX   EXTREME TURBULENCE"/>
+      <field name="wx_severe_turbulence" word="6" bits="7" type="bool" doc="WARNING: WX   SEVERE TURBULENCE"/>
+      <field name="wx_moderate_turbulence" word="6" bits="6" type="bool" doc="CAUTION: WX   MODERATE TURBULENCE"/>
+      <field name="wx_light_turbulence" word="6" bits="5" type="bool" doc="ADVISORY: WX   LIGHT TURBULENCE"/>
+      <field name="spare_alerts" word="6" bits="4-0" type="spare"/>
+      <field name="chaff_remaining" word="7" bits="15-8" type="uint" doc="DEF_STATUS's, for CMDS CHAFF LOW (60, the full load, while it is not heard)"/>
+      <field name="flares_remaining" word="7" bits="7-0" type="uint" doc="DEF_STATUS's, for CMDS FLARES LOW (30 while it is not heard)"/>
+      <field name="rwr_high_priority" word="8" bits="15-8" type="uint" doc="Hostile radar warning contacts of priority 1"/>
+      <field name="rwr_hostile" word="8" bits="7-0" type="uint" doc="Hostile radar warning contacts"/>
+      <field name="fused_hostile" word="9" bits="15-8" type="uint" doc="Fused air tracks assessed HOSTILE"/>
+      <field name="spare_9" word="9" bits="7-0" type="spare"/>
+      <field name="gcas_vertical_speed" word="10" bits="15-0" type="sint" lsb="1" units="ft/min" min="-30000" max="30000" doc="FCS_GCAS_ALERTS's, for the FCS rows' texts"/>
+      <field name="gcas_altitude" word="11" bits="15-0" type="uint" lsb="1" units="ft" min="0" max="65535"/>
+      <field name="gcas_terrain_clearance" word="12" bits="15-0" type="sint" lsb="1" units="ft" min="-32768" max="32767"/>
+    </message>
+    <message id="CAS_MODE_CMD" rt="26" sa="11" dir="R" words="1" rate="aperiodic" title="Crew alerting mode command">
+      <doc>At subaddress 11, not the usual 10: the terminal listens to the flight envelope broadcast at 31/10, and a terminal's own receive subaddresses must be broadcast numbers it never hears (README section 8).</doc>
+      <field name="requested_state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="cmd_seq" word="0" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+    </message>
+    <message id="CAS_DEF_STATUS" rt="26" sa="1" dir="R" layout_of="DEF_STATUS" rate="5" title="Defensive systems status, for the crew alerting terminal">
+      <doc>DEF_STATUS relayed (its second relay): the countermeasures and the ECM mode of the defensive alerts. The radar warning contacts are the broadcast block's.</doc>
+    </message>
+    <message id="CAS_SNS_STATUS" rt="26" sa="3" dir="R" layout_of="SNS_STATUS" rate="5" title="Sensor management status, for the crew alerting terminal">
+      <doc>SNS_STATUS relayed (its second relay): the health of the sensor alerts.</doc>
+    </message>
+    <message id="CAS_PWR_STATUS" rt="26" sa="4" dir="R" layout_of="PWR_STATUS" rate="5" title="Power management status, for the crew alerting terminal">
+      <doc>PWR_STATUS relayed (its second relay): the generator and the main bus voltage of the electrical alerts.</doc>
+    </message>
+    <message id="CAS_HYD_STATUS" rt="26" sa="6" dir="R" layout_of="HYD_STATUS" rate="5" title="Hydraulics status, for the crew alerting terminal">
+      <doc>HYD_STATUS relayed (its second relay): the primary and backup pressures the HYD A and HYD B alerts judge (README section 2).</doc>
+    </message>
+    <message id="EICAS_CAS_ALERTS" rt="14" sa="9" dir="R" layout_of="CAS_ALERTS" rate="5" title="Crew alerts, for the EICAS">
+      <doc>CAS_ALERTS relayed to the EICAS, its one consumer (section 8): the alert window's list.</doc>
+    </message>
   </messages>
 
   <!-- RT-to-RT transfers the bus controller performs: in the minor frame where it polls `from`,
@@ -2217,6 +2323,11 @@
     <relay from="HYD_STATUS" to="EICAS_HYD_STATUS"/>
     <relay from="ECS_STATUS" to="EICAS_ECS_STATUS"/>
     <relay from="AVN_STATUS" to="EICAS_AVN_STATUS"/>
+    <relay from="DEF_STATUS" to="CAS_DEF_STATUS"/>
+    <relay from="SNS_STATUS" to="CAS_SNS_STATUS"/>
+    <relay from="PWR_STATUS" to="CAS_PWR_STATUS"/>
+    <relay from="HYD_STATUS" to="CAS_HYD_STATUS"/>
+    <relay from="CAS_ALERTS" to="EICAS_CAS_ALERTS"/>
   </relays>
 
   <!-- Payloads larger than one message use the block transfer format in README.md.
@@ -2533,7 +2644,7 @@
     <block id="MFD_RDR_SAR_IMAGE" rt="13" dir="R" desc_sa="26" seg_sa="27" rate="25" title="SAR image, for the MFD" layout_of="RDR_SAR_IMAGE">
       <doc>The MFD's SAR page (v1.13). Broadcast as BCAST_RDR_SAR_IMAGE at 31/13-14 until v1.15 (one consumer: its own relay).</doc>
     </block>
-    <block id="BCAST_RDR_FUSED_TRACKS" rt="31" dir="R" desc_sa="22" seg_sa="23" rate="25" title="Fused air tracks, broadcast to the displays" layout_of="RDR_FUSED_TRACKS" listeners="14 16 22">
+    <block id="BCAST_RDR_FUSED_TRACKS" rt="31" dir="R" desc_sa="22" seg_sa="23" rate="25" title="Fused air tracks, broadcast to the displays" layout_of="RDR_FUSED_TRACKS" listeners="14 16 22 26">
       <doc>The relayed RDR_FUSED_TRACKS for the tactical situation display's threat picture and the EICAS's hostile track count (v1.10).</doc>
     </block>
     <block id="MSN_PLAN" rt="6" desc_sa="12" seg_sa="13" rate="10" title="Mission plan: the route, the targets, the order of battle">
@@ -2610,7 +2721,7 @@
         <field name="id" word="3" bits="15-0" type="uint" doc="FUSION: the fused track number (FUS-n); ESM: the whole degrees of the bearing when first seen (ESM-band-n); SCENARIO: DEF_CMD's threat_id (SCEN-n)"/>
       </section>
     </block>
-    <block id="BCAST_DEF_RWR_CONTACTS" rt="31" dir="R" desc_sa="16" seg_sa="17" rate="25" title="Radar warning receiver contacts, broadcast to the displays" layout_of="DEF_RWR_CONTACTS" listeners="14 16">
+    <block id="BCAST_DEF_RWR_CONTACTS" rt="31" dir="R" desc_sa="16" seg_sa="17" rate="25" title="Radar warning receiver contacts, broadcast to the displays" layout_of="DEF_RWR_CONTACTS" listeners="14 16 26">
       <doc>The relayed DEF_RWR_CONTACTS for the TSD's threat ring and the EICAS's defensive panel (v1.17). Subaddresses 16-17 carried the SAR image until v1.15.</doc>
     </block>
     <block id="PLANT_SENSOR_SCAN" rt="27" desc_sa="14" seg_sa="15" rate="25" title="Sensor scans, from the plant">

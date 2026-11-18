@@ -606,6 +606,25 @@ class EicasFeedTest(unittest.TestCase):
                                                              max_shear=ShearSeverity.SEVERE)), age=3.0)
         self.assertEqual(("NONE", "NONE", False), self.feed.weather_severity(), "stale data is no data")
 
+    def test_the_alert_list_is_the_crew_alerting_terminal_s(self):
+        """v1.25: the list is rebuilt from CAS_ALERTS in eicas.py's order, its numbers in the texts; a silent or not
+        yet computed terminal is one caution saying so."""
+        silent = [{"text": "CAS  ALERTS UNKNOWN", "severity": "CAUTION", "ts": 1000.0}]
+        self.assertEqual(silent, self.feed.cas_alerts())
+        self.terminal.put(m.EicasCasAlerts(payload=m.CasAlerts(state=TerminalState.INITIALIZING)))
+        self.assertEqual(silent, self.feed.cas_alerts(), "nothing computed yet")
+        self.terminal.put(m.EicasCasAlerts(payload=m.CasAlerts(
+            state=TerminalState.NORMAL, computed=True, wx_light_turbulence=True, eng_egt_high=True, fcs_terrain=True,
+            cmds_flares_low=True, fusion_hostile_tracks=True, flares_remaining=4, fused_hostile=5,
+            gcas_terrain_clearance=-20.0)))
+        self.assertEqual([("ENG  EGT HIGH", "WARNING"), ("FCS  TERRAIN  -20 ft clearance", "WARNING"),
+                          ("CMDS  FLARES LOW (4)", "CAUTION"), ("FUSION  5 HOSTILE TRACKS", "WARNING"),
+                          ("WX   LIGHT TURBULENCE", "ADVISORY")],
+                         [(a["text"], a["severity"]) for a in self.feed.cas_alerts()])
+        self.assertEqual({1000.0}, {a["ts"] for a in self.feed.cas_alerts()})
+        self.terminal.put(m.EicasCasAlerts(payload=m.CasAlerts(computed=True, eng_egt_high=True)), age=3.0)
+        self.assertEqual(silent, self.feed.cas_alerts(), "a stale list is no list")
+
     def test_the_sources_not_on_the_bus_yet(self):
         self.assertEqual([], self.feed.bit.self_tests, "no BITS section until the avionics terminal")
         self.assertEqual({}, self.feed.defensive.get_data())

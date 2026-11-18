@@ -37,9 +37,10 @@ add_executable(ofp_tests
     flight_data_recorder_test.cpp
     rt_process_test.cpp
     avionics_test.cpp
+    crew_alerting_test.cpp
     icd_messages_test.cpp)
 add_dependencies(ofp_tests ofp_icd_generate)
 target_link_libraries(ofp_tests PRIVATE
-    ofp::bus ofp::osal ofp::icd ofp::bc ofp::rt_process ofp::fcs ofp::nav ofp::fms ofp::radar ofp::engine ofp::mission ofp::comms ofp::defensive ofp::sensor ofp::power ofp::surfaces ofp::ecs ofp::hydraulics ofp::airframe ofp::fdm ofp::avionics ofp::warnings
+    ofp::bus ofp::osal ofp::icd ofp::bc ofp::rt_process ofp::fcs ofp::nav ofp::fms ofp::radar ofp::engine ofp::mission ofp::comms ofp::defensive ofp::sensor ofp::power ofp::surfaces ofp::ecs ofp::hydraulics ofp::airframe ofp::fdm ofp::avionics ofp::cas ofp::warnings
     Threads::Threads GTest::gtest GTest::gtest_main)
 add_test(NAME ofp_tests COMMAND ofp_tests)

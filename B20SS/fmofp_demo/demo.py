@@ -8,7 +8,7 @@ terrain, engines and RF environment, RT 27), the ported partitions (flight
 control RT 5, navigation RT 7, flight management RT 12, the radar computer RT 9,
 engine management RT 3, the mission computer RT 6, communications RT 2, defensive systems RT 22, sensor management RT 10,
 power management RT 8, the flight surfaces RT 21, environmental control RT 4, hydraulics RT 19, the airframe
-RT 20, flight data monitoring RT 23, avionics RT 1), the
+RT 20, flight data monitoring RT 23, avionics RT 1, crew alerting RT 26), the
 six display programs (the radar display RT 15, the PFD
 RT 11, the MFD RT 13, the EICAS RT 14, the TSD RT 16 and the SMS RT 17, each in its own window), and
 finally the bus
@@ -20,8 +20,8 @@ the engines' N1 and the fuel, the radars' modes, the terrain clearance and the
 targeting tracks, the navigation fix, the mission's phase and route progress, the
 radio and satcom links, the countermeasures and the radar warning receiver, the sensors' health, the
 electrical system, the control surfaces, the hydraulics, the cabin, the landing gear and the flight data
-recorder, the avionics health (the line replaceable units and the built-in tests), and which terminals are
-answering.
+recorder, the avionics health (the line replaceable units and the built-in tests), the crew alerts (warnings,
+cautions and advisories), and which terminals are answering.
 
 Unless --no-events is given, a short scripted flight runs: the radars are
 switched on (the targeting and AEWC radars search, the SAR images the strip
@@ -76,7 +76,7 @@ PARTITIONS = (("fcs", m.FcsStatus.RT), ("nav", m.NavSolution.RT), ("fms", m.FmsS
               ("comms", m.ComStatus.RT), ("defensive", m.DefStatus.RT), ("sensor", m.SnsStatus.RT),
               ("power", m.PwrStatus.RT), ("surfaces", m.FsfStatus.RT), ("ecs", m.EcsStatus.RT),
               ("hydraulics", m.HydStatus.RT), ("airframe", m.AfrStatus.RT), ("fdm", m.FdmStatus.RT),
-              ("avionics", m.AvnStatus.RT))
+              ("avionics", m.AvnStatus.RT), ("cas", m.CasAlerts.RT))
 # (fmofp_display argument, RT) of each display program.
 DISPLAYS = (("radar", m.DspRadarStatus.RT), ("pfd", m.DspPfdStatus.RT), ("mfd", m.DspMfdStatus.RT),
             ("eicas", m.DspEicasStatus.RT), ("tsd", m.DspTsdStatus.RT), ("sms", m.DspSmsStatus.RT))
@@ -86,7 +86,7 @@ NAMES = {PLANT_RT: "plant", m.FcsStatus.RT: "FCS", m.NavSolution.RT: "nav", m.Fm
          m.DspTsdStatus.RT: "TSD", m.DspSmsStatus.RT: "SMS", m.MsnStatus.RT: "mission",
          m.ComStatus.RT: "comms", m.DefStatus.RT: "defensive", m.SnsStatus.RT: "sensors", m.PwrStatus.RT: "power",
          m.FsfStatus.RT: "surfaces", m.EcsStatus.RT: "ECS", m.HydStatus.RT: "hydraulics", m.AfrStatus.RT: "airframe",
-         m.FdmStatus.RT: "FDM", m.AvnStatus.RT: "avionics"}
+         m.FdmStatus.RT: "FDM", m.AvnStatus.RT: "avionics", m.CasAlerts.RT: "CAS"}
 
 Event = namedtuple("Event", "seconds what message")
 
@@ -563,6 +563,9 @@ class Dashboard:
             if avn.avionics_cmd_status.name not in ("NONE", "ACCEPTED"):
                 text += f" cmd {avn.avionics_cmd_status.name}"
             parts.append(text)
+        cas = self.latest.get(m.CasAlerts)
+        if cas is not None and cas.computed:
+            parts.append(f"CAS {cas.warning_count}W {cas.caution_count}C {cas.advisory_count}A")
         nav = self.latest.get(m.NavSolution)
         if nav is not None and nav.position_ssm == Ssm.NORMAL:
             parts.append(f"nav {nav.latitude:+.4f} {nav.longitude:+.4f} ({nav.sats_used} sats)")
@@ -591,7 +594,7 @@ def banner(args, terminals, events, log_dir, paths):
               "    rows, COMMS the radio, satcom and data link, MISSION the route (the active waypoint marked),\n"
               "    the targets and the order of battle.\n"
               "  EICAS window: the engine readings, the fuel quantity and balance, the FCS alerts and the crew alert\n"
-              "    list, the countermeasures and the radar warning ring, the sensors' health and fused track count,\n"
+              "    list (decided by the crew alerting terminal, RT 26), the countermeasures and the radar warning ring, the sensors' health and fused track count,\n"
               "    the electrical rows (main and essential bus, the generators: FAIL during the generator-off event)\n"
               "    the BITS rows (the power-on self tests, from the avionics terminal)\n"
               "    (hydraulics and ECS read unknown until their terminals exist).\n"

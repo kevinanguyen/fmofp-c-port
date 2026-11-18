@@ -372,7 +372,8 @@ class DisplayWindowsTest(unittest.TestCase):
             empty = lit_pixels(eicas.grab().toImage())
             self.assertGreater(empty, 0)
             self.assertFalse(eicas.has_valid("total_kg"), "nothing from the bus yet")
-            self.assertIn("FUEL QTY UNKNOWN", [a["text"] for a in eicas._alerts])
+            self.assertEqual(["CAS  ALERTS UNKNOWN"], [a["text"] for a in eicas._alerts],
+                             "the crew alerting terminal is not heard: said so, never an empty list")
 
             terminal.put(m.BcastFmsFlightData(payload=flight_payload(airspeed=420.0, altitude=12345.0, g_force=1.3)))
             terminal.put(m.BcastFmsStatus(payload=m.FmsStatus(state=TerminalState.NORMAL, flight_mode=FmsFlightMode.COMBAT)))
@@ -394,6 +395,14 @@ class DisplayWindowsTest(unittest.TestCase):
             terminal.put(sample_hyd_status())
             terminal.put(sample_ecs_status())
             terminal.put(sample_avn_status(nav=BitStatus.FAIL))
+            # The crew alerting terminal's list for these inputs (v1.25: test_cas_oracle holds its rules to eicas.py's,
+            # test_cas_e2e its reading of the bus); the window draws it in place of its own rules' list.
+            terminal.put(m.EicasCasAlerts(payload=m.CasAlerts(
+                state=TerminalState.NORMAL, computed=True, eng_egt_caution=True, fuel_imbalance=True, hyd_c_unknown=True,
+                eng_max_continuous_thrust=True, fcs_sink_rate=True, rwr_high_pri_threats=True, cmds_chaff_low=True,
+                cmds_flares_depleted=True, ew_ecm_active=True, fusion_hostile_track=True, wx_severe_windshear=True,
+                warning_count=4, caution_count=5, advisory_count=2, chaff_remaining=8, flares_remaining=0,
+                rwr_high_priority=1, rwr_hostile=2, fused_hostile=1, gcas_vertical_speed=-2500.0, gcas_altitude=1800.0)))
             window.tick()        # the oil and fuel readings go in through set_engine_readings()
             eicas._poll_data()   # the 10 Hz poll reads the getters
             window.tick()
@@ -408,6 +417,10 @@ class DisplayWindowsTest(unittest.TestCase):
             self.assertFalse(eicas.has_valid("sys_c_psi"), "no third system in hydrConfig.xml")
             self.assertEqual((39000.0, -1000.0), (eicas._fuel["total_kg"], eicas._fuel["balance_kg"]))
             texts = [a["text"] for a in eicas._alerts]
+            self.assertEqual(["ENG  EGT CAUTION", "FUEL  IMBALANCE", "HYD C  PRESSURE UNKNOWN",
+                              "ENG  MAX CONTINUOUS THRUST", "FCS  SINK RATE  -2500 fpm", "RWR  1 HIGH-PRI THREAT(S)",
+                              "CMDS  CHAFF LOW (8)", "CMDS  FLARES DEPLETED", "EW   ECM ACTIVE",
+                              "FUSION  1 HOSTILE TRACK(S)", "WX   SEVERE WINDSHEAR"], texts, "in eicas.py's order")
             self.assertIn("FUEL  IMBALANCE", texts)
             self.assertIn("FCS  SINK RATE  -2500 fpm", texts)
             self.assertIn("WX   SEVERE WINDSHEAR", texts)

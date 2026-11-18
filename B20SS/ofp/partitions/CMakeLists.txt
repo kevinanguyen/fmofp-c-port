@@ -245,3 +245,18 @@ target_link_libraries(fmofp_avionics PRIVATE ofp::avionics ofp::rt_process ofp::
 
 add_executable(fmofp_avionics_tool avionics/tools/avionics_tool.cpp)
 target_link_libraries(fmofp_avionics_tool PRIVATE ofp::avionics ofp::warnings)
+
+# Crew alerting, RT 26: the EICAS's warning, caution and advisory rules over
+# what the bus delivers (the frozen eicas.py decided them in the display).
+# fmofp_cas_tool exposes the rules on stdin/stdout for the oracle tests.
+add_library(ofp_cas STATIC cas/src/crew_alerting.cpp)
+add_library(ofp::cas ALIAS ofp_cas)
+add_dependencies(ofp_cas ofp_icd_generate)
+target_include_directories(ofp_cas PUBLIC cas/include)
+target_link_libraries(ofp_cas PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_cas cas/src/main.cpp)
+target_link_libraries(fmofp_cas PRIVATE ofp::cas ofp::rt_process ofp::bc ofp::warnings)
+
+add_executable(fmofp_cas_tool cas/tools/cas_tool.cpp)
+target_link_libraries(fmofp_cas_tool PRIVATE ofp::cas ofp::warnings)
