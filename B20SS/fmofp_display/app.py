@@ -45,10 +45,27 @@ DEFAULT_RANGE_KM = 200.0
 
 
 def bootstrap():
-    """The FMOFP display code expects B20SS as the working directory (its config paths are relative) and on sys.path."""
+    """The FMOFP display code expects B20SS as the working directory (its config paths are relative) and on
+    sys.path, and a folder for its logger to write into (`ensure_fmofp_logs_dir`)."""
     os.chdir(B20SS)
     if str(B20SS) not in sys.path:
         sys.path.insert(0, str(B20SS))
+    ensure_fmofp_logs_dir()
+
+
+def ensure_fmofp_logs_dir():
+    """Makes the folder FMOFP's logger writes into, before the frozen logger looks for it; returns its path.
+
+    The frozen `SysLogger.ensure_logs_directory` asks whether the folder is there and then makes it. Git ignores
+    the folder, so a fresh clone has none: six display programs started together all saw "not there", one made
+    it, and the others died with FileExistsError before the bus started (`py -m fmofp_demo` failed on its first
+    start in four fresh checkouts of four, 2026-11-17). Made here first, with `exist_ok`, the frozen test finds
+    it. The path is the frozen code's own (`resolve_data_dir`, which honours FMOFP_DATA_DIR); that module imports
+    nothing of FMOFP, so asking it does not start the logger."""
+    from FMOFP.Utils.common.fetching import resolve_data_dir
+    logs_dir = resolve_data_dir("logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    return logs_dir
 
 
 def quiet_fmofp_logging():

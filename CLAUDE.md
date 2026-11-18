@@ -147,9 +147,9 @@ person may continue it in their next session; when it is green it is rebased ont
   debug build (seven runs: 7, 1, 7, 0, 6, 4, 9) and 0-6 on the optimised build (1, 5, 6, 1, 0, 0, and one run of 91
   in which 69 frames started late and every terminal was slow at once: the machine, section 7). Kevin's machine,
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
-  optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms, the difference not explained (section 7's last entry). `fmofp_bc --report` now says which terminal held each overrun frame up (section
+  optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms. **That rise was the machine that afternoon, not the repairs** (measured 2026-11-17, section 7): the code before the repairs and each step after them, flown in turn with two fixed plant seeds, thirty flights: 0 overruns in every one, the five versions' median worst frame 6.8 to 7.6 ms (7.0 before the repairs, 7.4 at the head), the radar computer's mean answer 40 us and its worst 1.0 to 1.6 ms for every version; the one flight flown while the desktop was busy read 18.9 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 316 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
+- **Tests**: Python 319 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
   ctest 2/2 (327 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
@@ -182,9 +182,19 @@ person may continue it in their next session; when it is green it is rebased ont
   command, section 5.4). (5) *Done 2026-11-14*: the demo after unit 29, measured on Kevin's idle machine with the optimised
   build: four runs of 1500 frames, 0 overruns in each (section 7). Kevin's agent put items 1 to 4 to Kevin on
   2026-11-14 with its review of unit 29 on his machine (section 7: the gate green on both builds, the legacy
-  suites and the coverage floors too, nothing found that should come back); his answers are awaited. Backlog,
-  nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-17 (the sixth finding repaired; an analysis of the
-  repository, section 7); before it Kevin's, 2026-11-14 (the test of the finished port and its repairs).
+  suites and the coverage floors too, nothing found that should come back); his answers are awaited. **Put to
+  Kevin again on 2026-11-17, in plain words, each with his agent's recommendation** (section 7's last entry):
+  accept unit 29; the instructor branches saved to a file on his machine and deleted from the public fork, then
+  issues switched on and the label made (the agent can do all three once he says yes: they are his repository's
+  settings and a deletion); the optimised build as a leg of the gate (about a minute and a half more); and an
+  answer proposed for each of the five ticket questions. (6) *Done 2026-11-17*: the worst frame after the
+  repairs is explained (the Load line above). Backlog,
+  nobody's yet: the ICD README's section 12. Last session: Kevin's, 2026-11-17 (Alee's repair checked here, the
+  worst frame explained, a first-start failure repaired, section 7); before it Alee's, 2026-11-16/17 (the sixth
+  finding repaired; an analysis of the repository, section 7).
+  **Repaired 2026-11-17**: `py -m fmofp_demo` failed on its first start on a fresh clone (the frozen logger's
+  folder, raced for by six display programs: seven first starts of seven on new checkouts); the display programs
+  make the folder first (`fmofp_display.app.bootstrap`, ICD README section 2, section 7).
   **Found by that analysis, for both humans**: the instructor branches `bug/SSTR-001` to `-007` (each an
   "INSTRUCTOR-ONLY" commit naming the planted bug and its fix, whose own message says it "MUST NOT be
   included in ... any intern-visible repository") are on this fork, which is public and is the chosen
@@ -716,7 +726,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (316 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (319 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -957,8 +967,11 @@ Python tests and displays
 - After a change under `ofp/`, build the optimised preset again as well as the debug one: the demo flies
   `build/<preset>-release/` when it exists, and `verify.sh` builds only the debug preset. A stale controller
   beside new Python clients answers MALFORMED to their numbered commands and never serves a monitor request.
-- A full rebuild after an ICD version bump takes about eight minutes at `-O0` on Kevin's machine: `verify.sh`
-  then outlasts a ten-minute tool timeout. Run it in the background and read its output file.
+- The gate takes a little over five minutes on Kevin's machine when it is quiet, three and a half of them
+  cppcheck; a full debug build from nothing is 22 s and a full optimised one 87 s (measured 2026-11-17). On
+  2026-11-14 the gate after the ICD bump outlasted a ten-minute tool timeout, which this file blamed on the
+  rebuild ("about eight minutes"): it was the machine that afternoon. Run the gate in the background and read
+  its output file.
 - A test that reads one changing thing twice (a block's contacts by two getters) reads it twice together and
   again if the two differ: a slow CI runner's Python terminal is still working through its socket after the
   controller has stopped (`test_display_e2e`, run 43642043228: 34 != 49 on a documents-only commit).
@@ -987,6 +1000,21 @@ Python tests and displays
   the stored value at every call near its end); the plant's area has kept the reflectivity it was made with
   since v1.24 (`base_intensity`). A comparison of the plant's weather with the frozen class steps both and
   leaves the area's intensity out: `test_plant_weather` holds the two apart on purpose.
+- The demo's worst frame says how quiet the machine was, not how fast the code is: it is the first second's
+  busiest frame (5.3 ms on Kevin's machine) plus the largest hiccup of the flight, a millisecond or two on a
+  quiet machine and ten with the desktop in use (the Claude app streaming a reply was enough for 18.9 ms). To
+  compare two versions, fly them in turn in the same hour with a fixed plant seed (`--seed`: without it every
+  flight has another sky and other traffic), several flights each, and compare the medians and the terminals'
+  mean answers. Never compare a morning's flights with an afternoon's.
+- Scratch checkouts for such a comparison: `git worktree add --detach <scratchpad>/t1 <commit>`, the demo from
+  its `B20SS` with `--build <the main tree's optimised build>` when the C++ did not change between the two (or
+  built in the worktree) and `--log-dir`; `git worktree remove --force` after. A worktree is a fresh clone as
+  far as the programs can tell, which is how the next line was found.
+- A fresh clone has no `FMOFP/logs` (git ignores it) and the frozen logger asks for the folder and then makes
+  it: six display programs at once lost that race on every first start of a new checkout (seven of seven).
+  `fmofp_display.app.bootstrap` makes it first. It does not reproduce with a new `FMOFP_DATA_DIR` or with the
+  `__pycache__` folders removed (ten good starts of ten without the repair): only a checkout made a moment
+  before brings the programs to that line together. Prove a first-start repair on a new worktree.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -2295,6 +2323,74 @@ done before this file existed are condensed from the private session notes.
   `icd/README.md`, this file.
 - *Tests and numbers*: `verify.sh` OK (icd cpp py load) on 2026-11-17 with the machine quiet: Python 316 OK in 83 s (was 313: the e2e and the two unit tests above), ctest 2/2 (327 gtests), cppcheck clean, load 107 messages, 8612 us; the Python suite against the optimised build 316 OK in 80 s; `lint: OK (41 flight sources, no finding)`. Two 30 s headless flights on the optimised build: 1500 frames each, 3 overruns each (worst frame 20.3 and 20.6 ms, late starts 1 and 0), 23/23 answering, the prompt beside the first listing 23 terminals. Kevin's machine stays the timing reference (0 overruns). Meter unchanged, 29.5 / 29.5 = 100 %.
 
+### 2026-11-17 - the worst frame after the repairs explained; a first-start failure repaired; Alee's repair checked here - by Kevin's agent
+- *What*: section 0.1 on Kevin's machine: tree clean, the pull brought Alee's `8a1ea01` (his check of the
+  repairs) and `5822802` (the sixth finding repaired, his analysis), every change to this file read,
+  upstream/main still `4c25f52`, no `wip/` branch. Kevin relayed Alee's agent's list of what waits on him. This
+  session did the part of it that is the agent's (why the worst frame rose), found and repaired a first-start
+  failure on the way, and put the rest to Kevin in plain words with a recommendation each.
+- *Alee's repair, checked here*: `bash B20SS/verify.sh` on `5822802`: OK (icd cpp py load), Python 316 OK in
+  70 s, ctest 2/2, cppcheck clean, load 8612 us. The withdrawal after fifty frames and the numbering 1 to 100
+  are the first way out of the ICD README's old section 12 item, which Kevin's agent had explained to Kevin on
+  2026-11-15 and Kevin had not yet answered: Alee's yes settles it.
+- *The worst frame, how*: five versions flown in turn, the head and four scratch worktrees: `a09316a` (before
+  the repairs, on its own optimised build, made in the worktree), `2cc2a22` (the clients), `9780f87` (and the
+  rain area), `a1ea8a9` (and the radar window), `5822802` (and Alee's display repair), the last four on the main
+  tree's optimised build, their C++ being the same. Thirty seconds headless with the scripted events, plant
+  seeds 7 and 11, three rounds: thirty flights, six of each version.
+- *The worst frame, what it shows*: 0 overruns and 0 late starts in all thirty. Worst frame in ms, the six
+  flights' least, median and most: before the repairs 6.5 / 7.0 / 10.0; the clients 6.2 / 6.8 / 7.8; the rain
+  area 6.0 / 7.3 / 8.5; the radar window 6.1 / 7.6 / 8.5; the head 6.7 / 7.4 / 18.9. The radar computer's mean
+  answer is 40 us in every version (39.8 to 41.5) and its worst 0.96 to 1.59 ms in 29 of the flights. There is
+  no step at any repair. **The repairs did not slow the bus.** The first second's busiest frame is 5.3 to 5.4 ms
+  in every version, and a flight's worst frame is that plus the flight's largest hiccup. The two flights over
+  8.5 ms were the 25th and the 26th, flown while the desktop was in use (the conversation that drove the
+  session: a long reply streaming in the Claude app, the user typing): 18.9 ms, with the FCS's worst answer
+  4.6 ms, the radar computer's 4.2, the plant's 2.9 and a wake 2.3 ms late, every terminal slower at once; and
+  in flights 25 to 30 every version's mean answers were a fifth up (the radar computer 46-47 us against 37-40,
+  the plant 86-90 against 74-77). The afternoon of 2026-11-14 (11.7 to 14.9 ms, the radar computer's worst 2.6 to
+  5.1 ms) is in that range, and the same afternoon the gate outlasted ten minutes where it takes five today.
+  What the machine was busy with then is not known. Alee's question, whether the repaired rain area gave the
+  weather processing more to do: not in these flights; the radar computer answers alike under the old sky
+  (`2cc2a22`: mean 39.8 us, median worst 1.14 ms) and the new (`9780f87`: 40.2 us, 1.14 ms).
+- *The first-start failure, what was wrong*: the first pass of that measurement failed in all four new
+  worktrees: "display_pfd exited with code 1 before the bus started", `FileExistsError` on `FMOFP\logs`. The
+  frozen `SysLogger.ensure_logs_directory` asks whether the folder is there and then makes it; git ignores the
+  folder, so a clone has none; the demo starts six display programs together. On checkouts made a moment
+  before, three more first starts of three failed (one, two and four display programs dead). From the second
+  start on the folder is there. The gate's Python suite makes it in one process before any test starts six
+  programs, so nobody who ran the gate first ever saw it; an intern who starts the demo first would.
+- *The repair*: `fmofp_display.app.bootstrap` calls the new `ensure_fmofp_logs_dir()`, which makes the folder
+  with `exist_ok` at the path the frozen code gives (`resolve_data_dir("logs")`; that module imports nothing
+  of FMOFP, so asking it does not start the logger). The frozen file is not edited. On new checkouts with the
+  repaired `app.py`: three first starts of three good (exit 0, 23/23 answering), flown in turn with the three
+  that failed.
+- *Warnings / lessons*: section 6's lines (the worst frame measures the machine; how to compare two versions;
+  scratch worktrees; the first start reproduces only on a new checkout: with a new `FMOFP_DATA_DIR`, and with
+  the `__pycache__` folders removed as well, the unrepaired code started ten times of ten). This file's "about
+  eight minutes" for a full rebuild was wrong and is corrected (22 s). The plant's seed is random unless
+  given: the flights of 2026-11-11 and 2026-11-14 each had another sky and other traffic. Not done: the
+  controller reports only the largest frame and the largest answer; a count of frames by length in `--report`
+  would have answered this in one flight.
+- *Put to Kevin, each with a recommendation; none of it done, his answers are awaited*: (1) unit 29: accept it.
+  (2) The instructor branches `bug/SSTR-001` to `-007` on the public fork (it has no forks, stars or watchers
+  today): save them to a file on Kevin's machine, then delete the seven from the fork. (3) Then issues on and
+  the label `intern-ticket`. (4) The optimised build as a leg of `verify.sh`: yes: its build, its unit tests and
+  the Python suite against it add about a minute and a half to a gate of five, and it is the build the demo
+  flies; CI's `linux-gcc-release` leg stays as it is. (5) The ticket questions: hints with the mentor, not on
+  the public ticket; Investigation tickets yes, a few, their answers kept off the public fork; interns hand
+  work in as pull requests into a training branch that is never merged into `port/cpp`, so that every intern
+  can be given the same ticket; the level 1 to 3 is enough; the SSTR tickets stay history, their numbering is
+  not continued and their six display faults are not reused (they are Python, and the tickets are for the C++).
+- *CI*: `5822802` run 44202786023 and `8a1ea01` run 43984102621 green.
+- *Files*: `fmofp_display/app.py`, `fmofp_bus/tests/test_display_bootstrap.py` (new), `icd/README.md` (a
+  section 2 row), this file. The measurement's scripts and results are in the session scratchpad
+  (`timing_ab.py`, `summarise.py`, `fresh_clone_trial.sh`, `pass2.jsonl`), not in the repository.
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 319 OK (was 316: the frozen race replayed in
+  one process, the folder made so that the frozen logger finds it, a second program finding it there), ctest
+  2/2 (327 gtests), cppcheck clean, load 107 messages, 8612 us. No C++ changed. Meter unchanged,
+  29.5 / 29.5 = 100 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -2458,3 +2554,10 @@ done before this file existed are condensed from the private session notes.
   displays number 1 to 100. The second way (separate subaddresses for the two senders) was not taken: it changes
   the ICD and every radar's receive table for the same result. Decided by the agent while building, and told to
   Alee: the hold is fifty bus frames from the synchronise word.
+- 2026-11-17, Kevin's agent (told to Kevin; either human may overrule): the first-start failure found that day
+  is repaired without waiting for a word, being a few lines of port code that a fresh clone's first start
+  needs: the display programs make FMOFP's logs folder before the frozen logger looks for it. The frozen file
+  is not edited, no message changed, the ICD stays v1.24, the meter does not move. What that session put to
+  Kevin (unit 29, the instructor branches, issues on the fork, the optimised build as a gate leg, the five
+  ticket questions) are recommendations in section 7, not decisions: they are decided when Kevin answers, and
+  the ticket questions when both humans have.
