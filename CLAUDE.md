@@ -109,8 +109,8 @@ person may continue it in their next session; when it is green it is rebased ont
   one unanswered poll in the display e2e on the slow runner, the same code green on the next run, the Linux 3.13
   Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename and Alee), `8d67afd` (this file and
   `B20SS/verify.sh`), `d82173f` (merge of upstream/main `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.25 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.26): 27 terminals, 161 message definitions
-  (209 after per-terminal expansion), 55 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
+- **ICD** v1.26 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.27): 28 terminals, 165 message definitions
+  (215 after per-terminal expansion), 56 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
   copies), 9 mode codes, 89/89 legacy types mapped. The bus controller has a **command port** at `port_base + 34`
   since v1.23 (ICD README section 7): a client queues a receive transaction and is acknowledged with the
   controller's frame count; `fmofp_bus/command_port.py` is the Python client, `fmofp_bus/bus_view.py` the picture
@@ -118,19 +118,20 @@ person may continue it in their next session; when it is green it is rebased ont
   **numbers the clients' commands** (a numbered command, frame type 6: `cmd_seq` 101 to 200 per destination,
   counted by the controller for all clients) and **gives each client its own copy of the monitor stream** (a
   monitor request, frame type 7: up to four listeners beside the fixed monitor port, three seconds a request);
-  a view's frame count is the controller's own. v1.25 adds the crew alerting terminal (RT 26, unit 31).
+  a view's frame count is the controller's own. v1.25 adds the crew alerting terminal (RT 26, unit 31), v1.26 the stores management terminal (RT 28, unit 32).
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
   systems (RT 22), sensor management (RT 10), power management (RT 8), flight surfaces
   (RT 21), environmental control (RT 4), hydraulics (RT 19), airframe systems (RT 20), flight
   data monitoring (RT 23), avionics (RT 1: LRU health, built-in tests, fitness, software
-  configuration), crew alerting (RT 26: the EICAS's warning, caution and advisory list, unit 31); the bus
+  configuration), crew alerting (RT 26: the EICAS's warning, caution and advisory list, unit 31), stores
+  management (RT 28: the SMS's stations, master arm, release and jettison, unit 32); the bus
   controller `fmofp_bc`, which also writes `AVN_BUS_HEALTH` for RT 1 once
   a second and takes the clients' commands on its command port (`--no-command-port` closes it); tools
   `fmofp_nav_tool`, `fmofp_radar_tool`, `fmofp_engine_tool`, `fmofp_mission_tool`, `fmofp_defensive_tool`,
   `fmofp_sensor_tool`, `fmofp_power_tool`, `fmofp_surfaces_tool`, `fmofp_utilities_tool`,
-  `fmofp_avionics_tool`, `fmofp_cas_tool` (stdin oracles for the Python tests).
+  `fmofp_avionics_tool`, `fmofp_cas_tool`, `fmofp_stores_tool` (stdin oracles for the Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
   random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
   ground scene, the RF environment, the ESM intercepts, the sensor scans, the electrical
@@ -142,25 +143,27 @@ person may continue it in their next session; when it is green it is rebased ont
   as bus commands through the command port, timed by the bus frame) and **the debug CLI** `py -m fmofp_cli [-c CMD]`
   (`fmofp_cli/`: `terminals`, `status`, `msg` from the monitor, `send ID field=value` of any ICD command, the
   `scenario` commands); the bus library `fmofp_bus` with generated `fmofp_bus/icd/`.
-- **Load**: 24 terminals, 109 scheduled messages, worst minor frame 8680 us of the 10000 us budget (the
-  schedule's estimate; 23 terminals and 8612 us before unit 31). The numbers below are from before unit 31. The real-time demo, thirty seconds headless with the scripted events, 1500 frames, 23/23
+- **Load**: 25 terminals, 111 scheduled messages, worst minor frame 8680 us of the 10000 us budget (the
+  schedule's estimate; 23 terminals and 8612 us before unit 31). On Alee's machine after unit 32 (2026-11-18,
+  optimised build): a 45 s headless demo, 2250 frames, 1 overrun, 25/25 answering. The numbers below are from
+  before unit 31. The real-time demo, thirty seconds headless with the scripted events, 1500 frames, 23/23
   answering: on Alee's machine 26-42 overruns before unit 30's first part and, after it (2026-11-11), 0-9 on the
   debug build (seven runs: 7, 1, 7, 0, 6, 4, 9) and 0-6 on the optimised build (1, 5, 6, 1, 0, 0, and one run of 91
   in which 69 frames started late and every terminal was slow at once: the machine, section 7). Kevin's machine,
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms. **That rise was the machine that afternoon, not the repairs** (measured 2026-11-17, section 7): the code before the repairs and each step after them, flown in turn with two fixed plant seeds, thirty flights: 0 overruns in every one, the five versions' median worst frame 6.8 to 7.6 ms (7.0 before the repairs, 7.4 at the head), the radar computer's mean answer 40 us and its worst 1.0 to 1.6 ms for every version; the one flight flown while the desktop was busy read 18.9 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 325 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
-  ctest 2/2 (344 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
+- **Tests**: Python 329 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
+  ctest 2/2 (355 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
   partition) at 86 % or more against a floor of 80 % (`cmake --build --preset coverage`); `test_timing.py` holds
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 30.5 of 31.5 units = **96.8 %** (section 2). Units 1-30 were done on 2026-11-12; unit 31 (the
-  EICAS's crew alert rules to C++, Alee's "Crew alerts first") on 2026-11-18. Unit 32, a stores management
-  computer for the SMS (Alee: "Yes, the stores computer", 2026-11-18), is open. What comes next is not in the number: the intern-ticket authoring phase, which starts with
+- **Meter**: 31.5 of 31.5 units = **100 %** (section 2). Units 1-30 were done on 2026-11-12; units 31 (the
+  EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18. Every unit
+  is DONE or STRUCK. What comes next is not in the number: the intern-ticket authoring phase, which starts with
   the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
@@ -174,7 +177,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: unit 32, stores management, `IN PROGRESS (Alee, 2026-11-18)`; no `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -192,7 +195,7 @@ person may continue it in their next session; when it is green it is rebased ont
   answer proposed for each of the five ticket questions. (6) *Done 2026-11-17*: the worst frame after the
   repairs is explained (the Load line above). Backlog,
   nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-18 (Kevin's `d334684` checked on his
-  machine; unit 31, crew alerting, added and done, section 7); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
+  machine; units 31, crew alerting, and 32, stores management, added and done, section 7); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
   first-start failure repaired, section 7).
   **Repaired 2026-11-17**: `py -m fmofp_demo` failed on its first start on a fresh clone (the frozen logger's
   folder, raced for by six display programs: seven first starts of seven on new checkouts); the display programs
@@ -280,18 +283,20 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | DONE 2026-11-12 |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | DONE 2026-11-12 (the ticket format a draft, its questions carried to the ticket phase: section 8) |
 | 31 | Crew alerting: the EICAS's alert rules to C++ (a new terminal, RT 26) | 1 | DONE 2026-11-18 |
-| 32 | Stores management computer for the SMS (a new terminal, RT 28) | 1 | IN PROGRESS (Alee, 2026-11-18) |
+| 32 | Stores management computer for the SMS (a new terminal, RT 28) | 1 | DONE 2026-11-18 |
 
-**Done: 30.5 / 31.5 = 96.8 %.** Open: unit 32.
+**Done: 31.5 / 31.5 = 100 %.** Open: none.
 
 ### 2.32 Stores management (RT 28), 1
 
-Added 2026-11-18 (Alee, section 8), from the ICD README's section 12 ("a stores management computer for the
+DONE 2026-11-18 (section 7, ICD v1.26), as planned below, the partition named `stores` (`ofp/partitions/stores`,
+`fmofp_stores`) to keep it apart from the SMS display program. Added the same day (Alee, section 8), from the ICD
+README's section 12 ("a stores management computer for the
 SMS"). The frozen `sms.py` has no armament system behind it: the eleven stations are `_build_default_loadout()`,
 the display's own table; master arm follows the FMS's weapons state (ARMED, READY as TRAIN, else SAFE); the load
 and the armed count are computed from the table (`weight x max(qty, 1)` over the stores not EMPTY, EXPENDED or
 JETTISONED); the release and delivery modes and the selected station are constants nothing changes. Plan: a
-stores management partition (`ofp/partitions/sms`, RT 28; 24 and 25 are the gate tests' stubs) holds that table,
+stores management partition (RT 28; 24 and 25 are the gate tests' stubs) holds that table,
 ports the master-arm rule and the two sums as written, and adds, as new behaviour with no Python behind it, the
 commands the backlog item names: select a station, the release and delivery modes, arm and safe a station,
 release from the selected station (only with master arm ARMED and the station ARMED: SINGLE one store, RIPPLE
@@ -761,7 +766,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (325 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (329 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -991,6 +996,10 @@ Python tests and displays
   `GCAS._evaluate(None, ...)`).
 - An alert bit named like a count field collides in the ICD tool (`rwr_high_priority`): name the bit for the
   alert (`rwr_high_pri_threats`).
+- gtest's `EXPECT_EQ(a, b)` takes no third argument: a message goes in with `<< "..."` (one failed build in
+  unit 32).
+- A random oracle run of commands that are mostly refused compares one table over and over: count the distinct
+  states it reached and bias the generator toward the commands that change the state (`test_stores_oracle`).
 - The real-time demo cannot be judged while a game runs on Alee's machine (again: 6-33 overruns in four runs
   with one running, late starts and 20-40 ms worst answers from C++ partitions and Python terminals alike).
 - The fixed monitor port (`port_base + 33`) has one listener, and `py -m fmofp_demo` binds it for its
@@ -2499,6 +2508,41 @@ done before this file existed are condensed from the private session notes.
   slowest in no overrun frame; 15 overruns, the plant (worst 45 ms) and the EICAS the slowest in them, on this machine
   (not the reference: Kevin's). Meter 30.5 / 30.5 = 100 %.
 
+### 2026-11-18 - unit 32 stores management (RT 28) - ICD v1.26 - by Alee's agent
+- *What*: Alee: "Yes, the stores computer". `ofp/partitions/stores` (`StoresManagement`: `default_loadout()`, sms.py's
+  eleven stations; `master_arm_from()`, `_poll_data`'s rule; `total_weight_kg()` and `armed_count()`, sms.py's two sums
+  with the `max(qty, 1)` quirk; and the new commands: select, release mode, delivery mode, arm, safe, release, jettison;
+  `fmofp_stores`, `fmofp_stores_tool`). ICD v1.26: terminal RT 28; `SMS_STATUS` (SA 10, 16 words, 5 Hz: the modes,
+  the sums, the stores released, one word per station) → `DSP_SMS_STORES` (17/1); `SMS_MODE_CMD` (SA 10), `SMS_CMD`
+  (SA 11); RT 28 a listener of `BCAST_FMS_STATUS`; six enums. The SMS window subclasses the display
+  (`app.make_sms`): the terminal's table, master arm, modes, selected station, load and armed count after each poll;
+  the display's own while the terminal is not heard, with "stores computer: no data" on the status line. Demo: an
+  `SMS` dashboard field and two events (a MK-82 released at 36 s, station 2 armed at 37 s); the CLI names RT 28
+  `stores`. The ICD README's backlog item is struck.
+- *How*: scoped from the frozen `sms.py` (no armament system: a table, one rule, two sums, constants), claimed
+  (`d57cc49`). `test_stores_oracle.py`: the starting table station for station against `_build_default_loadout`, the
+  master arm against the frozen `_poll_data` on a stand-in `self` for each weapons state and none, and both sums against
+  the frozen methods over the tables sixty random command runs leave. `test_stores_e2e.py` (port base 51500): the plant,
+  the FMS and the stores terminal under the real controller, a release refused under a SAFE master arm, COMBAT, a
+  release, SALVO, a station released whole and a jettison, read at the SMS display's bus half. Render, feed, display
+  e2e, demo and message tests extended; 11 gtests.
+- *Warnings / lessons*: section 6's two lines. The first random oracle runs met only four tables (most commands were
+  refused): the generator now favours the commands that move stores, and the test checks it met many. cppcheck asked
+  for `std::accumulate` over the load. The commands are new behaviour; ICD README section 2 has their rules, and the
+  humans may change them. Released stores go nowhere (no weapon in the plant, no effect on the mission's targets).
+- *Files*: `ofp/partitions/stores/{include/fmofp/stores/stores_management.hpp, src/stores_management.cpp,
+  src/main.cpp, tools/stores_tool.cpp}`, `ofp/partitions/CMakeLists.txt`, `ofp/tests/{stores_management_test.cpp,
+  icd_messages_test.cpp, CMakeLists.txt}`, `fmofp_bus/bus_view.py`, `fmofp_display/{app.py, systems_feed.py}`,
+  `fmofp_demo/demo.py`, `icd/fmofp_icd.xml` + README + generated files, `ofp/README.md`, `ofp/docs/ARCHITECTURE.md`,
+  `verify.sh`, both CI files, `_support.py`, the tests (`test_stores_oracle.py`, `test_stores_e2e.py`,
+  `test_messages.py`, `test_display_render.py`, `test_display_e2e.py`, `test_demo.py`).
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 329 OK (was 325), ctest 2/2 (355 gtests), cppcheck
+  clean; the optimised build built and the suite 329 OK against it; `lint: OK (43 flight sources, no finding)`; load
+  111 messages for 25 terminals, worst minor frame 8680 us (unchanged). Headless demo 45 s, optimised: 2250 frames,
+  1 overrun, 25/25 answering on every line, 29 of 29 scripted commands; `SMS SAFE 2 armed 7806 kg` until COMBAT,
+  ARMED after it, 7579 kg and 1 released after 36 s, 3 armed after 37 s; the stores terminal's mean answer 108 us,
+  worst 1.0 ms. CI: unit 31 (`b40b240`) and the two claims green (public Actions API). Meter 31.5 / 31.5 = 100 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -2684,3 +2728,9 @@ done before this file existed are condensed from the private session notes.
   computer for the SMS (section 2.32). The total becomes 31.5, the meter 30.5 / 31.5 = 96.8 % until it lands. Most
   of it is new behaviour (the frozen display had only a table); the agent keeps it to the commands the ICD
   README's backlog item named, documents each as new, and either human may change them.
+- 2026-11-18, Alee's agent, under Alee's "Yes, the stores computer" (told to Alee; either human may overrule): unit
+  32 as planned in section 2.32. The table, the master-arm rule and the two sums are sms.py's, quirks kept; the
+  commands are new and kept to the backlog item's list (select, the two modes, arm, safe, release, jettison) with the
+  smallest rules that make them work: release only with the master arm ARMED and the station ARMED, RIPPLE as two
+  stores, jettison whatever the master arm, the delivery mode reported only. Released stores reach nothing else
+  (backlog). The terminal is RT 28, the partition `stores`; ICD v1.26.

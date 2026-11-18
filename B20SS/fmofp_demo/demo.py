@@ -8,7 +8,7 @@ terrain, engines and RF environment, RT 27), the ported partitions (flight
 control RT 5, navigation RT 7, flight management RT 12, the radar computer RT 9,
 engine management RT 3, the mission computer RT 6, communications RT 2, defensive systems RT 22, sensor management RT 10,
 power management RT 8, the flight surfaces RT 21, environmental control RT 4, hydraulics RT 19, the airframe
-RT 20, flight data monitoring RT 23, avionics RT 1, crew alerting RT 26), the
+RT 20, flight data monitoring RT 23, avionics RT 1, crew alerting RT 26, stores management RT 28), the
 six display programs (the radar display RT 15, the PFD
 RT 11, the MFD RT 13, the EICAS RT 14, the TSD RT 16 and the SMS RT 17, each in its own window), and
 finally the bus
@@ -21,7 +21,7 @@ targeting tracks, the navigation fix, the mission's phase and route progress, th
 radio and satcom links, the countermeasures and the radar warning receiver, the sensors' health, the
 electrical system, the control surfaces, the hydraulics, the cabin, the landing gear and the flight data
 recorder, the avionics health (the line replaceable units and the built-in tests), the crew alerts (warnings,
-cautions and advisories), and which terminals are answering.
+cautions and advisories), the stores (master arm, load, releases), and which terminals are answering.
 
 Unless --no-events is given, a short scripted flight runs: the radars are
 switched on (the targeting and AEWC radars search, the SAR images the strip
@@ -55,7 +55,7 @@ from collections import namedtuple
 from fmofp_bus.avionics import key_fields
 from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import (Affiliation, AvionicsCommand, LruHealth, CommsCommand, DefensiveCommand, EcmMode, MissionCommand, MissionPhase,
-                                 PowerCommand, RadioMode, SensorCommand, SensorId, SurfaceCommand, EcsCommand,
+                                 PowerCommand, RadioMode, SensorCommand, SensorId, SmsCommand, SurfaceCommand, EcsCommand,
                                  FdmCommand, GearPosition, HydraulicCommand,
                                  RwrBand, TargetKind, ThreatType, UnitKind, WaypointType, Weapon, AewcMode, EngineCommand, EngineSelect, FmsFlightMode, FuelTank, LockStatus, SarMode,
                                  Ssm,
@@ -76,7 +76,8 @@ PARTITIONS = (("fcs", m.FcsStatus.RT), ("nav", m.NavSolution.RT), ("fms", m.FmsS
               ("comms", m.ComStatus.RT), ("defensive", m.DefStatus.RT), ("sensor", m.SnsStatus.RT),
               ("power", m.PwrStatus.RT), ("surfaces", m.FsfStatus.RT), ("ecs", m.EcsStatus.RT),
               ("hydraulics", m.HydStatus.RT), ("airframe", m.AfrStatus.RT), ("fdm", m.FdmStatus.RT),
-              ("avionics", m.AvnStatus.RT), ("cas", m.CasAlerts.RT))
+              ("avionics", m.AvnStatus.RT), ("cas", m.CasAlerts.RT),
+              ("stores", m.SmsStatus.RT))
 # (fmofp_display argument, RT) of each display program.
 DISPLAYS = (("radar", m.DspRadarStatus.RT), ("pfd", m.DspPfdStatus.RT), ("mfd", m.DspMfdStatus.RT),
             ("eicas", m.DspEicasStatus.RT), ("tsd", m.DspTsdStatus.RT), ("sms", m.DspSmsStatus.RT))
@@ -86,7 +87,7 @@ NAMES = {PLANT_RT: "plant", m.FcsStatus.RT: "FCS", m.NavSolution.RT: "nav", m.Fm
          m.DspTsdStatus.RT: "TSD", m.DspSmsStatus.RT: "SMS", m.MsnStatus.RT: "mission",
          m.ComStatus.RT: "comms", m.DefStatus.RT: "defensive", m.SnsStatus.RT: "sensors", m.PwrStatus.RT: "power",
          m.FsfStatus.RT: "surfaces", m.EcsStatus.RT: "ECS", m.HydStatus.RT: "hydraulics", m.AfrStatus.RT: "airframe",
-         m.FdmStatus.RT: "FDM", m.AvnStatus.RT: "avionics", m.CasAlerts.RT: "CAS"}
+         m.FdmStatus.RT: "FDM", m.AvnStatus.RT: "avionics", m.CasAlerts.RT: "CAS", m.SmsStatus.RT: "stores"}
 
 Event = namedtuple("Event", "seconds what message")
 
@@ -165,6 +166,10 @@ def default_events():
         Event(35.0, "mission: engage target 1 (JDAM)",
               m.MsnCmd(cmd_seq=209, command=MissionCommand.ENGAGE_TARGET, id=1, weapon=Weapon.JDAM)),
         Event(36.0, "mission: phase OBJECTIVE", m.MsnCmd(cmd_seq=210, command=MissionCommand.ADVANCE_PHASE)),
+        Event(36.0, "stores: one MK-82 released from station 1 (master arm ARMED since COMBAT: SMS 1 released)",
+              m.SmsCmd(cmd_seq=201, command=SmsCommand.RELEASE, station=1)),
+        Event(37.0, "stores: station 2's JDAMs armed (SMS 3 armed)",
+              m.SmsCmd(cmd_seq=202, command=SmsCommand.ARM_STATION, station=2)),
         Event(38.0, "autothrottle disengaged", m.EngCmd(cmd_seq=202, command=EngineCommand.AUTOTHROTTLE_DISENGAGE)),
         Event(40.0, "engine 2 alone to 40 %: asymmetric thrust",
               m.EngCmd(cmd_seq=203, command=EngineCommand.SET_THRUST, engine=EngineSelect.ENGINE_2, thrust=40.0)),
@@ -566,6 +571,10 @@ class Dashboard:
         cas = self.latest.get(m.CasAlerts)
         if cas is not None and cas.computed:
             parts.append(f"CAS {cas.warning_count}W {cas.caution_count}C {cas.advisory_count}A")
+        sms = self.latest.get(m.SmsStatus)
+        if sms is not None:
+            parts.append(f"SMS {sms.master_arm.name} {sms.armed_count} armed {sms.total_weight:.0f} kg "
+                         f"{sms.stores_released} released")
         nav = self.latest.get(m.NavSolution)
         if nav is not None and nav.position_ssm == Ssm.NORMAL:
             parts.append(f"nav {nav.latitude:+.4f} {nav.longitude:+.4f} ({nav.sats_used} sats)")
@@ -602,7 +611,8 @@ def banner(args, terminals, events, log_dir, paths):
               "    the enemy unit as a hostile contact, the radar warning contacts on the ring's edge (red dots with\n"
               "    their band), the energy metrics and the tactical systems strip.\n"
               "  SMS window: the weapon stations, colour-coded by state, and the signature strip; MASTER ARM follows\n"
-              "    the FMS's weapons state (ARMED from the COMBAT event at 30 s).")
+              "    the FMS's weapons state (ARMED from the COMBAT event at 30 s); the stations are the stores\n"
+              "    management terminal's (RT 28): a MK-82 released at 36 s, station 2 armed at 37 s.")
     if events:
         print("  scripted flight: " + "; ".join(f"{e.seconds:.0f} s {e.what}" for e in events))
     print("  stop with Ctrl-C" + (f"; runs for {args.seconds:.0f} s" if args.seconds > 0 else ""))

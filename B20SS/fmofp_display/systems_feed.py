@@ -86,6 +86,11 @@ from fmofp_bus.icd.enums import Ssm
 from fmofp_display.flight_feed import FlightDataFeed
 from fmofp_display.terminal import STALE_AFTER_S
 
+STATIONS = 11  # sms.py _build_default_loadout's stations, SMS_STATUS's station words
+# store_kind enum names to sms.py's _Store name, weight and store_type.
+STORE_KINDS = {"MK_82": ("MK-82", 227, "WEAPON"), "JDAM": ("JDAM", 910, "WEAPON"), "JASSM": ("JASSM", 1021, "WEAPON"),
+               "ALE_55": ("ALE-55", 8, "DECOY"), "AN_ALQ": ("AN/ALQ", 180, "POD")}
+
 HYDRAULIC_SYSTEM_NAMES = {"PRIMARY": "Main hydraulic system", "BACKUP": "Backup hydraulic system"}  # hydrConfig.xml
 
 
@@ -513,6 +518,30 @@ class SystemsFeed:
         readings.update(self.hydraulic_readings())
         readings.update(self.ecs_readings())
         return readings
+
+    def stores_status(self):
+        """The stores management terminal's status (v1.26), relayed as DSP_SMS_STORES, while it is fresh; None
+        otherwise."""
+        message = self.terminal.fresh(m.DspSmsStores, self.stale_after_s)
+        return None if message is None else message.payload
+
+    def stores_stations(self):
+        """The eleven stations of the stores management terminal as sms.py's _Store fields: (name, weight_kg,
+        qty, state, store_type) per station, None for a station with no store; None while the terminal is not
+        heard."""
+        p = self.stores_status()
+        if p is None:
+            return None
+        out = []
+        for n in range(1, STATIONS + 1):
+            kind = getattr(p, f"station_{n}_kind").name
+            if kind not in STORE_KINDS:
+                out.append(None)
+                continue
+            name, weight_kg, store_type = STORE_KINDS[kind]
+            out.append((name, weight_kg, getattr(p, f"station_{n}_qty"), getattr(p, f"station_{n}_state").name,
+                        store_type))
+        return out
 
     def cas_alerts(self):
         """The crew alert list (v1.25): the crew alerting terminal's (RT 26) decision, relayed as EICAS_CAS_ALERTS,

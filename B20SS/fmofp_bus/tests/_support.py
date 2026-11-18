@@ -30,6 +30,8 @@ The binaries are named by environment variables (CI sets them):
     FMOFP_AVIONICS_TOOL partitions/fmofp_avionics_tool
     FMOFP_CAS       partitions/fmofp_cas
     FMOFP_CAS_TOOL  partitions/fmofp_cas_tool
+    FMOFP_STORES    partitions/fmofp_stores
+    FMOFP_STORES_TOOL partitions/fmofp_stores_tool
 """
 
 import os

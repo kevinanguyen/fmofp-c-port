@@ -767,18 +767,47 @@ class TsdWindow(QWidget):
 # ---- the SMS, RT 17 --------------------------------------------------------------------
 
 def sms_terminal(port_base):
-    return TerminalProcess(SMS_RT, port_base, m.DspSmsStatus, m.DspSmsModeCmd, receives=(m.BcastFmsStatus,))
+    return TerminalProcess(SMS_RT, port_base, m.DspSmsStatus, m.DspSmsModeCmd,
+                           receives=(m.BcastFmsStatus, m.DspSmsStores))
 
 
 def make_sms(systems_feed):
     """A StoresManagementDisplay whose sources are the bus feeds: the FMS and the FMS control it polls five times a
-    second for the flight mode and the tactical systems (its master arm is the weapons state, its ECM cell the
-    countermeasures state, its signature the stealth bit). Its weapon stations are its own table, as in the Python:
-    no stores management computer exists to report them."""
+    second for the flight mode and the tactical systems (its ECM cell the countermeasures state, its signature the
+    stealth bit). Its stations, master arm, release and delivery modes, selected station, load and armed count are the
+    stores management terminal's (v1.26, DSP_SMS_STORES), put in place right after each poll; while that terminal is
+    not heard the display keeps the last table it had (its own at start, which is the terminal's starting table) and
+    its own master arm."""
     bootstrap()
     install_system_sources(systems_feed)
     import FMOFP.Interfaces.userInterface.displays.sms as sms_module
-    sms = sms_module.StoresManagementDisplay()
+
+    class BusSms(sms_module.StoresManagementDisplay):
+        def _poll_data(self):
+            super()._poll_data()
+            status = systems_feed.stores_status()
+            stations = systems_feed.stores_stations()
+            if status is None or stations is None:
+                return
+            with self._lock:
+                self._master_arm = status.master_arm.name
+                self._release_mode = status.release_mode.name
+                self._delivery_mode = status.delivery_mode.name
+                self._selected_sta = status.selected_station
+                for station, store in zip(self._stations, stations):
+                    station.store = None if store is None else sms_module._Store(store[0], store[1], store[2],
+                                                                                 store[3], store[4])
+            self._safe_update()
+
+        def _total_weight_kg(self):
+            status = systems_feed.stores_status()
+            return super()._total_weight_kg() if status is None else float(status.total_weight)
+
+        def _armed_count(self):
+            status = systems_feed.stores_status()
+            return super()._armed_count() if status is None else status.armed_count
+
+    sms = BusSms()
     sms.start()
     return sms
 
@@ -810,7 +839,8 @@ class SmsWindow(QWidget):
         sms = self.sms
         self.status.setText(f"RT {self.terminal.rt} {self.terminal.state.name}  frames {self.terminal.syncs}  |  "
                             f"{self.systems.flight.tactical_text()}  |  MASTER ARM {sms._master_arm}, "
-                            f"{sms._armed_count()} stations armed, {sms._total_weight_kg():.0f} kg")
+                            f"{sms._armed_count()} stations armed, {sms._total_weight_kg():.0f} kg"
+                            + ("" if self.systems.stores_status() is not None else "  |  stores computer: no data"))
 
     def closeEvent(self, event):
         self.sms.stop()

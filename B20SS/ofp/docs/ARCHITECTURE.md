@@ -33,13 +33,13 @@ is in a bus message, and the message is defined in the ICD.
    +--------------+---------------+----------------+------------------+
    |              |                                |                  |
 +--+----------+ +-+-----------------------------+ ++---------------+ ++-----------------+
-| plant RT 27 | | 17 C++ partitions             | | 6 displays     | | clients          |
+| plant RT 27 | | 18 C++ partitions             | | 6 displays     | | clients          |
 | (Python)    | | FCS 5, nav 7, FMS 12, radar 9,| | (Python, PyQt6)| | (Python)         |
 | the world:  | | engine 3, mission 6, comms 2, | | radar 15,      | | scenario engine, |
 | flight state| | defensive 22, sensors 10,     | | PFD 11, MFD 13,| | debug CLI: they  |
 | weather,    | | power 8, surfaces 21, ECS 4,  | | EICAS 14,      | | send commands    |
 | terrain,    | | hydraulics 19, airframe 20,   | | TSD 16, SMS 17 | | through the      |
-| traffic ... | | recorder 23, AVN 1, CAS 26    | |                | | controller       |
+| traffic ... | | FDR 23, AVN 1, CAS 26, SMS 28 | |                | | controller       |
 +-------------+ +-------------------------------+ +----------------+ +------------------+
 ```
 

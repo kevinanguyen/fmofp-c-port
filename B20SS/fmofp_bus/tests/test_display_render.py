@@ -21,7 +21,8 @@ except ImportError:  # pragma: no cover - depends on the machine
 from fmofp_bus.icd import blocks as b
 from fmofp_bus.icd import messages as m
 from fmofp_bus.icd.enums import (AewcMode, BitStatus, SarMode, ClearanceLevel, CountermeasuresState, FmsFlightMode, GcasStatus, ShearSeverity,
-                                 Ssm, TargetingMode, TargetingState, TerminalState, TfrMode, WeaponsState, WeatherMode)
+                                 Ssm, TargetingMode, TargetingState, TerminalState, TfrMode, WeaponsState, WeatherMode,
+                                 DeliveryMode, MasterArm, ReleaseMode, StoreKind, StoreState)
 from fmofp_bus.tests.test_display_feeds import (FakeTerminal, flight_payload, sample_aewc, sample_elevation, sample_fused, sample_sar_image,
                                                 sample_link, sample_mission_status, sample_plan, sample_products,
                                                 sample_tracks, sample_def_status, sample_rwr_contacts,
@@ -572,6 +573,26 @@ class DisplayWindowsTest(unittest.TestCase):
                 targeting=TargetingState.READY, weapons=WeaponsState.READY)))
             sms._poll_data()
             self.assertEqual(("TRAIN", "ACTIVE"), (sms._master_arm, sms._ecm), "READY weapons are the TRAIN master arm")
+            self.assertIn("stores computer: no data", window.status.text())
+
+            # The stores management terminal (v1.26): its table, master arm, modes and sums replace the display's own.
+            terminal.put(m.DspSmsStores(payload=m.SmsStatus(
+                state=TerminalState.NORMAL, master_arm=MasterArm.ARMED, release_mode=ReleaseMode.SALVO,
+                delivery_mode=DeliveryMode.CCRP, selected_station=5, armed_count=1, total_weight=6000.0,
+                station_1_kind=StoreKind.MK_82, station_1_state=StoreState.ARMED, station_1_qty=3,
+                station_2_kind=StoreKind.JDAM, station_2_state=StoreState.EXPENDED, station_2_qty=0)))
+            sms._poll_data()
+            window.tick()
+            self.app.processEvents()
+            self.assertEqual(("ARMED", "SALVO", "CCRP", 5), (sms._master_arm, sms._release_mode, sms._delivery_mode,
+                                                             sms._selected_sta))
+            self.assertEqual(("MK-82", 3, "ARMED"), (sms._stations[0].store.name, sms._stations[0].store.qty,
+                                                     sms._stations[0].store.state))
+            self.assertEqual("EXPENDED", sms._stations[1].store.state)
+            self.assertIsNone(sms._stations[2].store, "a station the computer reports with no store")
+            self.assertIn("MASTER ARM ARMED, 1 stations armed, 6000 kg", window.status.text())
+            self.assertNotIn("stores computer: no data", window.status.text())
+            self.assertFalse(getattr(sms, "_paint_error", False))
         finally:
             window.timer.stop()
             window.close()

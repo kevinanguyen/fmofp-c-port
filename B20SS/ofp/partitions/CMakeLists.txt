@@ -260,3 +260,18 @@ target_link_libraries(fmofp_cas PRIVATE ofp::cas ofp::rt_process ofp::bc ofp::wa
 
 add_executable(fmofp_cas_tool cas/tools/cas_tool.cpp)
 target_link_libraries(fmofp_cas_tool PRIVATE ofp::cas ofp::warnings)
+
+# Stores management, RT 28: the SMS's eleven stations, the master arm from the
+# FMS's weapons state, the load and the armed count (sms.py), and the commands
+# that select, arm, release and jettison. fmofp_stores_tool for the oracle tests.
+add_library(ofp_stores STATIC stores/src/stores_management.cpp)
+add_library(ofp::stores ALIAS ofp_stores)
+add_dependencies(ofp_stores ofp_icd_generate)
+target_include_directories(ofp_stores PUBLIC stores/include)
+target_link_libraries(ofp_stores PUBLIC ofp::bus ofp::icd PRIVATE ofp::flight)
+
+add_executable(fmofp_stores stores/src/main.cpp)
+target_link_libraries(fmofp_stores PRIVATE ofp::stores ofp::rt_process ofp::bc ofp::warnings)
+
+add_executable(fmofp_stores_tool stores/tools/stores_tool.cpp)
+target_link_libraries(fmofp_stores_tool PRIVATE ofp::stores ofp::warnings)

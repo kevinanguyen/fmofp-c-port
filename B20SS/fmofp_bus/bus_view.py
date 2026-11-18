@@ -38,7 +38,7 @@ def nearest_frame(count, reference):
 TERMINAL_NAMES = {1: "avionics", 2: "comms", 3: "engine", 4: "ecs", 5: "fcs", 6: "mission", 7: "nav", 8: "power",
                   9: "radar", 10: "sensors", 11: "pfd", 12: "fms", 13: "mfd", 14: "eicas", 15: "radar display",
                   16: "tsd", 17: "sms", 18: "hud", 19: "hydraulics", 20: "airframe", 21: "surfaces", 22: "defensive",
-                  23: "fdm", 26: "cas", 27: "plant", 31: "broadcast"}
+                  23: "fdm", 26: "cas", 27: "plant", 28: "stores", 31: "broadcast"}
 
 # Transmit messages by address: (rt, subaddress) -> class; TERM_STATUS is every terminal's.
 BY_ADDRESS = {(info.rt, info.subaddress): info.cls for info in m.MESSAGES if info.direction == "T"}

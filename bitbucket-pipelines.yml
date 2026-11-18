@@ -122,6 +122,8 @@ pipelines:
               - export FMOFP_AVIONICS_TOOL=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_avionics_tool
               - export FMOFP_CAS=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_cas
               - export FMOFP_CAS_TOOL=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_cas_tool
+              - export FMOFP_STORES=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_stores
+              - export FMOFP_STORES_TOOL=$(pwd)/ofp/build/linux-gcc/partitions/fmofp_stores_tool
               - export QT_QPA_PLATFORM=offscreen
               - python3 -m unittest discover -s fmofp_bus/tests -t . -v
               - cd ofp

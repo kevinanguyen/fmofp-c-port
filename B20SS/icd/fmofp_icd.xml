@@ -8,7 +8,7 @@
   bits="11-8" means (word >> 8) & 0xF. A field may span two consecutive words
   (word="3-4" bits="31-0", most significant word first) for one 32-bit value.
 -->
-<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="25" status="DRAFT" date="2026-11-18">
+<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="26" status="DRAFT" date="2026-11-18">
   <revision version="1.0-draft" date="2026-10-04" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">First draft, derived from FMOFP/rtAddressConfig.xml and FMOFP/MIL_STD_1553B/message_schemas.py.</revision>
   <revision version="1.0-draft.2" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 1-3: display addresses accepted; BIT merged into avionics (RT 1), FM fitness and SW configuration folded in as well; bus controller confirmed as its own process. RT 24-26 freed.</revision>
   <revision version="1.0-draft.3" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 4-10: UDP transport accepted; legacy WEATHER mode dropped as unnecessary; every TBD value defined from the code that uses it; heading and yaw are true. Command parameters nothing consumed were removed.</revision>
@@ -556,6 +556,50 @@
       <value name="SEVERE" value="3"/>
       <value name="EXTREME" value="4"/>
     </enum>
+    <enum id="master_arm" bits="2" doc="The SMS's master arm (sms.py _MASTER_ARM_COLOUR's states): from the FMS's weapons state, ARMED when it is ARMED, TRAIN when it is READY, SAFE otherwise">
+      <value name="SAFE" value="0"/>
+      <value name="ARMED" value="1"/>
+      <value name="TRAIN" value="2"/>
+    </enum>
+    <enum id="release_mode" bits="2" doc="The SMS's release mode (sms.py _RELEASE_MODE): how many stores one RELEASE drops (v1.26: one, two, or the rest)">
+      <value name="SINGLE" value="0"/>
+      <value name="RIPPLE" value="1"/>
+      <value name="SALVO" value="2"/>
+    </enum>
+    <enum id="delivery_mode" bits="3" doc="The SMS's delivery mode (sms.py _DELIVERY_MODE), reported only: no weapon delivery is modelled">
+      <value name="AUTO" value="0"/>
+      <value name="MAN" value="1"/>
+      <value name="CCIP" value="2"/>
+      <value name="CCRP" value="3"/>
+      <value name="DTOS" value="4"/>
+    </enum>
+    <enum id="store_kind" bits="3" doc="What a station carries: the stores of sms.py _build_default_loadout, by name (MK-82 227 kg, JDAM 910, JASSM 1021 weapons; ALE-55 8 kg decoys; AN/ALQ 180 kg, a pod)">
+      <value name="NONE" value="0"/>
+      <value name="MK_82" value="1"/>
+      <value name="JDAM" value="2"/>
+      <value name="JASSM" value="3"/>
+      <value name="ALE_55" value="4"/>
+      <value name="AN_ALQ" value="5"/>
+    </enum>
+    <enum id="store_state" bits="3" doc="A station's store state (sms.py _STATE_COLOUR's keys)">
+      <value name="SAFE" value="0"/>
+      <value name="ARMED" value="1"/>
+      <value name="READY" value="2"/>
+      <value name="EXPENDED" value="3"/>
+      <value name="JETTISONED" value="4"/>
+      <value name="EMPTY" value="5"/>
+      <value name="FAULT" value="6"/>
+    </enum>
+    <enum id="sms_command" bits="4" doc="What SMS_CMD asks of the stores management terminal (v1.26; the frozen display had no commands: README section 2)">
+      <value name="NONE" value="0"/>
+      <value name="SELECT_STATION" value="1"/>
+      <value name="SET_RELEASE_MODE" value="2"/>
+      <value name="SET_DELIVERY_MODE" value="3"/>
+      <value name="ARM_STATION" value="4"/>
+      <value name="SAFE_STATION" value="5"/>
+      <value name="RELEASE" value="6"/>
+      <value name="JETTISON" value="7"/>
+    </enum>
   </enums>
 
   <terminals>
@@ -584,6 +628,7 @@
     <terminal rt="22" id="defensive" name="Defensive systems - RWR, chaff, flare, ECM" status="new" source="Systems/defensiveSys/defensiveService.py" note="Ported in v1.17 (fmofp_defensive). The radar warning receiver's contact table, built from the fused air tracks it hears by broadcast (31/22-23) and the ESM intercepts the plant publishes (PLANT_ESM, relayed as DEF_ESM); the chaff and flare inventories with the automatic flare salvo and its cooldown; the ECM mode. DEF_CMD carries the manual controls and the scenario engine's threat injection. DEF_STATUS reaches the EICAS by relay (EICAS_DEF_STATUS) and the DEF_RWR_CONTACTS block reaches the EICAS and the TSD by broadcast (31/16-17)"/>
     <terminal rt="23" id="flightdatamonitoring" name="Flight data monitoring - the flight data recorder and its storage" status="existing" source="Systems/flightDataMonitoring/fdmControl.py" note="Ported in v1.22 (fmofp_fdm). FlightDataMonitoring's 2 Hz recording loop: fdmsConfig.xml's flight data recorder takes the time, altitude and airspeed from the FMS flight data it hears by broadcast (31/25) into a ring of 512 records (the Python logged the number 123 for every parameter), the cockpit voice recorder has nothing to record on the bus, and FDM_CMD ejects a storage card (which, as in the Python, stops nothing). Nothing consumes FDM_STATUS yet; the dump is unit 28's"/>
     <terminal rt="26" id="crewalerting" name="Crew alerting - the EICAS's warning, caution and advisory list" status="new" source="Interfaces/userInterface/displays/eicas.py (_compute_alerts, _poll_data's GCAS and performance rows, _compute_defensive_alerts, _compute_sensor_alerts, _compute_weather_alerts)" note="Added in v1.25 (fmofp_cas). The frozen EICAS decided its alert list in the display process; the crew alerting terminal decides it from what those rules read: the broadcasts the EICAS hears (FMS status, GCAS alerts, flight envelope, engine and fuel status, the weather scan, the fused tracks and the radar warning contacts) and its own relays of DEF_STATUS, SNS_STATUS, PWR_STATUS and HYD_STATUS. CAS_ALERTS reaches the EICAS by relay (EICAS_CAS_ALERTS), which draws it"/>
+    <terminal rt="28" id="storesmanagement" name="Stores management - the weapon stations, master arm, release and jettison" status="new" source="Interfaces/userInterface/displays/sms.py (_build_default_loadout, _poll_data's master arm, _total_weight_kg, _armed_count)" note="Added in v1.26 (fmofp_sms). The frozen SMS display had no armament system behind it: its eleven stations were its own table. The stores management terminal holds that table, ports the master-arm rule (from the FMS status it hears by broadcast) and the load and armed count, and takes SMS_CMD: select a station, the release and delivery modes, arm and safe a station, release and jettison (new behaviour, README section 2). SMS_STATUS reaches the SMS display by relay (DSP_SMS_STORES)"/>
     <terminal rt="27" id="plant" name="Plant model - the simulated aircraft and world (test equipment, not aircraft software)" status="new" source="Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process" note="Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD). From v1.22 it also invents the cabin environment ECSControl had no sensors for (PLANT_CABIN, twice a second), the hydraulic pressures HydraulicSystemController read as a constant (PLANT_HYDRAULICS, once a second) and the airframe sensor readings AirframeSystemManager had no source for (PLANT_AIRFRAME, once a second). From v1.23 it takes the scenario engine's injections into the world: a radar contact into its traffic (PLANT_INJECT_CONTACT) and a storm cell into its weather (PLANT_INJECT_WEATHER)"/>
     <terminal rt="31" id="broadcast" name="Broadcast address - every terminal that accepts a subaddress hears it" status="reserved" note="Not a terminal: MIL-STD-1553B address 31. A message or block here is the far end of a relay, stored by the terminals its listeners attribute names, each of which accepts that subaddress for broadcast (README section 8); nothing else stores it and nobody answers it. Added in v1.7"/>
   </terminals>
@@ -1150,7 +1195,7 @@
     <message id="BCAST_FMS_FLIGHT_DATA" rt="31" sa="25" dir="R" words="21" rate="10" title="FMS flight data, broadcast" layout_of="FMS_FLIGHT_DATA" listeners="3 6 9 11 13 14 16 23">
       <doc>What the PFD draws and the MFD's mission page reads; the HUD will listen too. From v1.8 the engine computer (RT 3) listens as well: its autothrottle holds the airspeed in it. From v1.13 the radar computer (RT 9) listens: the synthetic aperture radar places its pictures by the position and heading in it.</doc>
     </message>
-    <message id="BCAST_FMS_STATUS" rt="31" sa="26" dir="R" words="3" rate="5" title="FMS status, broadcast to the displays" layout_of="FMS_STATUS" listeners="11 14 16 17 26">
+    <message id="BCAST_FMS_STATUS" rt="31" sa="26" dir="R" words="3" rate="5" title="FMS status, broadcast to the displays" layout_of="FMS_STATUS" listeners="11 14 16 17 26 28">
       <doc>The PFD's and the TSD's tactical strips, the EICAS's profile power and, from v1.14, the SMS's master arm (the weapons state), ECM cell (the countermeasures state) and signature (the stealth bit).</doc>
     </message>
     <message id="BCAST_FMS_ATTITUDE_STATUS" rt="31" sa="27" dir="R" words="8" rate="10" title="Attitude command status, broadcast to the displays" layout_of="FMS_ATTITUDE_STATUS" listeners="11 16"/>
@@ -2251,6 +2296,91 @@
     <message id="EICAS_CAS_ALERTS" rt="14" sa="9" dir="R" layout_of="CAS_ALERTS" rate="5" title="Crew alerts, for the EICAS">
       <doc>CAS_ALERTS relayed to the EICAS, its one consumer (section 8): the alert window's list.</doc>
     </message>
+    <!-- ===== RT 28 stores management (v1.26): the SMS's stations on the bus ===== -->
+    <message id="SMS_STATUS" rt="28" sa="10" dir="T" words="16" rate="5" title="Stores management status">
+      <doc>The terminal's state and command handling, the master arm (from BCAST_FMS_STATUS's weapons state as sms.py derived it: SAFE while the FMS is not heard), the release and delivery modes, the selected station, the armed count and the total load as sms.py computed them (_armed_count: the stations whose store is ARMED, whatever the master arm; _total_weight_kg: weight x max(qty, 1) over the stores not EMPTY, EXPENDED or JETTISONED), the stores released since start, whether the stores were jettisoned, and one word per station of _build_default_loadout's eleven (its store, state and quantity).</doc>
+      <field name="state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="last_cmd_seq" word="0" bits="7-0" type="uint" doc="cmd_seq of the last SMS_MODE_CMD processed (see Command sequence rule)"/>
+      <field name="cmd_rejected" word="1" bits="15" type="bool" doc="1 = the last SMS_MODE_CMD was rejected"/>
+      <field name="mode_transition" word="1" bits="14" type="bool" doc="1 = a commanded mode change is still in progress"/>
+      <field name="master_arm" word="1" bits="13-12" type="enum" enum="master_arm"/>
+      <field name="sms_cmd_status" word="1" bits="11-8" type="enum" enum="cmd_status" doc="Outcome of the last SMS_CMD"/>
+      <field name="fms_valid" word="1" bits="7" type="bool" doc="1 = BCAST_FMS_STATUS arrived within the last 100 frames"/>
+      <field name="jettisoned" word="1" bits="6" type="bool" doc="1 = the stores were jettisoned"/>
+      <field name="spare_1" word="1" bits="5-1" type="spare"/>
+      <field name="healthy" word="1" bits="0" type="bool" doc="1 = healthy (legacy health_status, bit 0)"/>
+      <field name="release_mode" word="2" bits="15-14" type="enum" enum="release_mode"/>
+      <field name="delivery_mode" word="2" bits="13-11" type="enum" enum="delivery_mode"/>
+      <field name="selected_station" word="2" bits="10-7" type="uint" doc="1-11 (sms.py _SELECTED_STA, 1 at start)"/>
+      <field name="armed_count" word="2" bits="6-3" type="uint" doc="sms.py _armed_count()"/>
+      <field name="spare_2" word="2" bits="2-0" type="spare"/>
+      <field name="total_weight" word="3" bits="15-0" type="uint" lsb="1" units="kg" min="0" max="65535" doc="sms.py _total_weight_kg()"/>
+      <field name="stores_released" word="4" bits="15-8" type="uint" doc="Stores released by RELEASE since start"/>
+      <field name="cmd_seq_last_sms" word="4" bits="7-0" type="uint" doc="cmd_seq of the last SMS_CMD processed"/>
+      <field name="station_1_kind" word="5" bits="15-13" type="enum" enum="store_kind" doc="Station 1: its store"/>
+      <field name="station_1_state" word="5" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_1_qty" word="5" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_1" word="5" bits="5-0" type="spare"/>
+      <field name="station_2_kind" word="6" bits="15-13" type="enum" enum="store_kind" doc="Station 2: its store"/>
+      <field name="station_2_state" word="6" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_2_qty" word="6" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_2" word="6" bits="5-0" type="spare"/>
+      <field name="station_3_kind" word="7" bits="15-13" type="enum" enum="store_kind" doc="Station 3: its store"/>
+      <field name="station_3_state" word="7" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_3_qty" word="7" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_3" word="7" bits="5-0" type="spare"/>
+      <field name="station_4_kind" word="8" bits="15-13" type="enum" enum="store_kind" doc="Station 4: its store"/>
+      <field name="station_4_state" word="8" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_4_qty" word="8" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_4" word="8" bits="5-0" type="spare"/>
+      <field name="station_5_kind" word="9" bits="15-13" type="enum" enum="store_kind" doc="Station 5: its store"/>
+      <field name="station_5_state" word="9" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_5_qty" word="9" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_5" word="9" bits="5-0" type="spare"/>
+      <field name="station_6_kind" word="10" bits="15-13" type="enum" enum="store_kind" doc="Station 6: its store"/>
+      <field name="station_6_state" word="10" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_6_qty" word="10" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_6" word="10" bits="5-0" type="spare"/>
+      <field name="station_7_kind" word="11" bits="15-13" type="enum" enum="store_kind" doc="Station 7: its store"/>
+      <field name="station_7_state" word="11" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_7_qty" word="11" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_7" word="11" bits="5-0" type="spare"/>
+      <field name="station_8_kind" word="12" bits="15-13" type="enum" enum="store_kind" doc="Station 8: its store"/>
+      <field name="station_8_state" word="12" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_8_qty" word="12" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_8" word="12" bits="5-0" type="spare"/>
+      <field name="station_9_kind" word="13" bits="15-13" type="enum" enum="store_kind" doc="Station 9: its store"/>
+      <field name="station_9_state" word="13" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_9_qty" word="13" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_9" word="13" bits="5-0" type="spare"/>
+      <field name="station_10_kind" word="14" bits="15-13" type="enum" enum="store_kind" doc="Station 10: its store"/>
+      <field name="station_10_state" word="14" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_10_qty" word="14" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_10" word="14" bits="5-0" type="spare"/>
+      <field name="station_11_kind" word="15" bits="15-13" type="enum" enum="store_kind" doc="Station 11: its store"/>
+      <field name="station_11_state" word="15" bits="12-10" type="enum" enum="store_state"/>
+      <field name="station_11_qty" word="15" bits="9-6" type="uint" doc="Stores left on the station"/>
+      <field name="spare_station_11" word="15" bits="5-0" type="spare"/>
+    </message>
+    <message id="SMS_MODE_CMD" rt="28" sa="10" dir="R" words="1" rate="aperiodic" title="Stores management mode command">
+      <field name="requested_state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="cmd_seq" word="0" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+    </message>
+    <message id="SMS_CMD" rt="28" sa="11" dir="R" words="2" rate="aperiodic" title="Stores management command">
+      <doc>New in v1.26 (README section 2; the frozen display had no commands). SELECT_STATION: station 1-11. SET_RELEASE_MODE, SET_DELIVERY_MODE: the mode field. ARM_STATION: a weapon (MK-82, JDAM, JASSM) that is SAFE with stores left becomes ARMED. SAFE_STATION: ARMED becomes SAFE. RELEASE: the station's store must be ARMED with stores left and the master arm ARMED (REJECTED_STATE otherwise): SINGLE drops one, RIPPLE two, SALVO the rest; at none the station is EXPENDED. JETTISON: every store left goes (JETTISONED, none left), whatever the master arm. Station 0 is the selected station. The outcome is SMS_STATUS.sms_cmd_status.</doc>
+      <field name="command" word="0" bits="15-12" type="enum" enum="sms_command"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="cmd_seq" word="0" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+      <field name="station" word="1" bits="15-12" type="uint" doc="1-11; 0 = the selected station"/>
+      <field name="release_mode" word="1" bits="11-10" type="enum" enum="release_mode" doc="SET_RELEASE_MODE"/>
+      <field name="delivery_mode" word="1" bits="9-7" type="enum" enum="delivery_mode" doc="SET_DELIVERY_MODE"/>
+      <field name="spare_1" word="1" bits="6-0" type="spare"/>
+    </message>
+    <message id="DSP_SMS_STORES" rt="17" sa="1" dir="R" layout_of="SMS_STATUS" rate="5" title="Stores management status, for the SMS display">
+      <doc>SMS_STATUS relayed to the SMS display, its one consumer (section 8): the stations, the master arm, the modes and the sums the window draws.</doc>
+    </message>
   </messages>
 
   <!-- RT-to-RT transfers the bus controller performs: in the minor frame where it polls `from`,
@@ -2328,6 +2458,7 @@
     <relay from="PWR_STATUS" to="CAS_PWR_STATUS"/>
     <relay from="HYD_STATUS" to="CAS_HYD_STATUS"/>
     <relay from="CAS_ALERTS" to="EICAS_CAS_ALERTS"/>
+    <relay from="SMS_STATUS" to="DSP_SMS_STORES"/>
   </relays>
 
   <!-- Payloads larger than one message use the block transfer format in README.md.

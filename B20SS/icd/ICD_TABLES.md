@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.25 (DRAFT, 2026-11-18). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.26 (DRAFT, 2026-11-18). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -32,9 +32,10 @@
 | 23 | `flightdatamonitoring` | Flight data monitoring - the flight data recorder and its storage | existing | Systems/flightDataMonitoring/fdmControl.py | Ported in v1.22 (fmofp_fdm). FlightDataMonitoring's 2 Hz recording loop: fdmsConfig.xml's flight data recorder takes the time, altitude and airspeed from the FMS flight data it hears by broadcast (31/25) into a ring of 512 records (the Python logged the number 123 for every parameter), the cockpit voice recorder has nothing to record on the bus, and FDM_CMD ejects a storage card (which, as in the Python, stops nothing). Nothing consumes FDM_STATUS yet; the dump is unit 28's |
 | 26 | `crewalerting` | Crew alerting - the EICAS's warning, caution and advisory list | new | Interfaces/userInterface/displays/eicas.py (_compute_alerts, _poll_data's GCAS and performance rows, _compute_defensive_alerts, _compute_sensor_alerts, _compute_weather_alerts) | Added in v1.25 (fmofp_cas). The frozen EICAS decided its alert list in the display process; the crew alerting terminal decides it from what those rules read: the broadcasts the EICAS hears (FMS status, GCAS alerts, flight envelope, engine and fuel status, the weather scan, the fused tracks and the radar warning contacts) and its own relays of DEF_STATUS, SNS_STATUS, PWR_STATUS and HYD_STATUS. CAS_ALERTS reaches the EICAS by relay (EICAS_CAS_ALERTS), which draws it |
 | 27 | `plant` | Plant model - the simulated aircraft and world (test equipment, not aircraft software) | new | Systems/flightControlSys/flightControlComputer (the random-walk flight state), to become a Python plant process | Added in v1.1. Publishes what the sensors would measure (and, from v1.16, the RF environment the communications terminal measures, PLANT_RF). Each quantity moves to its real producer as that subsystem is ported (terrain clearance went to the radar in v1.4). From v1.4 it also publishes the terrain: the elevation profile ahead of the aircraft (PLANT_TERRAIN), which is what the terrain-following radar's antenna would measure. From v1.8 it also runs the two engines of engineControlUnit.py (PLANT_ENGINE), at the thrust the engine computer commands (PLANT_THRUST_CMD). From v1.10 it also flies the air traffic the targeting and AEWC radars generated (PLANT_TRAFFIC). From v1.13 it also holds the ground scene the synthetic aperture radar images (PLANT_GROUND): roads, a river, a town with its buildings, forests, a lake, and the vehicles and the ship that move. From v1.17 it also intercepts the ESM signals the passive sensor manager generated (PLANT_ESM): a set of up to five every 10 frames (every 25 until v1.18). From v1.18 it also returns the scans of the other five sensors the two sensor managers invented (PLANT_SENSOR_SCAN: the two radars, the LIDAR and the two infrared sensors, a set every 10 frames). From v1.19 it also draws the electrical readings PowerManagementSystem invented (PLANT_ELECTRICAL: the generator output, the consumption, the bus voltages, the frequency and the power factor, once a second) and holds its generator at the output the power management terminal commands (PLANT_GEN_CMD). From v1.22 it also invents the cabin environment ECSControl had no sensors for (PLANT_CABIN, twice a second), the hydraulic pressures HydraulicSystemController read as a constant (PLANT_HYDRAULICS, once a second) and the airframe sensor readings AirframeSystemManager had no source for (PLANT_AIRFRAME, once a second). From v1.23 it takes the scenario engine's injections into the world: a radar contact into its traffic (PLANT_INJECT_CONTACT) and a storm cell into its weather (PLANT_INJECT_WEATHER) |
+| 28 | `storesmanagement` | Stores management - the weapon stations, master arm, release and jettison | new | Interfaces/userInterface/displays/sms.py (_build_default_loadout, _poll_data's master arm, _total_weight_kg, _armed_count) | Added in v1.26 (fmofp_sms). The frozen SMS display had no armament system behind it: its eleven stations were its own table. The stores management terminal holds that table, ports the master-arm rule (from the FMS status it hears by broadcast) and the load and armed count, and takes SMS_CMD: select a station, the release and delivery modes, arm and safe a station, release and jettison (new behaviour, README section 2). SMS_STATUS reaches the SMS display by relay (DSP_SMS_STORES) |
 | 31 | `broadcast` | Broadcast address - every terminal that accepts a subaddress hears it | reserved |  | Not a terminal: MIL-STD-1553B address 31. A message or block here is the far end of a relay, stored by the terminals its listeners attribute names, each of which accepts that subaddress for broadcast (README section 8); nothing else stores it and nobody answers it. Added in v1.7 |
 
-RT 31 is broadcast. Unused: 24, 25, 28, 29, 30.
+RT 31 is broadcast. Unused: 24, 25, 29, 30.
 
 ## Message summary
 
@@ -139,6 +140,7 @@ RT 31 is broadcast. Unused: 24, 25, 28, 29, 30.
 | [`TSD_FMS_ENERGY`](#tsd_fms_energy) | 16 | 1 | R | 6 | 1 | Energy maneuverability, for the TSD | DRAFT |
 | [`DSP_TSD_MODE_CMD`](#dsp_tsd_mode_cmd) | 16 | 15 | R | 1 | aperiodic | Tactical situation display mode command | DRAFT |
 | [`DSP_TSD_STATUS`](#dsp_tsd_status) | 16 | 15 | T | 2 | 1 | Tactical situation display status | DRAFT |
+| [`DSP_SMS_STORES`](#dsp_sms_stores) | 17 | 1 | R | 16 | 5 | Stores management status, for the SMS display | DRAFT |
 | [`DSP_SMS_MODE_CMD`](#dsp_sms_mode_cmd) | 17 | 16 | R | 1 | aperiodic | Stores management display mode command | DRAFT |
 | [`DSP_SMS_STATUS`](#dsp_sms_status) | 17 | 16 | T | 2 | 1 | Stores management display status | DRAFT |
 | [`DSP_HUD_MODE_CMD`](#dsp_hud_mode_cmd) | 18 | 17 | R | 1 | aperiodic | Head-up display mode command | DRAFT |
@@ -184,6 +186,9 @@ RT 31 is broadcast. Unused: 24, 25, 28, 29, 30.
 | [`PLANT_AIRFRAME`](#plant_airframe) | 27 | 20 | T | 4 | 1 | Airframe sensor readings from the plant | DRAFT |
 | [`PLANT_INJECT_CONTACT`](#plant_inject_contact) | 27 | 21 | R | 9 | aperiodic | A radar contact injected into the plant's traffic | DRAFT |
 | [`PLANT_INJECT_WEATHER`](#plant_inject_weather) | 27 | 22 | R | 6 | aperiodic | A storm cell injected into the plant's weather | DRAFT |
+| [`SMS_MODE_CMD`](#sms_mode_cmd) | 28 | 10 | R | 1 | aperiodic | Stores management mode command | DRAFT |
+| [`SMS_STATUS`](#sms_status) | 28 | 10 | T | 16 | 5 | Stores management status | DRAFT |
+| [`SMS_CMD`](#sms_cmd) | 28 | 11 | R | 2 | aperiodic | Stores management command | DRAFT |
 | [`BCAST_RDR_WX_STATUS`](#bcast_rdr_wx_status) | 31 | 1 | R | 2 | 5 | Weather radar status, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_WX_SCAN`](#bcast_rdr_wx_scan) | 31 | 2 | R | 10 | 5 | Weather radar scan summary, broadcast to the displays | DRAFT |
 | [`BCAST_RDR_TFR_STATUS`](#bcast_rdr_tfr_status) | 31 | 3 | R | 2 | 5 | Terrain-following radar status, broadcast to the displays | DRAFT |
@@ -265,7 +270,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`FCS_GCAS_ALERTS`](#fcs_gcas_alerts) | [`BCAST_FCS_GCAS_ALERTS`](#bcast_fcs_gcas_alerts) (broadcast, heard by RT 13, 14, 26) | 4 | 5 |
 | [`FCS_PERF_STATUS`](#fcs_perf_status) | [`BCAST_FCS_PERF_STATUS`](#bcast_fcs_perf_status) (broadcast, heard by RT 13, 14, 26) | 4 | 1 |
 | [`FMS_FLIGHT_DATA`](#fms_flight_data) | [`BCAST_FMS_FLIGHT_DATA`](#bcast_fms_flight_data) (broadcast, heard by RT 3, 6, 9, 11, 13, 14, 16, 23) | 21 | 10 |
-| [`FMS_STATUS`](#fms_status) | [`BCAST_FMS_STATUS`](#bcast_fms_status) (broadcast, heard by RT 11, 14, 16, 17, 26) | 3 | 5 |
+| [`FMS_STATUS`](#fms_status) | [`BCAST_FMS_STATUS`](#bcast_fms_status) (broadcast, heard by RT 11, 14, 16, 17, 26, 28) | 3 | 5 |
 | [`FMS_ATTITUDE_STATUS`](#fms_attitude_status) | [`BCAST_FMS_ATTITUDE_STATUS`](#bcast_fms_attitude_status) (broadcast, heard by RT 11, 16) | 8 | 10 |
 | [`FMS_CONTROL_STATUS`](#fms_control_status) | [`ENG_FMS_CONTROL`](#eng_fms_control) | 3 | 5 |
 | [`PLANT_ENGINE`](#plant_engine) | [`ENG_ENGINE_IN`](#eng_engine_in) | 19 | 10 |
@@ -308,6 +313,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`PWR_STATUS`](#pwr_status) | [`CAS_PWR_STATUS`](#cas_pwr_status) | 16 | 5 |
 | [`HYD_STATUS`](#hyd_status) | [`CAS_HYD_STATUS`](#cas_hyd_status) | 4 | 5 |
 | [`CAS_ALERTS`](#cas_alerts) | [`EICAS_CAS_ALERTS`](#eicas_cas_alerts) | 13 | 5 |
+| [`SMS_STATUS`](#sms_status) | [`DSP_SMS_STORES`](#dsp_sms_stores) | 16 | 5 |
 
 ## Mode codes
 
@@ -1222,6 +1228,80 @@ The scenario engine's weather_cell category (scenarioEngine.py: the cell diction
 | 2 | MODERATE |  |  |
 | 3 | SEVERE |  |  |
 | 4 | EXTREME |  |  |
+
+### `master_arm` (2 bits)
+
+The SMS's master arm (sms.py _MASTER_ARM_COLOUR's states): from the FMS's weapons state, ARMED when it is ARMED, TRAIN when it is READY, SAFE otherwise
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | SAFE |  |  |
+| 1 | ARMED |  |  |
+| 2 | TRAIN |  |  |
+
+### `release_mode` (2 bits)
+
+The SMS's release mode (sms.py _RELEASE_MODE): how many stores one RELEASE drops (v1.26: one, two, or the rest)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | SINGLE |  |  |
+| 1 | RIPPLE |  |  |
+| 2 | SALVO |  |  |
+
+### `delivery_mode` (3 bits)
+
+The SMS's delivery mode (sms.py _DELIVERY_MODE), reported only: no weapon delivery is modelled
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | AUTO |  |  |
+| 1 | MAN |  |  |
+| 2 | CCIP |  |  |
+| 3 | CCRP |  |  |
+| 4 | DTOS |  |  |
+
+### `store_kind` (3 bits)
+
+What a station carries: the stores of sms.py _build_default_loadout, by name (MK-82 227 kg, JDAM 910, JASSM 1021 weapons; ALE-55 8 kg decoys; AN/ALQ 180 kg, a pod)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | MK_82 |  |  |
+| 2 | JDAM |  |  |
+| 3 | JASSM |  |  |
+| 4 | ALE_55 |  |  |
+| 5 | AN_ALQ |  |  |
+
+### `store_state` (3 bits)
+
+A station's store state (sms.py _STATE_COLOUR's keys)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | SAFE |  |  |
+| 1 | ARMED |  |  |
+| 2 | READY |  |  |
+| 3 | EXPENDED |  |  |
+| 4 | JETTISONED |  |  |
+| 5 | EMPTY |  |  |
+| 6 | FAULT |  |  |
+
+### `sms_command` (4 bits)
+
+What SMS_CMD asks of the stores management terminal (v1.26; the frozen display had no commands: README section 2)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | SELECT_STATION |  |  |
+| 2 | SET_RELEASE_MODE |  |  |
+| 3 | SET_DELIVERY_MODE |  |  |
+| 4 | ARM_STATION |  |  |
+| 5 | SAFE_STATION |  |  |
+| 6 | RELEASE |  |  |
+| 7 | JETTISON |  |  |
 
 ## Messages
 
@@ -3799,6 +3879,112 @@ Same layout as [`HYD_STATUS`](#hyd_status).
 CAS_ALERTS relayed to the EICAS, its one consumer (section 8): the alert window's list.
 
 Same layout as [`CAS_ALERTS`](#cas_alerts).
+
+### SMS_STATUS
+
+**Stores management status** — RT 28 · SA 10 · transmit (terminal to bus) · 16 words · 5 Hz
+
+The terminal's state and command handling, the master arm (from BCAST_FMS_STATUS's weapons state as sms.py derived it: SAFE while the FMS is not heard), the release and delivery modes, the selected station, the armed count and the total load as sms.py computed them (_armed_count: the stations whose store is ARMED, whatever the master arm; _total_weight_kg: weight x max(qty, 1) over the stores not EMPTY, EXPENDED or JETTISONED), the stores released since start, whether the stores were jettisoned, and one word per station of _build_default_loadout's eleven (its store, state and quantity).
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `last_cmd_seq` | uint | raw counts | cmd_seq of the last SMS_MODE_CMD processed (see Command sequence rule) |
+| 1 | 15 | `cmd_rejected` | bool |  | 1 = the last SMS_MODE_CMD was rejected |
+| 1 | 14 | `mode_transition` | bool |  | 1 = a commanded mode change is still in progress |
+| 1 | 13-12 | `master_arm` | enum | enum `master_arm` |  |
+| 1 | 11-8 | `sms_cmd_status` | enum | enum `cmd_status` | Outcome of the last SMS_CMD |
+| 1 | 7 | `fms_valid` | bool |  | 1 = BCAST_FMS_STATUS arrived within the last 100 frames |
+| 1 | 6 | `jettisoned` | bool |  | 1 = the stores were jettisoned |
+| 1 | 5-1 | `spare_1` | spare |  |  |
+| 1 | 0 | `healthy` | bool |  | 1 = healthy (legacy health_status, bit 0) |
+| 2 | 15-14 | `release_mode` | enum | enum `release_mode` |  |
+| 2 | 13-11 | `delivery_mode` | enum | enum `delivery_mode` |  |
+| 2 | 10-7 | `selected_station` | uint | raw counts | 1-11 (sms.py _SELECTED_STA, 1 at start) |
+| 2 | 6-3 | `armed_count` | uint | raw counts | sms.py _armed_count() |
+| 2 | 2-0 | `spare_2` | spare |  |  |
+| 3 | 15-0 | `total_weight` | uint | LSB 1 kg, range 0 to 65535 | sms.py _total_weight_kg() |
+| 4 | 15-8 | `stores_released` | uint | raw counts | Stores released by RELEASE since start |
+| 4 | 7-0 | `cmd_seq_last_sms` | uint | raw counts | cmd_seq of the last SMS_CMD processed |
+| 5 | 15-13 | `station_1_kind` | enum | enum `store_kind` | Station 1: its store |
+| 5 | 12-10 | `station_1_state` | enum | enum `store_state` |  |
+| 5 | 9-6 | `station_1_qty` | uint | raw counts | Stores left on the station |
+| 5 | 5-0 | `spare_station_1` | spare |  |  |
+| 6 | 15-13 | `station_2_kind` | enum | enum `store_kind` | Station 2: its store |
+| 6 | 12-10 | `station_2_state` | enum | enum `store_state` |  |
+| 6 | 9-6 | `station_2_qty` | uint | raw counts | Stores left on the station |
+| 6 | 5-0 | `spare_station_2` | spare |  |  |
+| 7 | 15-13 | `station_3_kind` | enum | enum `store_kind` | Station 3: its store |
+| 7 | 12-10 | `station_3_state` | enum | enum `store_state` |  |
+| 7 | 9-6 | `station_3_qty` | uint | raw counts | Stores left on the station |
+| 7 | 5-0 | `spare_station_3` | spare |  |  |
+| 8 | 15-13 | `station_4_kind` | enum | enum `store_kind` | Station 4: its store |
+| 8 | 12-10 | `station_4_state` | enum | enum `store_state` |  |
+| 8 | 9-6 | `station_4_qty` | uint | raw counts | Stores left on the station |
+| 8 | 5-0 | `spare_station_4` | spare |  |  |
+| 9 | 15-13 | `station_5_kind` | enum | enum `store_kind` | Station 5: its store |
+| 9 | 12-10 | `station_5_state` | enum | enum `store_state` |  |
+| 9 | 9-6 | `station_5_qty` | uint | raw counts | Stores left on the station |
+| 9 | 5-0 | `spare_station_5` | spare |  |  |
+| 10 | 15-13 | `station_6_kind` | enum | enum `store_kind` | Station 6: its store |
+| 10 | 12-10 | `station_6_state` | enum | enum `store_state` |  |
+| 10 | 9-6 | `station_6_qty` | uint | raw counts | Stores left on the station |
+| 10 | 5-0 | `spare_station_6` | spare |  |  |
+| 11 | 15-13 | `station_7_kind` | enum | enum `store_kind` | Station 7: its store |
+| 11 | 12-10 | `station_7_state` | enum | enum `store_state` |  |
+| 11 | 9-6 | `station_7_qty` | uint | raw counts | Stores left on the station |
+| 11 | 5-0 | `spare_station_7` | spare |  |  |
+| 12 | 15-13 | `station_8_kind` | enum | enum `store_kind` | Station 8: its store |
+| 12 | 12-10 | `station_8_state` | enum | enum `store_state` |  |
+| 12 | 9-6 | `station_8_qty` | uint | raw counts | Stores left on the station |
+| 12 | 5-0 | `spare_station_8` | spare |  |  |
+| 13 | 15-13 | `station_9_kind` | enum | enum `store_kind` | Station 9: its store |
+| 13 | 12-10 | `station_9_state` | enum | enum `store_state` |  |
+| 13 | 9-6 | `station_9_qty` | uint | raw counts | Stores left on the station |
+| 13 | 5-0 | `spare_station_9` | spare |  |  |
+| 14 | 15-13 | `station_10_kind` | enum | enum `store_kind` | Station 10: its store |
+| 14 | 12-10 | `station_10_state` | enum | enum `store_state` |  |
+| 14 | 9-6 | `station_10_qty` | uint | raw counts | Stores left on the station |
+| 14 | 5-0 | `spare_station_10` | spare |  |  |
+| 15 | 15-13 | `station_11_kind` | enum | enum `store_kind` | Station 11: its store |
+| 15 | 12-10 | `station_11_state` | enum | enum `store_state` |  |
+| 15 | 9-6 | `station_11_qty` | uint | raw counts | Stores left on the station |
+| 15 | 5-0 | `spare_station_11` | spare |  |  |
+
+### SMS_MODE_CMD
+
+**Stores management mode command** — RT 28 · SA 10 · receive (bus to terminal) · 1 words · aperiodic
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### SMS_CMD
+
+**Stores management command** — RT 28 · SA 11 · receive (bus to terminal) · 2 words · aperiodic
+
+New in v1.26 (README section 2; the frozen display had no commands). SELECT_STATION: station 1-11. SET_RELEASE_MODE, SET_DELIVERY_MODE: the mode field. ARM_STATION: a weapon (MK-82, JDAM, JASSM) that is SAFE with stores left becomes ARMED. SAFE_STATION: ARMED becomes SAFE. RELEASE: the station's store must be ARMED with stores left and the master arm ARMED (REJECTED_STATE otherwise): SINGLE drops one, RIPPLE two, SALVO the rest; at none the station is EXPENDED. JETTISON: every store left goes (JETTISONED, none left), whatever the master arm. Station 0 is the selected station. The outcome is SMS_STATUS.sms_cmd_status.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `sms_command` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+| 1 | 15-12 | `station` | uint | raw counts | 1-11; 0 = the selected station |
+| 1 | 11-10 | `release_mode` | enum | enum `release_mode` | SET_RELEASE_MODE |
+| 1 | 9-7 | `delivery_mode` | enum | enum `delivery_mode` | SET_DELIVERY_MODE |
+| 1 | 6-0 | `spare_1` | spare |  |  |
+
+### DSP_SMS_STORES
+
+**Stores management status, for the SMS display** — RT 17 · SA 1 · receive (bus to terminal) · 16 words · 5 Hz
+
+SMS_STATUS relayed to the SMS display, its one consumer (section 8): the stations, the master arm, the modes and the sums the window draws.
+
+Same layout as [`SMS_STATUS`](#sms_status).
 
 ## Block payloads
 
