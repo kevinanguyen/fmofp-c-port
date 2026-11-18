@@ -158,9 +158,9 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 30.5 of 30.5 units = **100 %** (section 2). Units 1-30 were done on 2026-11-12; unit 31 (the
-  EICAS's crew alert rules to C++, Alee's "Crew alerts first") on 2026-11-18. Every unit is DONE or STRUCK.
-  The other candidate found that day, a stores management computer for the SMS, is not in the meter (section 8). What comes next is not in the number: the intern-ticket authoring phase, which starts with
+- **Meter**: 30.5 of 31.5 units = **96.8 %** (section 2). Units 1-30 were done on 2026-11-12; unit 31 (the
+  EICAS's crew alert rules to C++, Alee's "Crew alerts first") on 2026-11-18. Unit 32, a stores management
+  computer for the SMS (Alee: "Yes, the stores computer", 2026-11-18), is open. What comes next is not in the number: the intern-ticket authoring phase, which starts with
   the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
@@ -174,7 +174,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: unit 32, stores management, `IN PROGRESS (Alee, 2026-11-18)`; no `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -243,7 +243,7 @@ person may continue it in their next session; when it is green it is rebased ont
 
 ## 2. The units (progress meter)
 
-Percentage = done weight / 30.5. Weights are rough equal-effort units; change one only with
+Percentage = done weight / 31.5. Weights are rough equal-effort units; change one only with
 a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <date>)`,
 `DONE <date>` (with the section 7 entry), `STRUCK <date>` (with the decision in section 8).
 
@@ -280,8 +280,25 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 29 | Retire the old Python messaging stack and the radar bridge | 1 | DONE 2026-11-12 |
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | DONE 2026-11-12 (the ticket format a draft, its questions carried to the ticket phase: section 8) |
 | 31 | Crew alerting: the EICAS's alert rules to C++ (a new terminal, RT 26) | 1 | DONE 2026-11-18 |
+| 32 | Stores management computer for the SMS (a new terminal, RT 28) | 1 | IN PROGRESS (Alee, 2026-11-18) |
 
-**Done: 30.5 / 30.5 = 100 %.** Open: none.
+**Done: 30.5 / 31.5 = 96.8 %.** Open: unit 32.
+
+### 2.32 Stores management (RT 28), 1
+
+Added 2026-11-18 (Alee, section 8), from the ICD README's section 12 ("a stores management computer for the
+SMS"). The frozen `sms.py` has no armament system behind it: the eleven stations are `_build_default_loadout()`,
+the display's own table; master arm follows the FMS's weapons state (ARMED, READY as TRAIN, else SAFE); the load
+and the armed count are computed from the table (`weight x max(qty, 1)` over the stores not EMPTY, EXPENDED or
+JETTISONED); the release and delivery modes and the selected station are constants nothing changes. Plan: a
+stores management partition (`ofp/partitions/sms`, RT 28; 24 and 25 are the gate tests' stubs) holds that table,
+ports the master-arm rule and the two sums as written, and adds, as new behaviour with no Python behind it, the
+commands the backlog item names: select a station, the release and delivery modes, arm and safe a station,
+release from the selected station (only with master arm ARMED and the station ARMED: SINGLE one store, RIPPLE
+two, SALVO the rest; EXPENDED at none) and jettison (every store left goes, JETTISONED). `SMS_STATUS` carries
+the modes, the sums and one word per station; it reaches the SMS display alone by relay, and the window draws
+the computer's table in place of its own. The signature strip (the display's invented RCS and IR sines) is not
+part of the unit.
 
 ### 2.31 Crew alerting (RT 26), 1
 
@@ -2663,3 +2680,7 @@ done before this file existed are condensed from the private session notes.
   re-applied too late), and the window shows one caution, `CAS  ALERTS UNKNOWN`, while the alert computer is not
   heard. The terminal is RT 26, its list `CAS_ALERTS` relayed to the EICAS alone; the four single-consumer statuses
   it reads get second relays, not broadcasts (the load allowed it: 8680 us). ICD v1.25.
+- 2026-11-18, Alee ("Yes, the stores computer"): a unit 32 is added to the meter, weight 1: a stores management
+  computer for the SMS (section 2.32). The total becomes 31.5, the meter 30.5 / 31.5 = 96.8 % until it lands. Most
+  of it is new behaviour (the frozen display had only a table); the agent keeps it to the commands the ICD
+  README's backlog item named, documents each as new, and either human may change them.
