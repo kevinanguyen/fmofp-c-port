@@ -679,6 +679,9 @@ def main(argv=None):
     parser.add_argument("--seed", type=int, default=None, help="the plant's random seed")
     parser.add_argument("--log-dir", default=None, help="where the programs' logs go (default: logs/demo)")
     parser.add_argument("--settle", type=float, default=4.0, help="seconds to let the programs start before the bus")
+    parser.add_argument("--record", nargs="?", const="", default=None, metavar="DIR",
+                        help="also run the data recorder (py -m fmofp_recorder) into DIR (default logs/recorder); "
+                             "py -m fmofp_cli -c tables reads it")
     args = parser.parse_args(argv)
 
     paths = binaries(args.build or default_build_dir())
@@ -725,6 +728,11 @@ def main(argv=None):
             for name, _ in DISPLAYS:
                 programs.start(f"display_{name}",
                                [sys.executable, "-m", "fmofp_display", name, "--port-base", str(args.port_base)])
+        if args.record is not None:
+            recorder = [sys.executable, "-m", "fmofp_recorder", "--port-base", str(args.port_base)]
+            if args.record:
+                recorder += ["--out", args.record]
+            programs.start("recorder", recorder)
         time.sleep(args.settle)
         dead = programs.exited()
         if dead:

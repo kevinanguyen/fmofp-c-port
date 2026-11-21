@@ -6,7 +6,9 @@ stack, `test` ran assertion suites against the live program, `scenario` drove th
 program has no objects to reach into: everything a terminal says is on the monitor stream, and everything an
 operator can do is a command through the controller's command port. So `status` decodes the latest TERM_STATUS
 and status messages the monitor has shown, `send` builds any ICD command message from `field=value` pairs and
-queues it, and `scenario` runs fmofp_scenario's engine. The test suites went where the tests are
+queues it, and `scenario` runs fmofp_scenario's engine. Its `list_tables` and `get_table` read the services'
+SQLite tables; the recorder (`py -m fmofp_recorder`, unit 33) writes those tables from the bus, and `tables` and
+`table NAME [N]` read them back. The test suites went where the tests are
 (fmofp_bus/tests); `test_1553b` is the bus itself now.
 
 A prompt that has just joined a running bus has seen nothing of it yet. The commands that read the picture
@@ -22,6 +24,7 @@ import time
 
 from fmofp_bus.bus_view import SYNC_HZ, TERMINAL_NAMES, terminal_address, terminal_name
 from fmofp_bus.icd import messages as m
+from fmofp_recorder import recorder
 from fmofp_scenario.engine import ScenarioEngine, describe
 
 BY_ID = {info.id: info.cls for info in m.MESSAGES}
@@ -44,6 +47,8 @@ commands go through its command port):
   scenario start [speed]     fire it from the present frame, at a time factor (10 runs it ten times faster)
   scenario stop              stop it
   scenario status            where it stands
+  tables                     the recorder's tables (py -m fmofp_recorder) and their row counts
+  table NAME [N]             the last N rows of a recorded table (10 by default)
   help                       this text
   quit                       leave"""
 
@@ -119,10 +124,11 @@ class DebugCli:
     SETTLE_FRAMES = 50      # one major frame: every TERM_STATUS and every 1 Hz message has come round
     SETTLE_TIMEOUT_S = 5.0  # a bus in real time takes a second for it; a loaded machine longer
 
-    def __init__(self, view, client, out=print):
+    def __init__(self, view, client, out=print, recorder_dir=None):
         self.view = view
         self.client = client
         self.out = out
+        self.recorder_dir = recorder_dir if recorder_dir is not None else recorder.DEFAULT_OUT
         self.engine = ScenarioEngine(client)
         self.engine.on_fire = lambda firing: self.out(describe(firing))
         self._scenario_thread = None
@@ -149,7 +155,7 @@ class DebugCli:
             return False
         handler = {"help": self.cmd_help, "?": self.cmd_help, "frame": self.cmd_frame, "terminals": self.cmd_terminals,
                    "status": self.cmd_status, "msgs": self.cmd_msgs, "msg": self.cmd_msg, "send": self.cmd_send,
-                   "scenario": self.cmd_scenario}.get(command)
+                   "scenario": self.cmd_scenario, "tables": self.cmd_tables, "table": self.cmd_table}.get(command)
         if handler is None:
             self.out(f"unknown command {words[0]!r}; 'help' lists them")
             return True
@@ -161,6 +167,33 @@ class DebugCli:
         except ValueError as error:
             self.out(f"error: {error}")
         return True
+
+    # ---- the recorder's tables (the old CLI's list_tables and get_table)
+
+    def cmd_tables(self, args):
+        found = recorder.list_tables(self.recorder_dir)
+        if not found:
+            self.out(f"no recorded tables in {self.recorder_dir} (start py -m fmofp_recorder beside the bus)")
+            return
+        for database, table, count in found:
+            self.out(f"  {table:18} {count:8d} rows  ({database})")
+
+    def cmd_table(self, args):
+        if not args:
+            raise ValueError("table NAME [N]")
+        last = 10
+        if len(args) > 1:
+            if not args[1].isdigit():
+                raise ValueError(f"not a row count: {args[1]!r}")
+            last = int(args[1])
+        result = recorder.read_table(args[0], last, self.recorder_dir)
+        if result is None:
+            self.out(f"no recorded table {args[0]!r}; 'tables' lists them")
+            return
+        columns, rows = result
+        self.out("  " + " | ".join(columns))
+        for row in rows:
+            self.out("  " + " | ".join(str(value) for value in row))
 
     # ---- status
 

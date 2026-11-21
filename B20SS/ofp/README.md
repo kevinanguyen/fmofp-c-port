@@ -398,6 +398,10 @@ monitor's rows) on 400 generated states beside `fmofp_cas_tool` and compares the
 `test_cas_e2e.py` runs the plant, the FCS, the FMS, the engine, hydraulics, power and defensive partitions
 and the crew alerting terminal under the real controller with a flight mode change, the generator held at
 zero, chaff released and a threat injected, and reads the list at the EICAS's bus half.
+`test_recorder.py` holds the data recorder's tables to the frozen services' `create_table` calls and
+`dbConfig.xml` and its rows to their dictionaries; `test_recorder_e2e.py` records eight terminals on a real
+bus in real time and reads the tables back (unit 33: `py -m fmofp_recorder`, or `py -m fmofp_demo --record`,
+writes them into `logs/recorder/`; `py -m fmofp_cli -c tables` and `-c "table fcs_data 5"` show them).
 `test_stores_oracle.py` holds the stores terminal's starting table, master arm and sums to the frozen `sms.py`
 (the sums over the tables random command runs leave); `test_stores_e2e.py` runs the plant, the FMS and the
 stores terminal under the real controller with a refused release, COMBAT, releases and a jettison.

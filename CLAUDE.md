@@ -142,7 +142,10 @@ person may continue it in their next session; when it is green it is rebased ont
   engine** `py -m fmofp_scenario FILE [--speed S]` (`fmofp_scenario/`: the frozen `Interfaces/scenarios/*.xml` fired
   as bus commands through the command port, timed by the bus frame) and **the debug CLI** `py -m fmofp_cli [-c CMD]`
   (`fmofp_cli/`: `terminals`, `status`, `msg` from the monitor, `send ID field=value` of any ICD command, the
-  `scenario` commands); the bus library `fmofp_bus` with generated `fmofp_bus/icd/`.
+  `scenario` commands, and since unit 33 `tables` / `table NAME [N]`); **the data recorder** `py -m fmofp_recorder`
+  (`fmofp_recorder/`: upstream's services' SQLite tables written from a copy of the monitor stream into
+  `logs/recorder/`; `py -m fmofp_demo --record` runs it beside the demo); the bus library `fmofp_bus` with
+  generated `fmofp_bus/icd/`.
 - **Load**: 25 terminals, 111 scheduled messages, worst minor frame 8680 us of the 10000 us budget (the
   schedule's estimate; 23 terminals and 8612 us before unit 31). On Alee's machine after unit 32 (2026-11-18,
   optimised build): a 45 s headless demo, 2250 frames, 1 overrun, 25/25 answering. The numbers below are from
@@ -153,7 +156,7 @@ person may continue it in their next session; when it is green it is rebased ont
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms. **That rise was the machine that afternoon, not the repairs** (measured 2026-11-17, section 7): the code before the repairs and each step after them, flown in turn with two fixed plant seeds, thirty flights: 0 overruns in every one, the five versions' median worst frame 6.8 to 7.6 ms (7.0 before the repairs, 7.4 at the head), the radar computer's mean answer 40 us and its worst 1.0 to 1.6 ms for every version; the one flight flown while the desktop was busy read 18.9 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 329 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
+- **Tests**: Python 341 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
   ctest 2/2 (355 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
@@ -161,9 +164,10 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 31.5 of 32.5 units = **96.9 %** (section 2). Units 1-30 were done on 2026-11-12; units 31 (the
-  EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18. Unit 33,
-  data recording (the punch list's item 2, Alee: "Data recording", 2026-11-21), is open. What comes next is not in the number: the intern-ticket authoring phase, which starts with
+- **Meter**: 32.5 of 32.5 units = **100 %** (section 2). Units 1-30 were done on 2026-11-12; units 31 (the
+  EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18; unit 33
+  (data recording, the punch list's item 2) on 2026-11-21. Every unit is DONE or STRUCK. The punch list of
+  2026-11-21 (section 7) has six items left, none in the meter until a human adds it. What comes next is not in the number: the intern-ticket authoring phase, which starts with
   the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
@@ -177,7 +181,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: unit 33, data recording, `IN PROGRESS (Alee, 2026-11-21)`; no `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -195,7 +199,7 @@ person may continue it in their next session; when it is green it is rebased ont
   answer proposed for each of the five ticket questions. (6) *Done 2026-11-17*: the worst frame after the
   repairs is explained (the Load line above). Backlog,
   nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-21 (the fork compared with upstream: a
-  punch list of seven items, section 7's last entry; nothing built); before it Alee's, 2026-11-18 (Kevin's
+  punch list of seven items, section 7; then unit 33, data recording, done); before it Alee's, 2026-11-18 (Kevin's
   `d334684` checked on his machine; units 31, crew alerting, and 32, stores management, added and done); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
   first-start failure repaired, section 7).
   **Repaired 2026-11-17**: `py -m fmofp_demo` failed on its first start on a fresh clone (the frozen logger's
@@ -285,13 +289,13 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | DONE 2026-11-12 (the ticket format a draft, its questions carried to the ticket phase: section 8) |
 | 31 | Crew alerting: the EICAS's alert rules to C++ (a new terminal, RT 26) | 1 | DONE 2026-11-18 |
 | 32 | Stores management computer for the SMS (a new terminal, RT 28) | 1 | DONE 2026-11-18 |
-| 33 | Data recording: the Python services' SQLite tables written from the bus, and the prompt's table commands | 1 | IN PROGRESS (Alee, 2026-11-21) |
+| 33 | Data recording: the Python services' SQLite tables written from the bus, and the prompt's table commands | 1 | DONE 2026-11-21 |
 
-**Done: 31.5 / 32.5 = 96.9 %.** Open: unit 33.
+**Done: 32.5 / 32.5 = 100 %.** Open: none.
 
 ### 2.33 Data recording, 1
 
-Added 2026-11-21 (Alee, section 8), the punch list's item 2 (section 7, 2026-11-21). Upstream's services wrote
+DONE 2026-11-21 (section 7), as planned below. Added the same day (Alee, section 8), the punch list's item 2 (section 7, 2026-11-21). Upstream's services wrote
 their state into SQLite (`storage/DBM.py`, the databases named in `dbConfig.xml`) and the old CLI listed and
 showed the tables (`list_tables`, `get_table`); the port stores nothing. Scoped from upstream's code: the tables
 the running services wrote are `comms_data` (CommsService, 1 Hz, a row each for the radio, the satcom and the
@@ -788,7 +792,7 @@ script).
 ### 5.4 Build, test, verify
 
 ```bash
-bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (329 tests), load
+bash B20SS/verify.sh            # icd, cpp (configure + build + ctest + cppcheck), py (341 tests), load
 bash B20SS/verify.sh icd py     # any subset, in order
 ```
 
@@ -825,7 +829,9 @@ command lines, `fmofp_bc --schedule --rt ...` prints the schedule and its load, 
 With the aircraft running, from `B20SS/`: `py -m fmofp_scenario FMOFP/Interfaces/scenarios/trainingScenario.xml
 [--speed 10] [--port-base N]` runs a frozen scenario against it through the bus controller's command port, one
 line per event; `py -m fmofp_cli [--port-base N] [-c CMD]` is the debug prompt (`help` lists its commands:
-`terminals`, `status RT`, `msg ID`, `send ID field=value ...`, `scenario load|start|stop|status`).
+`terminals`, `status RT`, `msg ID`, `send ID field=value ...`, `scenario load|start|stop|status`, `tables`,
+`table NAME [N]`). `py -m fmofp_recorder [--port-base N] [--out DIR]` records upstream's database tables from
+the bus beside it (or `py -m fmofp_demo --record`); the prompt reads them back.
 
 ### 5.6 Where things are
 
@@ -1022,6 +1028,11 @@ Python tests and displays
   unit 32).
 - A random oracle run of commands that are mostly refused compares one table over and over: count the distinct
   states it reached and bias the generator toward the commands that change the state (`test_stores_oracle`).
+- A SQLite connection belongs to the thread that opened it unless it is opened with `check_same_thread=False`:
+  the recorder opens in one thread and writes from its loop's (one failed e2e run in unit 33).
+- A fake bus for the display feeds stores a consumer's message (an `Eicas...` or `Bcast...` copy) under its
+  producer's class, as the monitor sees the producer's transmit; a relayed block class names its layout by
+  `LAYOUT` (`fmofp_recorder.view.producer_class`, `producer_block`).
 - The real-time demo cannot be judged while a game runs on Alee's machine (again: 6-33 overruns in four runs
   with one running, late starts and 20-40 ms worst answers from C++ partitions and Python terminals alike).
 - The fixed monitor port (`port_base + 33`) has one listener, and `py -m fmofp_demo` binds it for its
@@ -2628,6 +2639,42 @@ done before this file existed are condensed from the private session notes.
 - *Files*: this file. The scripts are in the session scratchpad (`orphans.py`).
 - *Numbers*: meter unchanged, 31.5 / 31.5 = 100 %; the punch list is not in it until a human adds items as units.
 
+### 2026-11-21 - unit 33 data recording - by Alee's agent
+- *What*: Alee: "Data recording" (the punch list's item 2). `fmofp_recorder/` (new, Python, a client of the bus):
+  `view.py` (`RecordingView`, a `BusView` that also keeps when each producer's message was seen and collects the
+  producers' blocks from their transmits, and answers the display feeds' `fresh` / `latest_block` for a consumer's
+  class with the producer's data), `tables.py` (the ten tables upstream's services wrote: their files from
+  `dbConfig.xml`, their `create_table` columns, their rates in bus frames, a row builder each), `recorder.py`
+  (`Recorder`: SQLite files under `logs/recorder/`, the rows due each frame; `list_tables`, `read_table`),
+  `__main__.py` (`py -m fmofp_recorder [--port-base] [--out] [--seconds]`). The prompt gained `tables` and `table
+  NAME [N]` (`--recorder-dir`), the old CLI's `list_tables` and `get_table`; the demo `--record [DIR]`. No C++, no
+  ICD change (v1.26 stays), no new binary.
+- *How*: scoped from upstream's code (section 2.33): which services wrote which tables at what rates, and which
+  tables upstream never wrote (the three comms classes asked for a system `dbConfig.xml` lacks; the request
+  services' tables went with unit 29). The rows reuse the display feeds' dictionaries (comms, engine, power,
+  mission), already held to the frozen Python; the flight control computer's, the surfaces', the defensive events'
+  and the fuel system's are built here. `test_recorder.py` (11 tests): every table's columns against the frozen
+  `create_table` call read with `ast` and its file against `dbConfig.xml`; the three never-written tables; the
+  `pms_data` and `_fcs_data` keys against the frozen dictionaries; the rates, the defensive events, the fuel setup and
+  updates, the power, comms, engine and mission rows on a fake bus; a restarted controller; the prompt's commands.
+  `test_recorder_e2e.py` (port base 52250): the plant and eight partitions under the real controller in real time
+  for 400 frames, chaff and ECM by script, the recorder subscribed; the tables read back.
+- *Departures* (ICD README section 2, one row): nothing written while the bus does not vouch for a value (the Python
+  wrote defaults); `surface_data` at 10 Hz (FSF_POSITIONS), not 50; `mission_data`'s waypoints and targets are the
+  mission computer's; an ECM mode set to the same mode leaves no `defensive_events` row; the timestamps are the
+  recorder's clock.
+- *Warnings / lessons*: section 6's two lines. A fake bus for the feeds must store a consumer's message under its
+  producer, as the monitor sees it (one failed run); a relayed block class names its producer by `LAYOUT`. Not done,
+  left in the ICD README's section 12: the flight data recorder's ring as a block (the recorder now keeps the flight
+  data in `fcs_data` on disk).
+- *Files*: `fmofp_recorder/{__init__,__main__,view,tables,recorder}.py` (new), `fmofp_cli/{cli,__main__}.py`,
+  `fmofp_demo/demo.py`, `fmofp_bus/tests/{test_recorder,test_recorder_e2e}.py` (new), `icd/README.md`,
+  `ofp/README.md`, this file.
+- *Tests and numbers*: `verify.sh icd py load` OK: Python 341 OK (was 329), load unchanged (111 messages, 8680 us);
+  no C++ changed. Headless demo 30 s with `--record`: 1500 frames, 1 overrun, every table filled at its rate
+  (`fcs_data` and `surface_data` 298 rows, `ecu_data` 59, `comms_data` 87, `pms_data` 28, `mission_data` 29,
+  `defensive_events` 4: three automatic flare salvos and the ECM switched ACTIVE; the fuel tables 3, 2 and 4). CI: the last four runs green (unit 32 among them). Meter 32.5 / 32.5 = 100 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -2822,3 +2869,7 @@ done before this file existed are condensed from the private session notes.
 - 2026-11-21, Alee ("Data recording", the punch list's item 2): a unit 33 is added to the meter, weight 1: the
   Python services' database tables written from the bus by a recorder client, and the prompt's table commands
   (section 2.33). The total becomes 32.5, the meter 31.5 / 32.5 = 96.9 % until it lands.
+- 2026-11-21, Alee's agent, under Alee's "Data recording" (told to Alee; either human may overrule): unit 33 as
+  planned in section 2.33. The recorder is a Python client of the bus, not C++ (the partitions do no file I/O by
+  rule); it writes only the tables upstream's services actually wrote, in their files and with their columns, and
+  only from data the bus vouches for. The flight data recorder's ring as a block stays backlog.
