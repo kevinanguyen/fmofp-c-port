@@ -161,9 +161,9 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 31.5 of 31.5 units = **100 %** (section 2). Units 1-30 were done on 2026-11-12; units 31 (the
-  EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18. Every unit
-  is DONE or STRUCK. What comes next is not in the number: the intern-ticket authoring phase, which starts with
+- **Meter**: 31.5 of 32.5 units = **96.9 %** (section 2). Units 1-30 were done on 2026-11-12; units 31 (the
+  EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18. Unit 33,
+  data recording (the punch list's item 2, Alee: "Data recording", 2026-11-21), is open. What comes next is not in the number: the intern-ticket authoring phase, which starts with
   the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
@@ -177,7 +177,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: unit 33, data recording, `IN PROGRESS (Alee, 2026-11-21)`; no `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -247,7 +247,7 @@ person may continue it in their next session; when it is green it is rebased ont
 
 ## 2. The units (progress meter)
 
-Percentage = done weight / 31.5. Weights are rough equal-effort units; change one only with
+Percentage = done weight / 32.5. Weights are rough equal-effort units; change one only with
 a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <date>)`,
 `DONE <date>` (with the section 7 entry), `STRUCK <date>` (with the decision in section 8).
 
@@ -285,8 +285,29 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 30 | Hardening: release build, timing checks, coverage targets, MISRA-subset lint, intern docs | 1.5 | DONE 2026-11-12 (the ticket format a draft, its questions carried to the ticket phase: section 8) |
 | 31 | Crew alerting: the EICAS's alert rules to C++ (a new terminal, RT 26) | 1 | DONE 2026-11-18 |
 | 32 | Stores management computer for the SMS (a new terminal, RT 28) | 1 | DONE 2026-11-18 |
+| 33 | Data recording: the Python services' SQLite tables written from the bus, and the prompt's table commands | 1 | IN PROGRESS (Alee, 2026-11-21) |
 
-**Done: 31.5 / 31.5 = 100 %.** Open: none.
+**Done: 31.5 / 32.5 = 96.9 %.** Open: unit 33.
+
+### 2.33 Data recording, 1
+
+Added 2026-11-21 (Alee, section 8), the punch list's item 2 (section 7, 2026-11-21). Upstream's services wrote
+their state into SQLite (`storage/DBM.py`, the databases named in `dbConfig.xml`) and the old CLI listed and
+showed the tables (`list_tables`, `get_table`); the port stores nothing. Scoped from upstream's code: the tables
+the running services wrote are `comms_data` (CommsService, 1 Hz, a row each for the radio, the satcom and the
+data link, `communication_data.db`), `defensive_events` (DefensiveService, on each auto flare, manual chaff,
+manual flare and ECM mode change, `default.db`), `ecu_data` (the ECU, 2 Hz), `fcs_data` (the flight control
+computer, 10 Hz) and `surface_data` (the flight surfaces, 50 Hz) in `flight_control_data.db`, `mission_data`
+(MissionService, 1 Hz, `mission_data.db`), `pms_data` (power management, 1 Hz, `power_data.db`) and the fuel
+system's `fuel_tanks`, `engines` and `fuel_lines` (`default.db`). Never written upstream, so not recorded:
+`satcom_data`, `radio_data`, `datalink_data` (their classes asked for a database system, `comms`, that
+`dbConfig.xml` does not configure, and nothing built them); the radar's precipitation, VIL and echo-top tables,
+the FMS's attitude, navigation, tactical and velocity tables and the display command tables, written by the old
+messaging's request services (deleted in unit 29). Plan: a Python client `fmofp_recorder` on the monitor
+stream (a subscriber, beside the demo) that builds each row from what the bus carries, with the display feeds'
+dictionaries where they exist (already held to the frozen Python), writes the same schemas into the same database
+files under an output folder (`logs/recorder/` by default), at the Python's rates counted in bus frames; and
+`tables` / `table NAME [N]` in the prompt. No C++ and no ICD change (the C++ partitions do no file I/O by rule).
 
 ### 2.32 Stores management (RT 28), 1
 
@@ -2798,3 +2819,6 @@ done before this file existed are condensed from the private session notes.
   smallest rules that make them work: release only with the master arm ARMED and the station ARMED, RIPPLE as two
   stores, jettison whatever the master arm, the delivery mode reported only. Released stores reach nothing else
   (backlog). The terminal is RT 28, the partition `stores`; ICD v1.26.
+- 2026-11-21, Alee ("Data recording", the punch list's item 2): a unit 33 is added to the meter, weight 1: the
+  Python services' database tables written from the bus by a recorder client, and the prompt's table commands
+  (section 2.33). The total becomes 32.5, the meter 31.5 / 32.5 = 96.9 % until it lands.
