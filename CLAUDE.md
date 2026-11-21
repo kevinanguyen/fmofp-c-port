@@ -164,7 +164,8 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 32.5 of 32.5 units = **100 %** (section 2). Units 1-30 were done on 2026-11-12; units 31 (the
+- **Meter**: 32.5 of 34 units = **95.6 %** (section 2): unit 34, the display themes and holographic variants
+  (the punch list's item 3, Alee: "Display variants", 2026-11-21), is open. Units 1-30 were done on 2026-11-12; units 31 (the
   EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18; unit 33
   (data recording, the punch list's item 2) on 2026-11-21. Every unit is DONE or STRUCK. The punch list of
   2026-11-21 (section 7) has six items left, none in the meter until a human adds it. What comes next is not in the number: the intern-ticket authoring phase, which starts with
@@ -181,7 +182,8 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: unit 34, display themes and holographic variants, `IN PROGRESS (Alee, 2026-11-21)`;
+  no `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -251,7 +253,7 @@ person may continue it in their next session; when it is green it is rebased ont
 
 ## 2. The units (progress meter)
 
-Percentage = done weight / 32.5. Weights are rough equal-effort units; change one only with
+Percentage = done weight / 34. Weights are rough equal-effort units; change one only with
 a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <date>)`,
 `DONE <date>` (with the section 7 entry), `STRUCK <date>` (with the decision in section 8).
 
@@ -290,8 +292,28 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 31 | Crew alerting: the EICAS's alert rules to C++ (a new terminal, RT 26) | 1 | DONE 2026-11-18 |
 | 32 | Stores management computer for the SMS (a new terminal, RT 28) | 1 | DONE 2026-11-18 |
 | 33 | Data recording: the Python services' SQLite tables written from the bus, and the prompt's table commands | 1 | DONE 2026-11-21 |
+| 34 | Display themes and the holographic PFD and MFD, fed from the bus | 1.5 | IN PROGRESS (Alee, 2026-11-21) |
 
-**Done: 32.5 / 32.5 = 100 %.** Open: none.
+**Done: 32.5 / 34 = 95.6 %.** Open: unit 34.
+
+### 2.34 Display themes and holographic variants, 1.5
+
+Added 2026-11-21 (Alee, section 8), the punch list's item 3. Upstream chose a display's look by theme
+(`visual/theme_manager.py`: CLASSIC, MODERN, NIGHT; their colours, fonts and gradients, which the standard displays
+read) and its class by the theme's `display_types` (MODERN: the holographic PFD and MFD) through
+`pfd_display_factory` and `mfd_display_factory`. Scoping found the variants were not live upstream: the
+holographic PFD has no data feed and upstream's own factory refuses it (`PROVIDES_FLIGHT_DATA = False`: it would
+show fixed values as if live); the holographic MFD draws an empty tactical picture and a fixed system status
+(fuel 85), its comments asking for a real track source to write `tactical_data`; the futuristic PFD and MFD were
+built by nothing; the HUD factory builds an empty `BaseDisplay` either way (unit 27 struck it). So the weight is
+1.5, not the punch list's 1-1.5 for a switch. Plan: `--theme classic|modern|night` for the display programs and
+the demo (the theme manager's theme; MODERN builds the holographic PFD and MFD, as upstream's factories meant);
+the holographic MFD's targets, friendlies, threats, waypoints, system status, radio channels and weapons from
+what the bus carries (the fused tracks, the radar warning contacts, the mission plan, the terminals' statuses,
+the stores computer); the holographic PFD's flight numbers from the FMS's flight data, with the standard
+displays' invalid-data marking over the picture whenever that data is stale, so it never shows a fixed value as
+live. The frozen files are not edited (subclasses in `fmofp_display`, as `make_eicas` does). Render tests per
+theme and variant; feed tests for every builder.
 
 ### 2.33 Data recording, 1
 
@@ -2873,3 +2895,6 @@ done before this file existed are condensed from the private session notes.
   planned in section 2.33. The recorder is a Python client of the bus, not C++ (the partitions do no file I/O by
   rule); it writes only the tables upstream's services actually wrote, in their files and with their columns, and
   only from data the bus vouches for. The flight data recorder's ring as a block stays backlog.
+- 2026-11-21, Alee ("Display variants", the punch list's item 3): a unit 34 is added to the meter, weight 1.5 (the
+  holographic variants were not live upstream and must be wired to the bus, section 2.34). The total becomes 34, the
+  meter 32.5 / 34 = 95.6 % until it lands.
