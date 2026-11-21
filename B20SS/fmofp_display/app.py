@@ -79,6 +79,29 @@ def quiet_fmofp_logging():
     logging.disable(logging.INFO)
 
 
+THEMES = ("classic", "modern", "night")
+
+
+def apply_theme(name):
+    """Sets the frozen theme manager's theme (`visual/theme_manager.py`: CLASSIC, MODERN, NIGHT) for this process
+    before any display is built: the standard displays read their colours, fonts and gradients from it, and its
+    `display_types` choose the PFD's and the MFD's class (MODERN: the holographic ones, as upstream's factories
+    meant; unit 34). Returns the theme's name."""
+    bootstrap()
+    from FMOFP.Interfaces.userInterface.displays.visual.theme_manager import DisplayTheme, get_theme_manager
+    theme = DisplayTheme[name.upper()]
+    if not get_theme_manager().set_theme(theme):
+        raise ValueError(f"theme {name} not loaded by the theme manager")
+    return theme.value
+
+
+def holographic(category):
+    """Whether the current theme builds the holographic class for this display ("pfd" or "mfd")."""
+    bootstrap()
+    from FMOFP.Interfaces.userInterface.displays.visual.theme_manager import get_theme_manager
+    return get_theme_manager().get_display_type(category, "standard") == "holographic"
+
+
 def radar_terminal(port_base):
     return TerminalProcess(RADAR_RT, port_base, m.DspRadarStatus, m.DspRadarModeCmd,
                            receives=(m.BcastRdrWxStatus, m.BcastRdrWxScan, m.BcastRdrTfrStatus, m.BcastRdrTfrGuidance,
@@ -88,7 +111,9 @@ def radar_terminal(port_base):
 
 def pfd_terminal(port_base):
     return TerminalProcess(PFD_RT, port_base, m.DspPfdStatus, m.DspPfdModeCmd,
-                           receives=(m.BcastFmsFlightData, m.BcastFmsStatus, m.BcastFmsAttitudeStatus))
+                           receives=(m.BcastFmsFlightData, m.BcastFmsStatus, m.BcastFmsAttitudeStatus,
+                                     m.BcastEngFuelStatus),
+                           blocks=(b.BcastDefRwrContacts,))  # the fuel and the contacts: the holographic PFD (v1.27)
 
 
 def weather_command(terminal, state, mode, range_km=DEFAULT_RANGE_KM):
@@ -337,16 +362,30 @@ def make_pfd(feed):
     return pfd
 
 
-class PfdWindow(QWidget):
-    """The primary flight display, RT 11."""
+def make_holographic_pfd(feed, systems_feed):
+    """The holographic PFD (the MODERN theme's) fed from the bus (unit 34, fmofp_display.holographic)."""
+    bootstrap()
+    from fmofp_display.holographic import bus_holographic_pfd_class
+    pfd = bus_holographic_pfd_class()(feed, systems_feed)
+    pfd.start()
+    return pfd
 
-    def __init__(self, terminal, feed=None):
+
+class PfdWindow(QWidget):
+    """The primary flight display, RT 11: the standard PFD, or the holographic one when the theme asks for it."""
+
+    def __init__(self, terminal, feed=None, holographic_pfd=None):
         super().__init__()
         self.terminal = terminal
         self.feed = feed if feed is not None else FlightDataFeed(terminal)
+        self.holographic = holographic("pfd") if holographic_pfd is None else holographic_pfd
         self.setWindowTitle(f"FMOFP primary flight display - RT {terminal.rt}")
         self.status = QLabel("waiting for the bus")
-        self.pfd = make_pfd(self.feed)
+        if self.holographic:
+            self.systems = SystemsFeed(terminal)
+            self.pfd = make_holographic_pfd(self.feed, self.systems)
+        else:
+            self.pfd = make_pfd(self.feed)
         from FMOFP.Interfaces.userInterface.displays.base_display import DisplayMode as PfdDisplayMode
         self._display_modes = PfdDisplayMode
         layout = QVBoxLayout(self)
@@ -357,6 +396,8 @@ class PfdWindow(QWidget):
         self.timer.start(250)
 
     def tick(self):
+        if self.holographic:
+            self.pfd.apply_bus()
         requested = self.terminal.take_mode_request()
         if requested is not None and requested.name in self._display_modes.__members__:
             self.pfd.set_mode(self._display_modes[requested.name])
@@ -376,7 +417,7 @@ def mfd_terminal(port_base):
                                      m.BcastFcsGcasAlerts, m.BcastFcsPerfStatus, m.BcastFmsFlightData,
                                      m.BcastEngEngineStatus, m.BcastEngFuelStatus, m.BcastRdrTgtStatus,
                                      m.BcastRdrAewcStatus, m.BcastRdrSarStatus, m.BcastMsnStatus,
-                                     m.MfdComLinkStatus),
+                                     m.MfdComLinkStatus, m.MfdSmsStores),
                            blocks=(b.BcastRdrWxProducts, b.BcastRdrTfrElevation, b.MfdRdrTgtTracks,
                                    b.MfdRdrAewcTracks, b.MfdRdrSarImage, b.BcastMsnPlan))
 
@@ -606,6 +647,57 @@ class MfdWindow(QWidget):
     def closeEvent(self, event):
         self.mfd.stop()
         super().closeEvent(event)
+
+
+class HolographicMfdWindow(QWidget):
+    """The multi-function display, RT 13, as the MODERN theme builds it: the holographic MFD, its tactical picture,
+    systems, communications and weapons pages from the bus (unit 34). Its pages are its own buttons."""
+
+    def __init__(self, terminal, systems_feed=None, radar_feed=None):
+        super().__init__()
+        bootstrap()
+        self.terminal = terminal
+        self.systems = systems_feed if systems_feed is not None else SystemsFeed(terminal)
+        self.systems.stores_message = m.MfdSmsStores
+        self.radar = radar_feed if radar_feed is not None else RadarFeed(terminal, _NullCoordinator())
+        from FMOFP.Interfaces.userInterface.displays.base_display import DisplayMode
+        from fmofp_display.holographic import bus_holographic_mfd_class
+        self._display_modes = DisplayMode
+        self.setWindowTitle(f"FMOFP multi-function display (holographic) - RT {terminal.rt}")
+        self.status = QLabel("waiting for the bus")
+        self.mfd = bus_holographic_mfd_class()(self.systems, self.radar)
+        self.mfd.start()
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.status)
+        layout.addWidget(self.mfd, 1)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.tick)
+        self.timer.start(250)
+
+    def tick(self):
+        picture = self.mfd.apply_bus()
+        requested = self.terminal.take_mode_request()
+        if requested is not None and requested.name in self._display_modes.__members__:
+            self.mfd.set_mode(self._display_modes[requested.name])
+        tactical = picture["tactical"]
+        self.status.setText(f"RT {self.terminal.rt} {self.terminal.state.name}  frames {self.terminal.syncs}  |  "
+                            f"{len(tactical['targets'])} targets, {len(tactical['waypoints'])} waypoints  |  "
+                            f"{self.systems.status_text()}")
+
+    def closeEvent(self, event):
+        self.mfd.cleanup()
+        super().closeEvent(event)
+
+
+class _NullCoordinator:
+    """The radar feed's coordinator for a window that draws no weather (the holographic MFD reads only the
+    terrain-following radar's profile from the feed)."""
+
+    def store_data(self, data_type, items, request_id):
+        return len(items)
+
+    def reset_data(self, data_type=None):
+        pass
 
 
 # ---- the EICAS, RT 14 ------------------------------------------------------------------
@@ -854,10 +946,13 @@ def main(argv=None):
     parser.add_argument("--seconds", type=float, default=0.0, help="close after this long (0 = until the window is closed)")
     parser.add_argument("--verbose", action="store_true",
                         help="keep the FMOFP display code's INFO and DEBUG log lines (dropped by default)")
+    parser.add_argument("--theme", choices=THEMES, default="classic",
+                        help="the displays' theme (modern: the holographic PFD and MFD)")
     args = parser.parse_args(argv)
     if not args.verbose:
         quiet_fmofp_logging()
     bootstrap()
+    apply_theme(args.theme)
     app = QApplication(sys.argv[:1])
     terminals = {"radar": radar_terminal, "pfd": pfd_terminal, "mfd": mfd_terminal, "eicas": eicas_terminal,
                  "tsd": tsd_terminal, "sms": sms_terminal}
@@ -867,8 +962,9 @@ def main(argv=None):
         print(f"display: terminal init failed: {status.name} (port {args.port_base + terminal.rt} in use?)",
               file=sys.stderr)
         return 1
-    windows = {"radar": RadarWindow, "pfd": PfdWindow, "mfd": MfdWindow, "eicas": EicasWindow, "tsd": TsdWindow,
-               "sms": SmsWindow}
+    windows = {"radar": RadarWindow, "pfd": PfdWindow,
+               "mfd": HolographicMfdWindow if holographic("mfd") else MfdWindow, "eicas": EicasWindow,
+               "tsd": TsdWindow, "sms": SmsWindow}
     window = windows[args.display](terminal)
     window.show()
     if args.seconds > 0.0:

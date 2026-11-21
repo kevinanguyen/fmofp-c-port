@@ -405,6 +405,9 @@ writes them into `logs/recorder/`; `py -m fmofp_cli -c tables` and `-c "table fc
 `test_stores_oracle.py` holds the stores terminal's starting table, master arm and sums to the frozen `sms.py`
 (the sums over the tables random command runs leave); `test_stores_e2e.py` runs the plant, the FMS and the
 stores terminal under the real controller with a refused release, COMBAT, releases and a jettison.
+`test_holographic.py` holds the holographic PFD and MFD (unit 34: `py -m fmofp_display pfd --theme modern`, or
+`py -m fmofp_demo --theme modern`) to the bus: the values built from fake bus data, the rewrite of the frozen MFD's
+panel methods against the frozen source, and each theme's windows painted offscreen with and without data.
 `test_display_e2e.py` runs the six display terminals headless beside the
 whole set of partitions and checks that the radars' products and the FMS's
 flight data arrive at the displays by broadcast, that the flight computer's

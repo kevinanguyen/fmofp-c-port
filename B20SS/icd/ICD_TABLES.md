@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.26 (DRAFT, 2026-11-18). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.27 (DRAFT, 2026-11-21). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -120,6 +120,7 @@ RT 31 is broadcast. Unused: 24, 25, 29, 30.
 | [`FMS_ENERGY`](#fms_energy) | 12 | 22 | T | 6 | 1 | Energy maneuverability | DRAFT |
 | [`DSP_MFD_MODE_CMD`](#dsp_mfd_mode_cmd) | 13 | 12 | R | 1 | aperiodic | Multi-function display mode command | DRAFT |
 | [`DSP_MFD_STATUS`](#dsp_mfd_status) | 13 | 12 | T | 2 | 1 | Multi-function display status | DRAFT |
+| [`MFD_SMS_STORES`](#mfd_sms_stores) | 13 | 16 | R | 16 | 5 | Stores management status, for the MFD | DRAFT |
 | [`MFD_COM_LINK_STATUS`](#mfd_com_link_status) | 13 | 17 | R | 11 | 1 | Radio, satcom and data link status, for the MFD | DRAFT |
 | [`EICAS_DEF_STATUS`](#eicas_def_status) | 14 | 1 | R | 6 | 5 | Defensive systems status, for the EICAS | DRAFT |
 | [`EICAS_SNS_STATUS`](#eicas_sns_status) | 14 | 3 | R | 5 | 5 | Sensor management status, for the EICAS | DRAFT |
@@ -276,7 +277,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`PLANT_ENGINE`](#plant_engine) | [`ENG_ENGINE_IN`](#eng_engine_in) | 19 | 10 |
 | [`ENG_THRUST_CMD`](#eng_thrust_cmd) | [`PLANT_THRUST_CMD`](#plant_thrust_cmd) | 3 | 10 |
 | [`ENG_ENGINE_STATUS`](#eng_engine_status) | [`BCAST_ENG_ENGINE_STATUS`](#bcast_eng_engine_status) (broadcast, heard by RT 5, 13, 14, 26) | 20 | 5 |
-| [`ENG_FUEL_STATUS`](#eng_fuel_status) | [`BCAST_ENG_FUEL_STATUS`](#bcast_eng_fuel_status) (broadcast, heard by RT 13, 14, 26) | 7 | 1 |
+| [`ENG_FUEL_STATUS`](#eng_fuel_status) | [`BCAST_ENG_FUEL_STATUS`](#bcast_eng_fuel_status) (broadcast, heard by RT 11, 13, 14, 26) | 7 | 1 |
 | [`PLANT_TRAFFIC`](#plant_traffic) | `RDR_TRAFFIC` | block: 4 + 32 per frame | 25 |
 | [`RDR_TGT_STATUS`](#rdr_tgt_status) | [`BCAST_RDR_TGT_STATUS`](#bcast_rdr_tgt_status) (broadcast, heard by RT 13, 15) | 4 | 5 |
 | [`RDR_TGT_TRACKS`](#rdr_tgt_tracks) | `MFD_RDR_TGT_TRACKS` | block: 4 + 32 per frame | 25 |
@@ -293,7 +294,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`MSN_PLAN`](#msn_plan) | `BCAST_MSN_PLAN` (broadcast, heard by RT 13, 16) | block: 4 + 32 per frame | 10 |
 | [`PLANT_ESM`](#plant_esm) | [`DEF_ESM`](#def_esm) | 26 | 5 |
 | [`DEF_STATUS`](#def_status) | [`EICAS_DEF_STATUS`](#eicas_def_status) | 6 | 5 |
-| [`DEF_RWR_CONTACTS`](#def_rwr_contacts) | `BCAST_DEF_RWR_CONTACTS` (broadcast, heard by RT 14, 16, 26) | block: 4 + 32 per frame | 25 |
+| [`DEF_RWR_CONTACTS`](#def_rwr_contacts) | `BCAST_DEF_RWR_CONTACTS` (broadcast, heard by RT 11, 14, 16, 26) | block: 4 + 32 per frame | 25 |
 | [`PLANT_ESM`](#plant_esm) | [`SNS_ESM`](#sns_esm) | 26 | 5 |
 | [`PLANT_SENSOR_SCAN`](#plant_sensor_scan) | `SNS_SCAN` | block: 4 + 32 per frame | 25 |
 | [`SNS_STATUS`](#sns_status) | [`EICAS_SNS_STATUS`](#eicas_sns_status) | 5 | 5 |
@@ -314,6 +315,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`HYD_STATUS`](#hyd_status) | [`CAS_HYD_STATUS`](#cas_hyd_status) | 4 | 5 |
 | [`CAS_ALERTS`](#cas_alerts) | [`EICAS_CAS_ALERTS`](#eicas_cas_alerts) | 13 | 5 |
 | [`SMS_STATUS`](#sms_status) | [`DSP_SMS_STORES`](#dsp_sms_stores) | 16 | 5 |
+| [`SMS_STATUS`](#sms_status) | [`MFD_SMS_STORES`](#mfd_sms_stores) | 16 | 5 |
 
 ## Mode codes
 
@@ -3982,7 +3984,15 @@ New in v1.26 (README section 2; the frozen display had no commands). SELECT_STAT
 
 **Stores management status, for the SMS display** — RT 17 · SA 1 · receive (bus to terminal) · 16 words · 5 Hz
 
-SMS_STATUS relayed to the SMS display, its one consumer (section 8): the stations, the master arm, the modes and the sums the window draws.
+SMS_STATUS relayed to the SMS display (section 8): the stations, the master arm, the modes and the sums the window draws.
+
+Same layout as [`SMS_STATUS`](#sms_status).
+
+### MFD_SMS_STORES
+
+**Stores management status, for the MFD** — RT 13 · SA 16 · receive (bus to terminal) · 16 words · 5 Hz
+
+SMS_STATUS's second relay (v1.27): the holographic MFD's weapons panels (the inventory, the master arm, the selected station). A second relay rather than a broadcast: the one broadcast subaddress free for both displays is 30, the wraparound subaddress (README section 2).
 
 Same layout as [`SMS_STATUS`](#sms_status).
 

@@ -308,6 +308,8 @@ class SystemsFeed:
         self.clock = clock
         # (metres, level name) for the terrain picture; the window sets it from the radar feed's guidance.
         self.terrain = (None, "UNKNOWN")
+        # The stores management status this terminal hears: the SMS display's relay; the MFD's is MFD_SMS_STORES (v1.27).
+        self.stores_message = m.DspSmsStores
         # The objects the pages' getters return.
         self.gcas = SimpleNamespace(get_alerts=self.get_alerts)
         self.performance = SimpleNamespace(get_exceedances=self.get_exceedances)
@@ -522,7 +524,7 @@ class SystemsFeed:
     def stores_status(self):
         """The stores management terminal's status (v1.26), relayed as DSP_SMS_STORES, while it is fresh; None
         otherwise."""
-        message = self.terminal.fresh(m.DspSmsStores, self.stale_after_s)
+        message = self.terminal.fresh(self.stores_message, self.stale_after_s)
         return None if message is None else message.payload
 
     def stores_stations(self):

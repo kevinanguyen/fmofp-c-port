@@ -109,8 +109,8 @@ person may continue it in their next session; when it is green it is rebased ont
   one unanswered poll in the display e2e on the slow runner, the same code green on the next run, the Linux 3.13
   Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename and Alee), `8d67afd` (this file and
   `B20SS/verify.sh`), `d82173f` (merge of upstream/main `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.26 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.27): 28 terminals, 165 message definitions
-  (215 after per-terminal expansion), 56 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
+- **ICD** v1.27 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.28): 28 terminals, 166 message definitions
+  (216 after per-terminal expansion), 57 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
   copies), 9 mode codes, 89/89 legacy types mapped. The bus controller has a **command port** at `port_base + 34`
   since v1.23 (ICD README section 7): a client queues a receive transaction and is acknowledged with the
   controller's frame count; `fmofp_bus/command_port.py` is the Python client, `fmofp_bus/bus_view.py` the picture
@@ -118,7 +118,8 @@ person may continue it in their next session; when it is green it is rebased ont
   **numbers the clients' commands** (a numbered command, frame type 6: `cmd_seq` 101 to 200 per destination,
   counted by the controller for all clients) and **gives each client its own copy of the monitor stream** (a
   monitor request, frame type 7: up to four listeners beside the fixed monitor port, three seconds a request);
-  a view's frame count is the controller's own. v1.25 adds the crew alerting terminal (RT 26, unit 31), v1.26 the stores management terminal (RT 28, unit 32).
+  a view's frame count is the controller's own. v1.25 adds the crew alerting terminal (RT 26, unit 31), v1.26 the stores management terminal (RT 28, unit 32), v1.27
+  what the holographic PFD and MFD read (unit 34: the fuel and the warning contacts to the PFD, the stores to the MFD).
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
@@ -138,7 +139,9 @@ person may continue it in their next session; when it is green it is rebased ont
   readings, the cabin, the hydraulic pressures, the airframe gauges; since v1.23 it takes the scenario engine's
   injections, an aircraft into its traffic and a storm cell into its sky); six display terminals
   `py -m fmofp_display radar|pfd|mfd|eicas|tsd|sms` (RT 15, 11, 13, 14, 16, 17), each an unchanged FMOFP display
-  class fed from the bus through `fmofp_display/*_feed.py`; the one-command demo `py -m fmofp_demo`; **the scenario
+  class fed from the bus through `fmofp_display/*_feed.py`, in the theme `--theme classic|modern|night` asks for
+  (unit 34: MODERN builds the holographic PFD and MFD, fed by `fmofp_display/holographic.py`); the one-command
+  demo `py -m fmofp_demo` (`--theme` too); **the scenario
   engine** `py -m fmofp_scenario FILE [--speed S]` (`fmofp_scenario/`: the frozen `Interfaces/scenarios/*.xml` fired
   as bus commands through the command port, timed by the bus frame) and **the debug CLI** `py -m fmofp_cli [-c CMD]`
   (`fmofp_cli/`: `terminals`, `status`, `msg` from the monitor, `send ID field=value` of any ICD command, the
@@ -146,7 +149,7 @@ person may continue it in their next session; when it is green it is rebased ont
   (`fmofp_recorder/`: upstream's services' SQLite tables written from a copy of the monitor stream into
   `logs/recorder/`; `py -m fmofp_demo --record` runs it beside the demo); the bus library `fmofp_bus` with
   generated `fmofp_bus/icd/`.
-- **Load**: 25 terminals, 111 scheduled messages, worst minor frame 8680 us of the 10000 us budget (the
+- **Load**: 25 terminals, 111 scheduled messages, worst minor frame 8852 us of the 10000 us budget since v1.27 (the
   schedule's estimate; 23 terminals and 8612 us before unit 31). On Alee's machine after unit 32 (2026-11-18,
   optimised build): a 45 s headless demo, 2250 frames, 1 overrun, 25/25 answering. The numbers below are from
   before unit 31. The real-time demo, thirty seconds headless with the scripted events, 1500 frames, 23/23
@@ -156,7 +159,7 @@ person may continue it in their next session; when it is green it is rebased ont
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms. **That rise was the machine that afternoon, not the repairs** (measured 2026-11-17, section 7): the code before the repairs and each step after them, flown in turn with two fixed plant seeds, thirty flights: 0 overruns in every one, the five versions' median worst frame 6.8 to 7.6 ms (7.0 before the repairs, 7.4 at the head), the radar computer's mean answer 40 us and its worst 1.0 to 1.6 ms for every version; the one flight flown while the desktop was busy read 18.9 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 341 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
+- **Tests**: Python 358 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
   ctest 2/2 (355 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
@@ -164,11 +167,11 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 32.5 of 34 units = **95.6 %** (section 2): unit 34, the display themes and holographic variants
-  (the punch list's item 3, Alee: "Display variants", 2026-11-21), is open. Units 1-30 were done on 2026-11-12; units 31 (the
+- **Meter**: 34 of 34 units = **100 %** (section 2). Units 1-30 were done on 2026-11-12; units 31 (the
   EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18; unit 33
-  (data recording, the punch list's item 2) on 2026-11-21. Every unit is DONE or STRUCK. The punch list of
-  2026-11-21 (section 7) has six items left, none in the meter until a human adds it. What comes next is not in the number: the intern-ticket authoring phase, which starts with
+  (data recording, the punch list's item 2) and unit 34 (the display themes and the holographic PFD and MFD, the
+  punch list's item 3) on 2026-11-21. Every unit is DONE or STRUCK. The punch list of
+  2026-11-21 (section 7) has five items left (1 and 4 to 7), none in the meter until a human adds it. What comes next is not in the number: the intern-ticket authoring phase, which starts with
   the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
@@ -182,8 +185,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: unit 34, display themes and holographic variants, `IN PROGRESS (Alee, 2026-11-21)`;
-  no `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -201,7 +203,7 @@ person may continue it in their next session; when it is green it is rebased ont
   answer proposed for each of the five ticket questions. (6) *Done 2026-11-17*: the worst frame after the
   repairs is explained (the Load line above). Backlog,
   nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-21 (the fork compared with upstream: a
-  punch list of seven items, section 7; then unit 33, data recording, done); before it Alee's, 2026-11-18 (Kevin's
+  punch list of seven items, section 7; then unit 33, data recording, and unit 34, display variants, done); before it Alee's, 2026-11-18 (Kevin's
   `d334684` checked on his machine; units 31, crew alerting, and 32, stores management, added and done); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
   first-start failure repaired, section 7).
   **Repaired 2026-11-17**: `py -m fmofp_demo` failed on its first start on a fresh clone (the frozen logger's
@@ -292,11 +294,17 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 31 | Crew alerting: the EICAS's alert rules to C++ (a new terminal, RT 26) | 1 | DONE 2026-11-18 |
 | 32 | Stores management computer for the SMS (a new terminal, RT 28) | 1 | DONE 2026-11-18 |
 | 33 | Data recording: the Python services' SQLite tables written from the bus, and the prompt's table commands | 1 | DONE 2026-11-21 |
-| 34 | Display themes and the holographic PFD and MFD, fed from the bus | 1.5 | IN PROGRESS (Alee, 2026-11-21) |
+| 34 | Display themes and the holographic PFD and MFD, fed from the bus | 1.5 | DONE 2026-11-21 |
 
-**Done: 32.5 / 34 = 95.6 %.** Open: unit 34.
+**Done: 34 / 34 = 100 %.** Open: none.
 
 ### 2.34 Display themes and holographic variants, 1.5
+
+DONE 2026-11-21 (section 7, ICD v1.27), as planned below, with three findings of the work: the MFD's tactical
+picture is the targeting and AEWC radars' tracks (the MFD cannot hear the fused tracks: its own receive
+subaddresses are their broadcast numbers); its weather radar page is crossed out, not fed (the embedded holographic
+weather display empties its own data at every repaint); the fixed values of seven frozen panel methods are
+replaced by rebuilding those methods from the frozen source at import, each replacement counted.
 
 Added 2026-11-21 (Alee, section 8), the punch list's item 3. Upstream chose a display's look by theme
 (`visual/theme_manager.py`: CLASSIC, MODERN, NIGHT; their colours, fonts and gradients, which the standard displays
@@ -1121,6 +1129,16 @@ Python tests and displays
   `fmofp_display.app.bootstrap` makes it first. It does not reproduce with a new `FMOFP_DATA_DIR` or with the
   `__pycache__` folders removed (ten good starts of ten without the repair): only a checkout made a moment
   before brings the programs to that line together. Prove a first-start repair on a new worktree.
+- A frozen method's fixed values can be replaced without copying the method: parse the frozen file, replace the
+  list assignments and string constants in that method's syntax tree with calls to the subclass
+  (`self._bus_rows(key)`), compile it with a copy of the frozen module's globals and set it on the subclass
+  (`fmofp_display.holographic.rewrite_methods`). Count every replacement and refuse to build when one is not found,
+  or a change of the frozen file brings the fixed value back in silence. Not for methods that call `super()`.
+- The frozen theme manager (`visual/theme_manager.py`) is a process-wide singleton: a test that sets MODERN must set
+  CLASSIC back (`tearDown`), or every later display built in that process is holographic.
+- `int(...)` cannot be made to print `--`: a placeholder for an unknown number the frozen code formats with
+  `f"{x}%"` is an `int` subclass with `__format__` (`holographic.Unknown`), and frozen code that calls `int(x)` on it
+  gets its value, so such a field must be left out (no track without the aircraft's altitude), not faked.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -2697,6 +2715,39 @@ done before this file existed are condensed from the private session notes.
   (`fcs_data` and `surface_data` 298 rows, `ecu_data` 59, `comms_data` 87, `pms_data` 28, `mission_data` 29,
   `defensive_events` 4: three automatic flare salvos and the ECM switched ACTIVE; the fuel tables 3, 2 and 4). CI: the last four runs green (unit 32 among them). Meter 32.5 / 32.5 = 100 %.
 
+### 2026-11-21 - unit 34 display themes and holographic variants - ICD v1.27 - by Alee's agent
+- *What*: Alee: "Display variants" (the punch list's item 3). `--theme classic|modern|night` for the display programs and
+  the demo (`fmofp_display.app.apply_theme`: the frozen theme manager's theme, whose `display_types` make MODERN build
+  the holographic PFD and MFD). `fmofp_display/holographic.py` (new): `pfd_picture` and `mfd_picture`, what the two
+  displays draw, built from what their terminals hear; `BusHolographicPFD` (`PROVIDES_FLIGHT_DATA = True`: the FMS's
+  numbers each tick, data_validity's amber cross over the picture whenever altitude, airspeed, heading, pitch or roll
+  is missing or stale, the FMS's mode and state in place of `CRUISE - AP ENGAGED` and `SYS OK`, the fuel state and the
+  threat ring from the bus); `BusHolographicMFD` (the targeting and AEWC tracks within 100 nm as targets, friendlies
+  and threats, the route's waypoints, the systems status, the terrain from the TFR profile; its radar page crossed
+  out); `rewrite_methods`, which rebuilds seven frozen panel methods with their fixed lists (THRUST 92 %, AIM-120C x4,
+  six radio channels, ...), three strings and one number replaced by reads of the bus picture.
+  `app.HolographicMfdWindow`; `PfdWindow` builds either PFD. ICD v1.27: `MFD_SMS_STORES` (13/16, `SMS_STATUS`'s
+  second relay), the PFD a listener of `BCAST_ENG_FUEL_STATUS` and `BCAST_DEF_RWR_CONTACTS`. `SystemsFeed.stores_message`
+  says which relay of the stores status a terminal hears.
+- *How*: scoped from the frozen files (the factories, the theme manager, both classes, each panel's literals listed by
+  `ast` in a scratch script); the ICD first; the builders without Qt, then the subclasses. The frozen files are not
+  edited: `test_holographic.py` checks that the frozen source still holds every value replaced, and that a missing one
+  stops the display from being built.
+- *Departures* (ICD README section 2, four rows): what the bus does not carry reads `NO DATA` or `--` (the INS reads
+  `NOT CARRIED`; the encryption and IFF rows are gone); track heading and speed are relative to the aircraft, as the
+  radars measure them; the PFD's tape bugs sit on the present value (no autopilot target reaches the PFD); the MFD's
+  weather radar page is crossed out (`NOT FED: SEE THE RADAR WINDOW`; backlog, ICD README section 12); the bus's
+  DAY/NIGHT/NVG mode command is kept, not applied, by the holographic displays; the theme is chosen at start.
+- *Warnings / lessons*: section 6's three lines. The MFD cannot hear the fused tracks or the warning contacts (its own
+  receive subaddresses 17 and 20-23 are their broadcast numbers): its picture is the two radars' own track blocks, which
+  it already had. A heredoc in a Bash command again (one stopped task): section 4.8 stands. The sample route of the feed
+  tests is near 0 N 0 E (the plant's home): a test aircraft elsewhere sees no waypoint within 100 nm.
+- *Files*: `fmofp_display/holographic.py` (new), `fmofp_display/{app,systems_feed}.py`, `fmofp_demo/demo.py`,
+  `fmofp_bus/tests/test_holographic.py` (new), `fmofp_bus/tests/{test_messages,test_display_e2e}.py`,
+  `ofp/tests/icd_messages_test.cpp`, `icd/fmofp_icd.xml` + README + generated files, `ofp/README.md`, this file.
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 358 OK (was 341: `test_holographic.py` 17), ctest
+  2/2, cppcheck clean; load 111 messages for 25 terminals, worst minor frame 8852 us (was 8680: the second stores relay and the PFD's two broadcasts). Headless demo 15 s with `--theme modern`, debug build: the holographic PFD and MFD programs answered every poll (RT 11, RT 13: no missed response), their logs free of errors; 31 overruns in 750 frames with League of Legends running on this machine (6 late starts, a wake 47 ms late): not a measurement. The whole suite against the optimised build: 358 OK; its ctest red on `BusControllerGate.RealTimeFramesHoldTwentyMillisecondsWithoutOverruns` alone (one 23 ms frame with the gate's stub terminals, three runs of three with the game on; green twice on the debug build): section 6's known real-time test on a busy machine, no flight code changed. In the full gate the same load reddened `test_demo` (293 overruns in 500 frames) and `test_mission_e2e` (one unanswered plant poll under --strict); both green when rerun. `lint: OK (43 flight sources, no finding)`. CI: unit 33 (`2f759f2`) and the claim of unit 34 green (public Actions API). Meter 34 / 34 = 100 %.
+
 ---
 
 ## 8. Decisions (append-only: date, who, what, why)
@@ -2898,3 +2949,9 @@ done before this file existed are condensed from the private session notes.
 - 2026-11-21, Alee ("Display variants", the punch list's item 3): a unit 34 is added to the meter, weight 1.5 (the
   holographic variants were not live upstream and must be wired to the bus, section 2.34). The total becomes 34, the
   meter 32.5 / 34 = 95.6 % until it lands.
+- 2026-11-21, Alee's agent, under Alee's "Display variants" (told to Alee; either human may overrule): unit 34 as
+  planned in section 2.34. The theme is a start option of each display program and of the demo; MODERN builds the
+  holographic PFD and MFD fed from the bus, every value either the bus's or marked as missing. The MFD's tactical
+  picture is the targeting and AEWC tracks (not the fused tracks, which it cannot hear); its weather radar page is
+  crossed out, its feeding left to the backlog. The frozen panel methods' fixed values are replaced by rebuilding the
+  methods from the frozen source, not by copying them. ICD v1.27.

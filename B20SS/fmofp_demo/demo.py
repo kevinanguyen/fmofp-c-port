@@ -682,6 +682,8 @@ def main(argv=None):
     parser.add_argument("--record", nargs="?", const="", default=None, metavar="DIR",
                         help="also run the data recorder (py -m fmofp_recorder) into DIR (default logs/recorder); "
                              "py -m fmofp_cli -c tables reads it")
+    parser.add_argument("--theme", choices=("classic", "modern", "night"), default="classic",
+                        help="the display windows' theme (modern: the holographic PFD and MFD, fed from the bus)")
     args = parser.parse_args(argv)
 
     paths = binaries(args.build or default_build_dir())
@@ -727,7 +729,8 @@ def main(argv=None):
         if not args.no_displays:
             for name, _ in DISPLAYS:
                 programs.start(f"display_{name}",
-                               [sys.executable, "-m", "fmofp_display", name, "--port-base", str(args.port_base)])
+                               [sys.executable, "-m", "fmofp_display", name, "--port-base", str(args.port_base),
+                                "--theme", args.theme])
         if args.record is not None:
             recorder = [sys.executable, "-m", "fmofp_recorder", "--port-base", str(args.port_base)]
             if args.record:

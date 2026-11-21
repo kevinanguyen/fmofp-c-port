@@ -8,7 +8,7 @@
   bits="11-8" means (word >> 8) & 0xF. A field may span two consecutive words
   (word="3-4" bits="31-0", most significant word first) for one 32-bit value.
 -->
-<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="26" status="DRAFT" date="2026-11-18">
+<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="27" status="DRAFT" date="2026-11-21">
   <revision version="1.0-draft" date="2026-10-04" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">First draft, derived from FMOFP/rtAddressConfig.xml and FMOFP/MIL_STD_1553B/message_schemas.py.</revision>
   <revision version="1.0-draft.2" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 1-3: display addresses accepted; BIT merged into avionics (RT 1), FM fitness and SW configuration folded in as well; bus controller confirmed as its own process. RT 24-26 freed.</revision>
   <revision version="1.0-draft.3" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 4-10: UDP transport accepted; legacy WEATHER mode dropped as unnecessary; every TBD value defined from the code that uses it; heading and yaw are true. Command parameters nothing consumed were removed.</revision>
@@ -1202,7 +1202,7 @@
     <message id="BCAST_ENG_ENGINE_STATUS" rt="31" sa="18" dir="R" words="20" rate="5" title="Engine status, broadcast" layout_of="ENG_ENGINE_STATUS" listeners="5 13 14 26">
       <doc>The engine band of the broadcast map, 18-19 (v1.8). The MFD's systems and engine pages draw it; the flight control computer takes the total fuel flow for FCS_PERF_STATUS's fuel efficiency; the EICAS's engine panel draws it too (v1.9).</doc>
     </message>
-    <message id="BCAST_ENG_FUEL_STATUS" rt="31" sa="19" dir="R" words="7" rate="1" title="Fuel status, broadcast" layout_of="ENG_FUEL_STATUS" listeners="13 14 26"/>
+    <message id="BCAST_ENG_FUEL_STATUS" rt="31" sa="19" dir="R" words="7" rate="1" title="Fuel status, broadcast" layout_of="ENG_FUEL_STATUS" listeners="11 13 14 26"/>
     <message id="BCAST_RDR_TGT_STATUS" rt="31" sa="24" dir="R" words="4" rate="5" title="Targeting radar status, broadcast to the displays" layout_of="RDR_TGT_STATUS" listeners="13 15">
       <doc>The tracks band of the broadcast map, 20-24 (v1.10): the targeting radar's status for the MFD's targeting page and the radar display's control panel, and the two track blocks.</doc>
     </message>
@@ -2379,7 +2379,10 @@
       <field name="spare_1" word="1" bits="6-0" type="spare"/>
     </message>
     <message id="DSP_SMS_STORES" rt="17" sa="1" dir="R" layout_of="SMS_STATUS" rate="5" title="Stores management status, for the SMS display">
-      <doc>SMS_STATUS relayed to the SMS display, its one consumer (section 8): the stations, the master arm, the modes and the sums the window draws.</doc>
+      <doc>SMS_STATUS relayed to the SMS display (section 8): the stations, the master arm, the modes and the sums the window draws.</doc>
+    </message>
+    <message id="MFD_SMS_STORES" rt="13" sa="16" dir="R" layout_of="SMS_STATUS" rate="5" title="Stores management status, for the MFD">
+      <doc>SMS_STATUS's second relay (v1.27): the holographic MFD's weapons panels (the inventory, the master arm, the selected station). A second relay rather than a broadcast: the one broadcast subaddress free for both displays is 30, the wraparound subaddress (README section 2).</doc>
     </message>
   </messages>
 
@@ -2459,6 +2462,7 @@
     <relay from="HYD_STATUS" to="CAS_HYD_STATUS"/>
     <relay from="CAS_ALERTS" to="EICAS_CAS_ALERTS"/>
     <relay from="SMS_STATUS" to="DSP_SMS_STORES"/>
+    <relay from="SMS_STATUS" to="MFD_SMS_STORES"/>
   </relays>
 
   <!-- Payloads larger than one message use the block transfer format in README.md.
@@ -2852,7 +2856,7 @@
         <field name="id" word="3" bits="15-0" type="uint" doc="FUSION: the fused track number (FUS-n); ESM: the whole degrees of the bearing when first seen (ESM-band-n); SCENARIO: DEF_CMD's threat_id (SCEN-n)"/>
       </section>
     </block>
-    <block id="BCAST_DEF_RWR_CONTACTS" rt="31" dir="R" desc_sa="16" seg_sa="17" rate="25" title="Radar warning receiver contacts, broadcast to the displays" layout_of="DEF_RWR_CONTACTS" listeners="14 16 26">
+    <block id="BCAST_DEF_RWR_CONTACTS" rt="31" dir="R" desc_sa="16" seg_sa="17" rate="25" title="Radar warning receiver contacts, broadcast to the displays" layout_of="DEF_RWR_CONTACTS" listeners="11 14 16 26">
       <doc>The relayed DEF_RWR_CONTACTS for the TSD's threat ring and the EICAS's defensive panel (v1.17). Subaddresses 16-17 carried the SAR image until v1.15.</doc>
     </block>
     <block id="PLANT_SENSOR_SCAN" rt="27" desc_sa="14" seg_sa="15" rate="25" title="Sensor scans, from the plant">

@@ -253,7 +253,7 @@ class DisplaysEndToEndTest(unittest.TestCase):
         # hydraulics and ECS (v1.22) and avionics (v1.20, SA 8) statuses and the crew alerts (v1.25, SA 9) arrive
         # unicast, as does the stores management status into the SMS (v1.26, SA 1); nothing else is written into
         # a display.
-        own = {m.DspMfdStatus.RT: {17, 20, 21, 22, 23, 26, 27}, m.DspTsdStatus.RT: {1},
+        own = {m.DspMfdStatus.RT: {16, 17, 20, 21, 22, 23, 26, 27}, m.DspTsdStatus.RT: {1},
                m.DspEicasStatus.RT: {1, 3, 4, 6, 7, 8, 9}, m.DspSmsStatus.RT: {1}}
         for rt in (m.DspRadarStatus.RT, m.DspPfdStatus.RT, m.DspMfdStatus.RT, m.DspEicasStatus.RT, m.DspTsdStatus.RT,
                    m.DspSmsStatus.RT):
@@ -262,7 +262,9 @@ class DisplaysEndToEndTest(unittest.TestCase):
             self.assertEqual(own.get(rt, set()), unicast, f"RT {rt}")
         # A terminal that did not accept a subaddress ignored the broadcasts on it: the PFD heard none of the radar's.
         self.assertIsNone(self.pfd.fresh(m.BcastRdrWxStatus, stale_after_s=60.0))
-        self.assertEqual(0, self.pfd.blocks_completed)
+        # Its blocks are the radar warning contacts alone (v1.27, the holographic threat ring), and the fuel by broadcast.
+        self.assertIsNotNone(self.pfd.latest_block(b.BcastDefRwrContacts)[0], "the contacts block at the PFD")
+        self.assertIsNotNone(self.pfd.fresh(m.BcastEngFuelStatus, stale_after_s=60.0), "the fuel at the PFD")
 
         # The MFD: the radars' pictures from its own copies, the flight computer by relay, the position from the FMS.
         mfd_feed = RadarFeed(self.mfd, FakeCoordinator())
@@ -416,6 +418,9 @@ class DisplaysEndToEndTest(unittest.TestCase):
         self.assertIsNotNone(stores.stores_status(), "the SMS display's own relay")
         self.assertEqual((7806.0, 2), (stores.stores_status().total_weight, stores.stores_status().armed_count))
         self.assertEqual(("MK-82", 227, 4, "ARMED", "WEAPON"), stores.stores_stations()[0])
+        mfd_stores = SystemsFeed(self.mfd, stale_after_s=60.0)
+        mfd_stores.stores_message = m.MfdSmsStores
+        self.assertEqual(stores.stores_stations(), mfd_stores.stores_stations(), "the MFD's copy (v1.27, 13/16)")
         eicas_status = self.transmitted(framed, m.DspEicasStatus, 100, FRAMES)
         self.assertEqual(TerminalState.NORMAL, eicas_status[-1][1].state)
         # The targeting radar, commanded from the radar display: its status and tracks reach the MFD's targeting page,
