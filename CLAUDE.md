@@ -194,8 +194,9 @@ person may continue it in their next session; when it is green it is rebased ont
   settings and a deletion); the optimised build as a leg of the gate (about a minute and a half more); and an
   answer proposed for each of the five ticket questions. (6) *Done 2026-11-17*: the worst frame after the
   repairs is explained (the Load line above). Backlog,
-  nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-18 (Kevin's `d334684` checked on his
-  machine; units 31, crew alerting, and 32, stores management, added and done, section 7); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
+  nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-21 (the fork compared with upstream: a
+  punch list of seven items, section 7's last entry; nothing built); before it Alee's, 2026-11-18 (Kevin's
+  `d334684` checked on his machine; units 31, crew alerting, and 32, stores management, added and done); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
   first-start failure repaired, section 7).
   **Repaired 2026-11-17**: `py -m fmofp_demo` failed on its first start on a fresh clone (the frozen logger's
   folder, raced for by six display programs: seven first starts of seven on new checkouts); the display programs
@@ -2542,6 +2543,69 @@ done before this file existed are condensed from the private session notes.
   1 overrun, 25/25 answering on every line, 29 of 29 scripted commands; `SMS SAFE 2 armed 7806 kg` until COMBAT,
   ARMED after it, 7579 kg and 1 released after 36 s, 3 armed after 37 s; the stores terminal's mean answer 108 us,
   worst 1.0 ms. CI: unit 31 (`b40b240`) and the two claims green (public Actions API). Meter 31.5 / 31.5 = 100 %.
+
+### 2026-11-21 - the fork against upstream: what TubAleeLo/fmofp has that port/cpp does not, and a punch list - by Alee's agent
+- *What*: Alee: compare `TubAleeLo/fmofp` with `kevinanguyen/fmofp-c-port` and make a punch list of the gaps. Read
+  only; no code changed. Section 0.1 first: tree clean, nothing new on `origin`, upstream/main still `4c25f52`.
+- *The two repositories*: upstream has one branch, `main`, unchanged since `4c25f52` (2026-11-02), which `port/cpp`
+  merged on 2026-11-04: nothing upstream has been missed. The fork's own branches: `main` is upstream's of
+  2026-09-29 (`0db2621`, 27 commits behind upstream, 120 behind `port/cpp`), `intern-canonical` (2026-09-19),
+  `bug/SSTR-001` to `-007` (the instructor branches, section 1), and **`port/flight-sim`, a stale copy of `port/cpp`
+  at `c55ff8c`** (the unit 31 claim; 3 commits behind, nothing of its own). Files: 262 exist only upstream, all
+  removed by unit 29 (`local_messaging` 120, `MIL_STD_1553B` 32, the display messaging mirror and display manager
+  26, the canned messages 12, the boot path, the old CLI, loop prevention, 27 legacy suites); 300 exist only in the
+  port (the C++, the ICD, the six Python packages); 32 changed, 5 moved.
+- *What upstream's Python did that the port does not* (each checked in upstream's code):
+  - **Data storage.** Thirteen services wrote to SQLite through `storage/DBM.py` (comms and its radio, satcom and
+    data link, the defensive service, the ECU, fuel control, the flight control computer, the flight surfaces at
+    50 Hz, the mission service, control and route, power management) and the weather radar stored precipitation
+    and VIL readings (`store_precipitation_data`, `store_vil_data`; upstream's last commit repaired that path).
+    The old CLI browsed them (`list_tables`, `get_table`). The port stores nothing: the C++ partitions have no
+    file I/O by rule, the recorder keeps a ring of 512 in memory with no dump (ICD README section 12).
+  - **Display variants and themes.** Upstream's `DisplayManager` built the PFD, the MFD and the HUD through
+    containers and factories that pick a standard or a holographic class from the theme manager (`CLASSIC`,
+    `MODERN`, `NIGHT`; `MODERN` makes the PFD, MFD and HUD holographic) and a settings panel. The port's windows
+    build the standard classes only: `holographic_pfd`, `holographic_mfd`, the holographic and futuristic radar
+    displays, the weather holographic display, `futuristic_pfd`/`_mfd`, `node_based_pfd`, the three containers,
+    the settings panels and theme managers (about 20,000 lines) are named nowhere in the port. They read the same
+    getters the feeds already answer (the defensive service, the fused tracks, the event bus).
+  - **The old CLI's other commands**: `test` (a menu of nine suites), `status` (a health table), numbered
+    commands from the command-word tables, and `Interfaces/predefinedMessages` (named canned commands for the five
+    radars, the FMS and the FCS). The port's prompt has `terminals`, `status`, `msg`, `send ID field=value` and
+    `scenario`: it can send any of them, by field, not by name.
+  - **One application**: upstream's `Main.py` started every subsystem and display in one process with a readiness
+    check, one display manager and one display mode for all (`DisplayManager.set_mode`). The port is one process
+    per terminal by design (section 4.1); each display has its own mode command, and nothing sets all six.
+  - **Logic that ran in no one's flight, never ported**: the FMS's own flight-control package
+    (`attitude_calculator`, `control_surface_manager`, `flight_dynamics_processor`, `flight_control_system`,
+    1,773 lines: an aircraft that answers its controls, which is plant material and the backlog's closed surface
+    loop); the radar management's mission-phase allocation (`update_mission_phase`: no caller upstream either);
+    the mission service's objectives, rules of engagement and intelligence (no caller upstream); the INS (not
+    carried since unit 5); TACAN (an empty file); the radar resource check (reads fields no radar has).
+  - **Documents**: `FMOFP_User_Manual` (17 chapters) and `FMOFP/docs` (Displays, Messaging, Threads) describe the
+    Python application and its deleted messaging.
+- *The punch list* (priority order; weights as section 2 would give them; at the pace of 2026-11-18, two units a
+  day, the units below are four to five days of work):
+  1. *Kevin, before interns*: the instructor branches off the public fork (save, then delete); issues on and the
+     label; the fork's default branch made `port/cpp` (or `main` brought to it), since a clone gets `main`, the
+     Python of September; `port/flight-sim` deleted (stale). Settings and deletions: his.
+  2. *Data recording, 1 unit*: a Python recorder client on the monitor stream writing the tables the services
+     wrote (the bus carries every value they stored), the FDR's ring as a block the CLI can dump, and `tables` /
+     `table` in the prompt. Keeps the C++ free of I/O.
+  3. *Display variants, 1-1.5 units*: `fmofp_display --theme classic|modern|night` (and the MFD's settings page)
+     building the holographic and futuristic classes over the same feeds; the render tests per variant.
+  4. *The prompt, 0.5 unit*: the canned messages as named `send` shortcuts, `test` running the suite, a `mode`
+     command that sets every display's lighting mode; the demo's `--mode`.
+  5. *Flight dynamics in the plant, 1.5 units*: the FMS flight-control package as the plant's aircraft, so attitude
+     answers the controls and the surfaces' loop can close (ICD README section 12).
+  6. *Small new behaviours, 0.5 unit, only if wanted*: the mission phase driving the radars' modes, the mission's
+     objectives / ROE / intelligence as `MSN_CMD`s (both dead upstream).
+  7. *The user manual, 1 unit*: rewrite the 13 stale chapters for the bus, the C++ and the demo; retire
+     `FMOFP/docs`' Messaging and Threads.
+  Not on the list: the INS, TACAN and the radar resource check (nothing to port), the old messaging itself
+  (replaced by the bus), and the ICD README's own backlog (section 12), which is a separate list.
+- *Files*: this file. The scripts are in the session scratchpad (`orphans.py`).
+- *Numbers*: meter unchanged, 31.5 / 31.5 = 100 %; the punch list is not in it until a human adds items as units.
 
 ---
 
