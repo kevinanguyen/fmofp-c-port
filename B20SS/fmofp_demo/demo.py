@@ -105,6 +105,16 @@ def waypoint(seq, name, lat, lon, alt_ft, kind=WaypointType.NAV):
                     name_3=words[3])
 
 
+def mode_events(mode_name, seconds=0.5):
+    """The six displays' lighting mode (DSP_*_MODE_CMD, unit 35), as upstream's one display manager set it for all:
+    `--mode DAY|NIGHT|NVG`."""
+    from fmofp_bus.icd.enums import DisplayMode
+    from fmofp_cli.shortcuts import display_mode_commands
+    mode = DisplayMode[mode_name.upper()]
+    return [Event(seconds, f"{name} display: {mode.name} mode", message)
+            for name, message in display_mode_commands(mode, cmd_seq=201)]
+
+
 def default_events():
     """The scripted flight. The cmd_seq values start at 201 so they never collide with the radar display
     window's own numbering, which starts at 1 (a command with the same cmd_seq as the last one is ignored)."""
@@ -684,6 +694,8 @@ def main(argv=None):
                              "py -m fmofp_cli -c tables reads it")
     parser.add_argument("--theme", choices=("classic", "modern", "night"), default="classic",
                         help="the display windows' theme (modern: the holographic PFD and MFD, fed from the bus)")
+    parser.add_argument("--mode", choices=("day", "night", "nvg"), type=str.lower, default=None,
+                        help="the six displays' lighting mode, sent on the bus at 0.5 s (their DSP_*_MODE_CMD)")
     args = parser.parse_args(argv)
 
     paths = binaries(args.build or default_build_dir())
@@ -700,6 +712,8 @@ def main(argv=None):
     log_dir = args.log_dir or os.path.join(B20SS, "logs", "demo")
     os.makedirs(log_dir, exist_ok=True)
     events = [] if args.no_events else default_events()
+    if args.mode and not args.no_displays:
+        events = sorted(mode_events(args.mode) + events, key=lambda event: event.seconds)
     if args.seconds > 0.0:
         events = [event for event in events if event.seconds < args.seconds]
     script = os.path.join(log_dir, "events.txt")

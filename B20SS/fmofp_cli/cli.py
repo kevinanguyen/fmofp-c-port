@@ -8,8 +8,10 @@ operator can do is a command through the controller's command port. So `status` 
 and status messages the monitor has shown, `send` builds any ICD command message from `field=value` pairs and
 queues it, and `scenario` runs fmofp_scenario's engine. Its `list_tables` and `get_table` read the services'
 SQLite tables; the recorder (`py -m fmofp_recorder`, unit 33) writes those tables from the bus, and `tables` and
-`table NAME [N]` read them back. The test suites went where the tests are
-(fmofp_bus/tests); `test_1553b` is the bus itself now.
+`table NAME [N]` read them back. Since unit 35: `do NAME` sends upstream's canned messages
+(`Interfaces/predefinedMessages`) by name (`fmofp_cli.shortcuts`), `mode` sets every display's lighting mode as
+upstream's one display manager did, and `test` runs the port's tests for upstream's nine suites, and the rest, in a
+child process (`fmofp_cli.suites`); `test_1553b` is the `bus` suite.
 
 A prompt that has just joined a running bus has seen nothing of it yet. The commands that read the picture
 (terminals, status, msgs, msg) first let the view watch one major frame, in which every terminal's TERM_STATUS
@@ -24,6 +26,8 @@ import time
 
 from fmofp_bus.bus_view import SYNC_HZ, TERMINAL_NAMES, terminal_address, terminal_name
 from fmofp_bus.icd import messages as m
+from fmofp_bus.icd.enums import DisplayMode
+from fmofp_cli import shortcuts, suites
 from fmofp_recorder import recorder
 from fmofp_scenario.engine import ScenarioEngine, describe
 
@@ -47,6 +51,12 @@ commands go through its command port):
   scenario start [speed]     fire it from the present frame, at a time factor (10 runs it ten times faster)
   scenario stop              stop it
   scenario status            where it stands
+  do                         list the shortcuts: upstream's canned messages by name
+  do NAME [args]             one of them (do wx SURVEILLANCE 200, do tgt-lock 3, do attitude roll=10)
+  mode DAY|NIGHT|NVG [display ...]
+                             the displays' lighting mode (all six, or radar pfd mfd eicas tsd sms)
+  test [SUITE ...|list|all]  the port's tests for a suite (upstream's nine by name or number, and the rest),
+                             in a child process against the built programs; 'test list' names them
   tables                     the recorder's tables (py -m fmofp_recorder) and their row counts
   table NAME [N]             the last N rows of a recorded table (10 by default)
   help                       this text
@@ -124,11 +134,13 @@ class DebugCli:
     SETTLE_FRAMES = 50      # one major frame: every TERM_STATUS and every 1 Hz message has come round
     SETTLE_TIMEOUT_S = 5.0  # a bus in real time takes a second for it; a loaded machine longer
 
-    def __init__(self, view, client, out=print, recorder_dir=None):
+    def __init__(self, view, client, out=print, recorder_dir=None, build_dir=None, run_tests=suites.run):
         self.view = view
         self.client = client
         self.out = out
         self.recorder_dir = recorder_dir if recorder_dir is not None else recorder.DEFAULT_OUT
+        self.build_dir = build_dir
+        self.run_tests = run_tests
         self.engine = ScenarioEngine(client)
         self.engine.on_fire = lambda firing: self.out(describe(firing))
         self._scenario_thread = None
@@ -155,7 +167,8 @@ class DebugCli:
             return False
         handler = {"help": self.cmd_help, "?": self.cmd_help, "frame": self.cmd_frame, "terminals": self.cmd_terminals,
                    "status": self.cmd_status, "msgs": self.cmd_msgs, "msg": self.cmd_msg, "send": self.cmd_send,
-                   "scenario": self.cmd_scenario, "tables": self.cmd_tables, "table": self.cmd_table}.get(command)
+                   "scenario": self.cmd_scenario, "tables": self.cmd_tables, "table": self.cmd_table,
+                   "do": self.cmd_do, "mode": self.cmd_mode, "test": self.cmd_test}.get(command)
         if handler is None:
             self.out(f"unknown command {words[0]!r}; 'help' lists them")
             return True
@@ -292,6 +305,69 @@ class DebugCli:
 
     # ---- commands
 
+    def send_message(self, message, rt=None):
+        """Queues one command message through the command port; the acknowledgement line."""
+        cls = type(message)
+        rt = cls.RT if rt is None else rt
+        ack = self.client.send(message, rt=rt)
+        line = f"{message_id(cls)} -> RT {rt} SA {cls.SUBADDRESS}: {ack.status.name}"
+        if ack.queued:
+            line += f", queued at frame {ack.frame}"
+            if ack.cmd_seq:
+                line += f" (cmd_seq {ack.cmd_seq})"
+        elif ack.status.name == "MALFORMED" and getattr(message, "cmd_seq", 1) == 0:
+            line += (" (the bus controller could not read a numbered command: one built before ICD v1.24? "
+                     "rebuild it, or give cmd_seq=N yourself)")
+        return line
+
+    def cmd_do(self, args):
+        """Upstream's canned messages by name (unit 35)."""
+        if not args:
+            self.out("shortcuts (do NAME ...), each an ICD command message:")
+            for line in shortcuts.listing():
+                self.out(line)
+            return
+        name = args[0].lower()
+        reading = shortcuts.READING_BY_NAME.get(name)
+        if reading is not None:
+            self.out(f"{reading.help}:")
+            return self.cmd_msg([reading.message_id])
+        shortcut = shortcuts.BY_NAME.get(name)
+        if shortcut is None:
+            raise ValueError(f"no shortcut {args[0]!r}; 'do' lists them")
+        message = shortcuts.build(shortcut, args[1:], parse_field)
+        self.out(self.send_message(message))
+        return None
+
+    def cmd_mode(self, args):
+        """Every display's lighting mode at once, or the named displays' (unit 35): their DSP_*_MODE_CMD."""
+        if not args:
+            raise ValueError("mode DAY|NIGHT|NVG [radar pfd mfd eicas tsd sms]")
+        try:
+            mode = DisplayMode[args[0].upper()]
+        except KeyError:
+            raise ValueError(f"{args[0]!r} is no lighting mode: DAY, NIGHT or NVG") from None
+        if mode == DisplayMode.NOT_SET:
+            raise ValueError("NOT_SET is no lighting mode: DAY, NIGHT or NVG")
+        for _, message in shortcuts.display_mode_commands(mode, args[1:]):
+            self.out(self.send_message(message))
+
+    def cmd_test(self, args):
+        """The port's tests for upstream's suites, in a child process (unit 35)."""
+        if not args or args[0].lower() == "list":
+            self.out("test suites (test NAME|NUMBER ... or all; or a test module's name):")
+            for line in suites.listing():
+                self.out(line)
+            return
+        modules = suites.resolve(args)
+        build_dir = self.build_dir
+        if build_dir is None:
+            from fmofp_demo.demo import default_build_dir
+            build_dir = default_build_dir()
+        self.out(f"running {len(modules)} test modules against {build_dir}: {', '.join(modules)}")
+        code = self.run_tests(modules, build_dir, self.out)
+        self.out("test: OK" if code == 0 else f"test: FAILED (exit {code})")
+
     def cmd_send(self, args):
         if not args:
             raise ValueError("send ID [field=value ...] [rt=N]")
@@ -315,17 +391,7 @@ class DebugCli:
             values[name] = parse_field(cls, name, text)
         if rt == m.EVERY_TERMINAL:
             raise ValueError(f"{message_id(cls)} is defined for every terminal: say which with rt=N")
-        message = cls(**values)
-        ack = self.client.send(message, rt=rt)
-        line = f"{message_id(cls)} -> RT {rt} SA {cls.SUBADDRESS}: {ack.status.name}"
-        if ack.queued:
-            line += f", queued at frame {ack.frame}"
-            if ack.cmd_seq:
-                line += f" (cmd_seq {ack.cmd_seq})"
-        elif ack.status.name == "MALFORMED" and getattr(message, "cmd_seq", 1) == 0:
-            line += (" (the bus controller could not read a numbered command: one built before ICD v1.24? "
-                     "rebuild it, or give cmd_seq=N yourself)")
-        self.out(line)
+        self.out(self.send_message(cls(**values), rt=rt))
 
     # ---- the scenario engine
 

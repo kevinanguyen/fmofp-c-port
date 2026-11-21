@@ -402,6 +402,11 @@ zero, chaff released and a threat injected, and reads the list at the EICAS's bu
 `dbConfig.xml` and its rows to their dictionaries; `test_recorder_e2e.py` records eight terminals on a real
 bus in real time and reads the tables back (unit 33: `py -m fmofp_recorder`, or `py -m fmofp_demo --record`,
 writes them into `logs/recorder/`; `py -m fmofp_cli -c tables` and `-c "table fcs_data 5"` show them).
+`test_cli_shortcuts.py` holds the prompt's unit 35 commands: `do NAME` (upstream's canned messages by name, each
+an ICD command: `do wx SURVEILLANCE 150`, `do tgt-lock 3`, `do attitude roll=10`; `do` lists them), `mode
+DAY|NIGHT|NVG [display ...]` (every display's mode command; the demo's `--mode`), and `test SUITE` (upstream's
+nine suites and the rest as the port's test modules, run in a child process: `test list`), and drives the real
+radar computer and a display terminal from the prompt.
 `test_stores_oracle.py` holds the stores terminal's starting table, master arm and sums to the frozen `sms.py`
 (the sums over the tables random command runs leave); `test_stores_e2e.py` runs the plant, the FMS and the
 stores terminal under the real controller with a refused release, COMBAT, releases and a jettison.

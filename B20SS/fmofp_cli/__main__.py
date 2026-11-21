@@ -42,6 +42,8 @@ def main(argv=None):
     parser.add_argument("-c", "--command", action="append", default=[], help="a command to run (repeatable), then exit")
     parser.add_argument("--recorder-dir", default=None,
                         help="where `tables` and `table` read the recorder's databases (default logs/recorder)")
+    parser.add_argument("--build", default=None,
+                        help="the C++ build `test` runs against (default: the demo's, the optimised one when built)")
     args = parser.parse_args(argv)
 
     view = BusView(args.port_base, subscribe=not args.fixed_monitor)
@@ -59,7 +61,7 @@ def main(argv=None):
         view.close()
         return 2
     view.start()
-    cli = DebugCli(view, client, recorder_dir=args.recorder_dir)
+    cli = DebugCli(view, client, recorder_dir=args.recorder_dir, build_dir=args.build)
     try:
         if not view.wait_for_frame(0, args.wait):
             print(f"cli: {no_bus(view, args)}; status stays empty until one runs")

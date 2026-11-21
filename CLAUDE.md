@@ -145,7 +145,8 @@ person may continue it in their next session; when it is green it is rebased ont
   engine** `py -m fmofp_scenario FILE [--speed S]` (`fmofp_scenario/`: the frozen `Interfaces/scenarios/*.xml` fired
   as bus commands through the command port, timed by the bus frame) and **the debug CLI** `py -m fmofp_cli [-c CMD]`
   (`fmofp_cli/`: `terminals`, `status`, `msg` from the monitor, `send ID field=value` of any ICD command, the
-  `scenario` commands, and since unit 33 `tables` / `table NAME [N]`); **the data recorder** `py -m fmofp_recorder`
+  `scenario` commands, since unit 33 `tables` / `table NAME [N]`, since unit 35 `do NAME` (upstream's canned
+  messages by name), `mode DAY|NIGHT|NVG` (every display) and `test SUITE` (the port's tests in a child process)); **the data recorder** `py -m fmofp_recorder`
   (`fmofp_recorder/`: upstream's services' SQLite tables written from a copy of the monitor stream into
   `logs/recorder/`; `py -m fmofp_demo --record` runs it beside the demo); the bus library `fmofp_bus` with
   generated `fmofp_bus/icd/`.
@@ -159,7 +160,7 @@ person may continue it in their next session; when it is green it is rebased ont
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms. **That rise was the machine that afternoon, not the repairs** (measured 2026-11-17, section 7): the code before the repairs and each step after them, flown in turn with two fixed plant seeds, thirty flights: 0 overruns in every one, the five versions' median worst frame 6.8 to 7.6 ms (7.0 before the repairs, 7.4 at the head), the radar computer's mean answer 40 us and its worst 1.0 to 1.6 ms for every version; the one flight flown while the desktop was busy read 18.9 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 358 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
+- **Tests**: Python 372 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
   ctest 2/2 (355 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
@@ -167,8 +168,8 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 34 of 37.5 units = **90.7 %** (section 2): units 35 to 38, the punch list's items 4 to 7 (Alee:
-  "lets move on to punch list item 4-7", 2026-11-21), are open, 35 claimed. Units 1-30 were done on 2026-11-12; units 31 (the
+- **Meter**: 34.5 of 37.5 units = **92 %** (section 2): units 36 to 38, the punch list's items 5 to 7 (Alee:
+  "lets move on to punch list item 4-7", 2026-11-21), are open; unit 35 (item 4, the prompt) is done. Units 1-30 were done on 2026-11-12; units 31 (the
   EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18; unit 33
   (data recording, the punch list's item 2) and unit 34 (the display themes and the holographic PFD and MFD, the
   punch list's item 3) on 2026-11-21. Every unit is DONE or STRUCK. The punch list of
@@ -186,8 +187,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: unit 35, the prompt's shortcuts, test suites and display modes, `IN PROGRESS (Alee,
-  2026-11-21)`; units 36 to 38 open, Alee's to take in order. No `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: none claimed; units 36 to 38 open, Alee's to take in order. No `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -297,14 +297,16 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 32 | Stores management computer for the SMS (a new terminal, RT 28) | 1 | DONE 2026-11-18 |
 | 33 | Data recording: the Python services' SQLite tables written from the bus, and the prompt's table commands | 1 | DONE 2026-11-21 |
 | 34 | Display themes and the holographic PFD and MFD, fed from the bus | 1.5 | DONE 2026-11-21 |
-| 35 | The prompt: upstream's canned messages as named shortcuts, the test suites, one mode for every display | 0.5 | IN PROGRESS (Alee, 2026-11-21) |
+| 35 | The prompt: upstream's canned messages as named shortcuts, the test suites, one mode for every display | 0.5 | DONE 2026-11-21 |
 | 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | open |
 | 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | open |
 | 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | open |
 
-**Done: 34 / 37.5 = 90.7 %.** Open: units 35 to 38.
+**Done: 34.5 / 37.5 = 92 %.** Open: units 36 to 38.
 
 ### 2.35 The prompt, 0.5
+
+DONE 2026-11-21 (section 7), as planned below.
 
 Added 2026-11-21 (Alee, section 8), the punch list's item 4. Upstream's prompt (`Utils/debug/userCLI.py`, deleted in
 unit 29) had `send` (a radar, then status or a mode change, by menu), `test` (a menu of nine suites run against the
@@ -906,7 +908,8 @@ With the aircraft running, from `B20SS/`: `py -m fmofp_scenario FMOFP/Interfaces
 [--speed 10] [--port-base N]` runs a frozen scenario against it through the bus controller's command port, one
 line per event; `py -m fmofp_cli [--port-base N] [-c CMD]` is the debug prompt (`help` lists its commands:
 `terminals`, `status RT`, `msg ID`, `send ID field=value ...`, `scenario load|start|stop|status`, `tables`,
-`table NAME [N]`). `py -m fmofp_recorder [--port-base N] [--out DIR]` records upstream's database tables from
+`table NAME [N]`, `do NAME ...`, `mode DAY|NIGHT|NVG`, `test SUITE|list`). `py -m fmofp_demo --mode night` sends
+every display its lighting mode at 0.5 s. `py -m fmofp_recorder [--port-base N] [--out DIR]` records upstream's database tables from
 the bus beside it (or `py -m fmofp_demo --record`); the prompt reads them back.
 
 ### 5.6 Where things are
@@ -1185,6 +1188,10 @@ Python tests and displays
 - `int(...)` cannot be made to print `--`: a placeholder for an unknown number the frozen code formats with
   `f"{x}%"` is an `int` subclass with `__format__` (`holographic.Unknown`), and frozen code that calls `int(x)` on it
   gets its value, so such a field must be left out (no track without the aircraft's altitude), not faked.
+- Never run `py -3.14 -` (or any interpreter reading a script from stdin) in a Bash command, not even with
+  `< /dev/null` in front of another command: it hung the tool for two minutes twice (section 4.8).
+- A radar command with a range, clearance or resolution of 0 encodes CLAMPED (the field's minimum): the prompt's
+  shortcuts start from the radar window's values (200 km, 1000 ft, 1 m) and an argument overrides them.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -2793,6 +2800,32 @@ done before this file existed are condensed from the private session notes.
   `ofp/tests/icd_messages_test.cpp`, `icd/fmofp_icd.xml` + README + generated files, `ofp/README.md`, this file.
 - *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 358 OK (was 341: `test_holographic.py` 17), ctest
   2/2, cppcheck clean; load 111 messages for 25 terminals, worst minor frame 8852 us (was 8680: the second stores relay and the PFD's two broadcasts). Headless demo 15 s with `--theme modern`, debug build: the holographic PFD and MFD programs answered every poll (RT 11, RT 13: no missed response), their logs free of errors; 31 overruns in 750 frames with League of Legends running on this machine (6 late starts, a wake 47 ms late): not a measurement. The whole suite against the optimised build: 358 OK; its ctest red on `BusControllerGate.RealTimeFramesHoldTwentyMillisecondsWithoutOverruns` alone (one 23 ms frame with the gate's stub terminals, three runs of three with the game on; green twice on the debug build): section 6's known real-time test on a busy machine, no flight code changed. In the full gate the same load reddened `test_demo` (293 overruns in 500 frames) and `test_mission_e2e` (one unanswered plant poll under --strict); both green when rerun. `lint: OK (43 flight sources, no finding)`. CI: unit 33 (`2f759f2`) and the claim of unit 34 green (public Actions API). Meter 34 / 34 = 100 %.
+
+### 2026-11-21 - unit 35 the prompt: canned messages by name, display modes, test suites - by Alee's agent
+- *What*: the punch list's item 4. `fmofp_cli/shortcuts.py` (new): upstream's canned messages
+  (`Interfaces/predefinedMessages`, deleted in unit 29) as named shortcuts, each the ICD command message its builder
+  amounted to: `wx`, `tfr`, `sar`, `tgt`, `tgt-lock`, `aewc`, `aewc-sector` (the radars' mode commands), `attitude`,
+  `nav`, `autopilot`, `maneuver`, `flight-mode` (the FMS's), `surface` (the FCS's); the data requests (precipitation,
+  VIL, echo top, elevation, imagery, tracks) as readings of the message that carries the product; positional
+  arguments and `field=value`, the `*_present` bits set for the fields given, mode NONE standing a radar by.
+  `fmofp_cli/suites.py` (new): upstream's nine `test` suites in its order and eight more, each a list of the port's
+  test modules, run in a child process with the gate's binary environment. The prompt gained `do [NAME ...]`, `mode
+  DAY|NIGHT|NVG [display ...]` (the six displays' own mode commands: upstream set one mode for all) and `test
+  [SUITE|NUMBER|module ...|list|all]`, `--build` for the build `test` runs against; `send` and the new commands share
+  `send_message`. The demo's `--mode` puts the six mode commands among its scripted events at 0.5 s.
+- *How*: scoped from upstream's `userCLI.py` (git show of `upstream/main`) and the canned builders' names; every
+  builder has a shortcut or a reading (a test holds the list). No C++, no ICD change (v1.27 stays), no new binary.
+- *Warnings / lessons*: section 6's two lines. The canned messages were free-form dictionaries: the shortcuts carry
+  the fields the ICD gave those requests (unit 6's FMS commands, unit 10's lock folded into the targeting mode
+  command, the AEWC sector scan's three fields), not the dictionaries' keys. The FCS's autopilot request and the FMS's
+  navigation update are the same bus message (`FMS_NAV_UPDATE_CMD`, the FMS's SET_AUTOPILOT targets).
+- *Files*: `fmofp_cli/{shortcuts,suites}.py` (new), `fmofp_cli/{cli,__main__}.py`, `fmofp_demo/demo.py`,
+  `fmofp_bus/tests/test_cli_shortcuts.py` (new), `ofp/README.md`, this file.
+- *Tests and numbers*: `verify.sh icd py load` OK: Python 372 OK (was 358), load unchanged (111 messages, 8852 us); no C++ changed. `test_cli_shortcuts.py` 14 tests (every shortcut built and encoded, the present bits,
+  the errors, the prompt's three commands on a fake bus, the suites' modules and order, a suite run in a child
+  process, the demo's events, and on the bus: `do wx SURVEILLANCE 150` moves the real radar computer and `mode NIGHT
+  pfd` a display terminal). By hand: `py -m fmofp_cli -c "test fcs"` ran the suite (2 tests OK); `py -m fmofp_demo
+  --mode night` sent its six commands. Meter 34.5 / 37.5 = 92 %.
 
 ---
 
