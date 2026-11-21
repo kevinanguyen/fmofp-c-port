@@ -167,11 +167,12 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 34 of 34 units = **100 %** (section 2). Units 1-30 were done on 2026-11-12; units 31 (the
+- **Meter**: 34 of 37.5 units = **90.7 %** (section 2): units 35 to 38, the punch list's items 4 to 7 (Alee:
+  "lets move on to punch list item 4-7", 2026-11-21), are open, 35 claimed. Units 1-30 were done on 2026-11-12; units 31 (the
   EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18; unit 33
   (data recording, the punch list's item 2) and unit 34 (the display themes and the holographic PFD and MFD, the
   punch list's item 3) on 2026-11-21. Every unit is DONE or STRUCK. The punch list of
-  2026-11-21 (section 7) has five items left (1 and 4 to 7), none in the meter until a human adds it. What comes next is not in the number: the intern-ticket authoring phase, which starts with
+  2026-11-21 (section 7) has items 4 to 7 in the meter as units 35 to 38; item 1 is Kevin's. What comes next is not in the number: the intern-ticket authoring phase, which starts with
   the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
@@ -185,7 +186,8 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: none. No unit is open, no `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: unit 35, the prompt's shortcuts, test suites and display modes, `IN PROGRESS (Alee,
+  2026-11-21)`; units 36 to 38 open, Alee's to take in order. No `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -255,7 +257,7 @@ person may continue it in their next session; when it is green it is rebased ont
 
 ## 2. The units (progress meter)
 
-Percentage = done weight / 34. Weights are rough equal-effort units; change one only with
+Percentage = done weight / 37.5. Weights are rough equal-effort units; change one only with
 a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <date>)`,
 `DONE <date>` (with the section 7 entry), `STRUCK <date>` (with the decision in section 8).
 
@@ -295,8 +297,52 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 32 | Stores management computer for the SMS (a new terminal, RT 28) | 1 | DONE 2026-11-18 |
 | 33 | Data recording: the Python services' SQLite tables written from the bus, and the prompt's table commands | 1 | DONE 2026-11-21 |
 | 34 | Display themes and the holographic PFD and MFD, fed from the bus | 1.5 | DONE 2026-11-21 |
+| 35 | The prompt: upstream's canned messages as named shortcuts, the test suites, one mode for every display | 0.5 | IN PROGRESS (Alee, 2026-11-21) |
+| 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | open |
+| 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | open |
+| 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | open |
 
-**Done: 34 / 34 = 100 %.** Open: none.
+**Done: 34 / 37.5 = 90.7 %.** Open: units 35 to 38.
+
+### 2.35 The prompt, 0.5
+
+Added 2026-11-21 (Alee, section 8), the punch list's item 4. Upstream's prompt (`Utils/debug/userCLI.py`, deleted in
+unit 29) had `send` (a radar, then status or a mode change, by menu), `test` (a menu of nine suites run against the
+live program: precipitation and VIL, the FMS, the flight control system, the canned messages, each radar in all its
+modes) and `status`; `Interfaces/predefinedMessages` built canned requests for the five radars (mode change,
+precipitation, VIL, echo top, elevation, track, lock, sector scan, imagery), the FMS (attitude, navigation,
+maneuver) and the FCS (control surface, flight mode, autopilot), each a free-form dictionary. The port's prompt has
+`send ID field=value`, which reaches all of them by field and none by name. Plan: `do NAME [args]` (and `do` to list
+them): each canned command a named shortcut to its ICD command message (`do wx SURVEILLANCE 200`, `do tgt-lock 3`,
+`do attitude roll=10`, `do surface AILERON 5`), the requests for data named after the message to read; `mode
+DAY|NIGHT|NVG [display ...]`, the six displays' own mode commands at once; `test [SUITE|list|all]`, the port's
+test modules for each of upstream's nine suites (and the rest), run in a child process against the built
+binaries; the demo's `--mode` (the displays' mode commands among its scripted events). No C++, no ICD change.
+
+### 2.36 Flight dynamics in the plant, 1.5
+
+Added 2026-11-21 (Alee, section 8), the punch list's item 5. Upstream's FMS carried a flight-control package nothing
+ran (`attitude_calculator`, `control_surface_manager`, `flight_dynamics_processor`, `flight_control_system`, 1,773
+lines): an aircraft that answers its controls. The plant's flight state is a random walk today (section 6), so the
+surfaces' positions and the FCS's surface commands move nothing (ICD README section 12). Plan, to be scoped before
+the claim: that package as the plant's aircraft model (world, not flight logic), driven by the flight surfaces'
+positions and the engines' thrust, its attitude, airspeed and altitude published as `PLANT_SENSORS` is today; the
+random walk kept as a plant option so seeded flights and the tests that hold a quantity still work.
+
+### 2.37 Mission phase and mission data, 0.5
+
+Added 2026-11-21 (Alee, section 8), the punch list's item 6. Upstream's radar management had a mission-phase
+allocation (`update_mission_phase`) and the mission service objectives, rules of engagement and intelligence; nothing
+called either. Plan, to be scoped before the claim: the mission computer's phase driving the radars' modes as that
+allocation says, and the objectives, rules of engagement and intelligence as `MSN_CMD` commands and `MSN_STATUS`
+fields; both new behaviour with the Python's rules, recorded in the ICD README section 2.
+
+### 2.38 The user manual, 1
+
+Added 2026-11-21 (Alee, section 8), the punch list's item 7. `B20SS/FMOFP_User_Manual/` (17 chapters) and
+`FMOFP/docs/` describe the Python application and its deleted messaging. Plan: rewrite the 13 stale chapters for the
+bus, the C++ partitions, the displays, the demo, the prompt, the scenario engine and the recorder, every command in
+them run before it is written; retire `FMOFP/docs`' Messaging and Threads pages.
 
 ### 2.34 Display themes and holographic variants, 1.5
 
@@ -2955,3 +3001,7 @@ done before this file existed are condensed from the private session notes.
   picture is the targeting and AEWC tracks (not the fused tracks, which it cannot hear); its weather radar page is
   crossed out, its feeding left to the backlog. The frozen panel methods' fixed values are replaced by rebuilding the
   methods from the frozen source, not by copying them. ICD v1.27.
+- 2026-11-21, Alee ("lets move on to punch list item 4-7"): the punch list's items 4 to 7 enter the meter as units 35
+  (the prompt, 0.5), 36 (flight dynamics in the plant, 1.5), 37 (mission phase and mission data, 0.5) and 38 (the
+  user manual, 1). The total becomes 37.5, the meter 34 / 37.5 = 90.7 % until they land. They are taken in order,
+  one claim at a time.
