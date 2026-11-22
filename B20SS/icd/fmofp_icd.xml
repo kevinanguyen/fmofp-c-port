@@ -8,7 +8,7 @@
   bits="11-8" means (word >> 8) & 0xF. A field may span two consecutive words
   (word="3-4" bits="31-0", most significant word first) for one 32-bit value.
 -->
-<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="28" status="DRAFT" date="2026-11-21">
+<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="29" status="DRAFT" date="2026-11-21">
   <revision version="1.0-draft" date="2026-10-04" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">First draft, derived from FMOFP/rtAddressConfig.xml and FMOFP/MIL_STD_1553B/message_schemas.py.</revision>
   <revision version="1.0-draft.2" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 1-3: display addresses accepted; BIT merged into avionics (RT 1), FM fitness and SW configuration folded in as well; bus controller confirmed as its own process. RT 24-26 freed.</revision>
   <revision version="1.0-draft.3" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 4-10: UDP transport accepted; legacy WEATHER mode dropped as unnecessary; every TBD value defined from the code that uses it; heading and yaw are true. Command parameters nothing consumed were removed.</revision>
@@ -599,6 +599,15 @@
       <value name="SAFE_STATION" value="5"/>
       <value name="RELEASE" value="6"/>
       <value name="JETTISON" value="7"/>
+    </enum>
+    <enum id="briefing_command" bits="4" doc="What MSN_BRIEF_CMD asks of the mission computer (v1.29): MissionControl's set_objectives, set_roe and update_intelligence, one entry per command (the Python took whole lists and a dictionary)">
+      <value name="NONE" value="0"/>
+      <value name="CLEAR_OBJECTIVES" value="1" doc="set_objectives([]): the list emptied"/>
+      <value name="ADD_OBJECTIVE" value="2" doc="set_objectives(old + [text]): the text appended"/>
+      <value name="CLEAR_ROE" value="3" doc="set_roe([])"/>
+      <value name="ADD_ROE" value="4" doc="set_roe(old + [text])"/>
+      <value name="UPDATE_INTELLIGENCE" value="5" doc="update_intelligence({key: text}): a new key appended, a known key's value replaced"/>
+      <value name="CLEAR_INTELLIGENCE" value="6" doc="the dictionary emptied (the Python had no call for it: a new mission's briefing needs one)"/>
     </enum>
   </enums>
 
@@ -1488,7 +1497,7 @@
     </message>
 
     <!-- ===== v1.16: the mission computer (RT 6), the communications terminal (RT 2) and the RF environment in the plant ===== -->
-    <message id="MSN_STATUS" rt="6" sa="10" dir="T" words="6" rate="5" title="Mission computer status">
+    <message id="MSN_STATUS" rt="6" sa="10" dir="T" words="8" rate="5" title="Mission computer status">
       <doc>The terminal's state and command handling as the other subsystems report them, plus what missionService.get_data() summarised: the phase (MissionControl), the route's progress (RouteManager.get_nav_data: the active waypoint's index, the distance and bearing to it), and the counts of waypoints, active targets and units by affiliation. The plan itself is the MSN_PLAN block. mission_cmd_status is the outcome of the last MSN_CMD.</doc>
       <field name="state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
       <field name="spare_0" word="0" bits="11-8" type="spare"/>
@@ -1511,11 +1520,39 @@
       <field name="spare_3" word="3" bits="0" type="spare"/>
       <field name="distance_to_next" word="4" bits="15-0" type="uint" lsb="1/10" units="nm" min="0" max="6553.5" doc="get_nav_data's distance_to_next_nm: great-circle, from the FMS position to the active waypoint; 0 without one"/>
       <field name="bearing_to_next" word="5" bits="15-0" type="uint" lsb="360/65536" units="deg" min="0" max="359.9945" doc="get_nav_data's bearing_to_next_deg, true; 0 without an active waypoint"/>
+      <field name="objective_count" word="6" bits="15-12" type="uint" doc="MissionControl._objectives: entries held (v1.29, up to 8)"/>
+      <field name="roe_count" word="6" bits="11-8" type="uint" doc="MissionControl._roe: entries held (up to 8)"/>
+      <field name="intelligence_count" word="6" bits="7-4" type="uint" doc="MissionControl._intelligence: keys held (up to 8)"/>
+      <field name="brief_cmd_status" word="6" bits="3-0" type="enum" enum="cmd_status" doc="Outcome of the last MSN_BRIEF_CMD: ACCEPTED, FAILED when the list is full, REJECTED_INVALID for an empty text or key"/>
+      <field name="last_brief_cmd_seq" word="7" bits="15-8" type="uint" doc="cmd_seq of the last MSN_BRIEF_CMD processed"/>
+      <field name="spare_7" word="7" bits="7-0" type="spare"/>
     </message>
     <message id="MSN_MODE_CMD" rt="6" sa="10" dir="R" words="1" rate="aperiodic" title="Mission computer mode command">
       <field name="requested_state" word="0" bits="15-12" type="enum" enum="terminal_state"/>
       <field name="spare_0" word="0" bits="11-8" type="spare"/>
       <field name="cmd_seq" word="0" bits="7-0" type="uint" doc="Incremented by the sender for each new command"/>
+    </message>
+    <message id="MSN_BRIEF_CMD" rt="6" sa="14" dir="R" words="17" rate="aperiodic" title="Mission briefing command">
+      <doc>MissionControl's set_objectives, set_roe and update_intelligence on the bus (v1.29; nothing called them upstream, and nothing read what they stored). One entry per command: an objective or a rule of engagement of up to 24 characters in text_0..text_11, an intelligence item as a key of up to 8 characters in key_0..key_3 and its value in the text, two characters a word, the first in the high byte, 0 padding (fmofp_bus.avionics.key_fields' packing). The mission computer holds up to 8 of each and reports the counts in MSN_STATUS.</doc>
+      <field name="command" word="0" bits="15-12" type="enum" enum="briefing_command"/>
+      <field name="spare_0" word="0" bits="11-8" type="spare"/>
+      <field name="cmd_seq" word="0" bits="7-0" type="uint"/>
+      <field name="key_0" word="1" bits="15-0" type="uint" doc="Intelligence key, characters 1 and 2"/>
+      <field name="key_1" word="2" bits="15-0" type="uint" doc="Intelligence key, characters 3 and 4"/>
+      <field name="key_2" word="3" bits="15-0" type="uint" doc="Intelligence key, characters 5 and 6"/>
+      <field name="key_3" word="4" bits="15-0" type="uint" doc="Intelligence key, characters 7 and 8"/>
+      <field name="text_0" word="5" bits="15-0" type="uint" doc="Text, characters 1 and 2"/>
+      <field name="text_1" word="6" bits="15-0" type="uint" doc="Text, characters 3 and 4"/>
+      <field name="text_2" word="7" bits="15-0" type="uint" doc="Text, characters 5 and 6"/>
+      <field name="text_3" word="8" bits="15-0" type="uint" doc="Text, characters 7 and 8"/>
+      <field name="text_4" word="9" bits="15-0" type="uint" doc="Text, characters 9 and 10"/>
+      <field name="text_5" word="10" bits="15-0" type="uint" doc="Text, characters 11 and 12"/>
+      <field name="text_6" word="11" bits="15-0" type="uint" doc="Text, characters 13 and 14"/>
+      <field name="text_7" word="12" bits="15-0" type="uint" doc="Text, characters 15 and 16"/>
+      <field name="text_8" word="13" bits="15-0" type="uint" doc="Text, characters 17 and 18"/>
+      <field name="text_9" word="14" bits="15-0" type="uint" doc="Text, characters 19 and 20"/>
+      <field name="text_10" word="15" bits="15-0" type="uint" doc="Text, characters 21 and 22"/>
+      <field name="text_11" word="16" bits="15-0" type="uint" doc="Text, characters 23 and 24"/>
     </message>
     <message id="MSN_CMD" rt="6" sa="11" dir="R" words="13" rate="aperiodic" title="Mission command">
       <doc>missionService.py's entry points on the bus (the scenario engine injected waypoints and phases through them; the targeting and order-of-battle calls had no caller). The fields a command does not use are ignored. ADD_WAYPOINT takes the name, position, altitude, type and fly-over flag; DESIGNATE_TARGET the kind, position, altitude and priority (the waypoint it inserts is named TGT-nnnn after the target's id); ADD_UNIT the kind, affiliation, status, threat level, position and altitude; the target and unit commands name their object by the id the mission computer gave it (MSN_PLAN); SET_PHASE takes the phase, ENGAGE_TARGET the weapon, ASSESS_DAMAGE the verdict. The outcome is MSN_STATUS.mission_cmd_status: ACCEPTED, REJECTED_INVALID for an unknown command or an unusable parameter, FAILED when the route or a table is full or the id is not found or the target's status does not allow the step.</doc>
@@ -1544,7 +1581,7 @@
       <field name="phase" word="12" bits="15-13" type="enum" enum="mission_phase" doc="SET_PHASE"/>
       <field name="spare_12" word="12" bits="12-0" type="spare"/>
     </message>
-    <message id="BCAST_MSN_STATUS" rt="31" sa="28" dir="R" words="6" rate="5" title="Mission status, broadcast to the displays" layout_of="MSN_STATUS" listeners="13 16">
+    <message id="BCAST_MSN_STATUS" rt="31" sa="28" dir="R" words="8" rate="5" title="Mission status, broadcast to the displays" layout_of="MSN_STATUS" listeners="9 13 16">
       <doc>The MFD's mission page header and route progress, the TSD's route (v1.16). Subaddress 28 carried the energy maneuverability until v1.15.</doc>
     </message>
     <message id="COM_STATUS" rt="2" sa="10" dir="T" words="3" rate="1" title="Communications status">

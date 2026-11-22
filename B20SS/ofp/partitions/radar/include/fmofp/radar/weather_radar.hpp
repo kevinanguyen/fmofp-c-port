@@ -46,6 +46,11 @@ public:
     // Applied only when its cmd_seq is new (ICD README section 5). A new
     // state, mode or range restarts the scan in progress.
     void command_mode(const icd::RdrWxModeCmd& cmd) noexcept;
+    // The mission phase's allocation (v1.29, radar::MissionAllocator): the mode change of a command without
+    // its number, and allocate() makes one from a mode, the radar's other settings kept; nothing when the
+    // radar is already in it.
+    void apply_mode(const icd::RdrWxModeCmd& cmd) noexcept;
+    void allocate(icd::WeatherMode requested) noexcept;
 
     // Mode code effects, relayed by the process from its RemoteTerminal.
     void reset() noexcept;

@@ -78,9 +78,40 @@ long index_of(const mission::RouteManager& route, std::uint8_t id) {
     return it == indices.end() ? -1L : static_cast<long>(*it);
 }
 
+// MSN_BRIEF_CMD from text (unit 37): two characters a word, the first in the high byte.
+template <std::size_t N>
+std::array<std::uint16_t, N> pack(const std::string& text) {
+    std::array<std::uint16_t, N> words{};
+    for (std::size_t i = 0; i < text.size() && i < 2 * N; ++i) {
+        const auto ch = static_cast<std::uint16_t>(static_cast<unsigned char>(text[i]));
+        words[i / 2] = static_cast<std::uint16_t>(words[i / 2] | (i % 2 == 0 ? static_cast<std::uint16_t>(ch << 8U) : ch));
+    }
+    return words;
+}
+
+icd::MsnBriefCmd brief_cmd(icd::BriefingCommand command, const std::string& text, const std::string& key) {
+    icd::MsnBriefCmd c{};
+    c.command = command;
+    const auto t = pack<mission::kBriefingTextWords>(text);
+    const auto k = pack<mission::kBriefingKeyWords>(key);
+    c.text_0 = t[0]; c.text_1 = t[1]; c.text_2 = t[2]; c.text_3 = t[3]; c.text_4 = t[4]; c.text_5 = t[5];
+    c.text_6 = t[6]; c.text_7 = t[7]; c.text_8 = t[8]; c.text_9 = t[9]; c.text_10 = t[10]; c.text_11 = t[11];
+    c.key_0 = k[0]; c.key_1 = k[1]; c.key_2 = k[2]; c.key_3 = k[3];
+    return c;
+}
+
+std::string rest_of(std::istringstream& in) {
+    std::string text;
+    std::getline(in, text);
+    const auto start = text.find_first_not_of(' ');
+    return start == std::string::npos ? std::string{} : text.substr(start);
+}
+
 }  // namespace
 
 int main() {
+    mission::Briefing briefing;
+    briefing.init();
     mission::RouteManager route;
     route.init();
     mission::Targeting targeting;
@@ -177,6 +208,42 @@ int main() {
         } else if (cmd == "oob_summary") {
             print({static_cast<double>(oob.friendly()), static_cast<double>(oob.enemy()),
                    static_cast<double>(oob.neutral())});
+        } else if (cmd.rfind("brief_", 0) == 0 && cmd != "brief_dump") {
+            // brief_objective TEXT, brief_roe TEXT, brief_intel KEY TEXT, brief_clear_objectives / _roe / _intel
+            using BC = icd::BriefingCommand;
+            std::string key;
+            BC command = BC::NONE;
+            if (cmd == "brief_objective") {
+                command = BC::ADD_OBJECTIVE;
+            } else if (cmd == "brief_roe") {
+                command = BC::ADD_ROE;
+            } else if (cmd == "brief_intel") {
+                command = BC::UPDATE_INTELLIGENCE;
+                in >> key;
+            } else if (cmd == "brief_clear_objectives") {
+                command = BC::CLEAR_OBJECTIVES;
+            } else if (cmd == "brief_clear_roe") {
+                command = BC::CLEAR_ROE;
+            } else if (cmd == "brief_clear_intel") {
+                command = BC::CLEAR_INTELLIGENCE;
+            }
+            const std::string text = rest_of(in);
+            std::printf("%s\n", icd::to_string(briefing.apply(brief_cmd(command, text, key))));
+        } else if (cmd == "brief_dump") {
+            for (std::size_t i = 0; i < briefing.objective_count(); ++i) {
+                const auto& t = briefing.objective(i);
+                std::printf("objective %.*s\n", static_cast<int>(t.length), t.chars.data());
+            }
+            for (std::size_t i = 0; i < briefing.roe_count(); ++i) {
+                const auto& t = briefing.roe(i);
+                std::printf("roe %.*s\n", static_cast<int>(t.length), t.chars.data());
+            }
+            for (std::size_t i = 0; i < briefing.intelligence_count(); ++i) {
+                const auto& item = briefing.intelligence(i);
+                std::printf("intel %.*s=%.*s\n", static_cast<int>(item.key_length), item.key.data(),
+                            static_cast<int>(item.value.length), item.value.chars.data());
+            }
+            std::printf("end\n");
         } else {
             std::printf("error unknown command\n");
         }

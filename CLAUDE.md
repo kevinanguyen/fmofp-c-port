@@ -109,8 +109,8 @@ person may continue it in their next session; when it is green it is rebased ont
   one unanswered poll in the display e2e on the slow runner, the same code green on the next run, the Linux 3.13
   Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename and Alee), `8d67afd` (this file and
   `B20SS/verify.sh`), `d82173f` (merge of upstream/main `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.28 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.29): 28 terminals, 167 message definitions
-  (217 after per-terminal expansion), 58 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
+- **ICD** v1.29 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.30): 28 terminals, 168 message definitions
+  (218 after per-terminal expansion), 58 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
   copies), 9 mode codes, 89/89 legacy types mapped. The bus controller has a **command port** at `port_base + 34`
   since v1.23 (ICD README section 7): a client queues a receive transaction and is acknowledged with the
   controller's frame count; `fmofp_bus/command_port.py` is the Python client, `fmofp_bus/bus_view.py` the picture
@@ -120,7 +120,8 @@ person may continue it in their next session; when it is green it is rebased ont
   monitor request, frame type 7: up to four listeners beside the fixed monitor port, three seconds a request);
   a view's frame count is the controller's own. v1.25 adds the crew alerting terminal (RT 26, unit 31), v1.26 the stores management terminal (RT 28, unit 32), v1.27
   what the holographic PFD and MFD read (unit 34: the fuel and the warning contacts to the PFD, the stores to the MFD),
-  v1.28 the FCS's commanded deflections to the plant (`PLANT_FCS_SURFACES`, unit 36).
+  v1.28 the FCS's commanded deflections to the plant (`PLANT_FCS_SURFACES`, unit 36), v1.29 the mission briefing
+  (`MSN_BRIEF_CMD`, `MSN_STATUS` at 8 words) and the radar computer following the mission phase (unit 37).
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
@@ -152,7 +153,7 @@ person may continue it in their next session; when it is green it is rebased ont
   (`fmofp_recorder/`: upstream's services' SQLite tables written from a copy of the monitor stream into
   `logs/recorder/`; `py -m fmofp_demo --record` runs it beside the demo); the bus library `fmofp_bus` with
   generated `fmofp_bus/icd/`.
-- **Load**: 25 terminals, 111 scheduled messages, worst minor frame 8700 us of the 10000 us budget since v1.28 (the
+- **Load**: 25 terminals, 111 scheduled messages, worst minor frame 8784 us of the 10000 us budget since v1.29 (the
   schedule's estimate; 23 terminals and 8612 us before unit 31). On Alee's machine after unit 32 (2026-11-18,
   optimised build): a 45 s headless demo, 2250 frames, 1 overrun, 25/25 answering. The numbers below are from
   before unit 31. The real-time demo, thirty seconds headless with the scripted events, 1500 frames, 23/23
@@ -162,7 +163,7 @@ person may continue it in their next session; when it is green it is rebased ont
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms. **That rise was the machine that afternoon, not the repairs** (measured 2026-11-17, section 7): the code before the repairs and each step after them, flown in turn with two fixed plant seeds, thirty flights: 0 overruns in every one, the five versions' median worst frame 6.8 to 7.6 ms (7.0 before the repairs, 7.4 at the head), the radar computer's mean answer 40 us and its worst 1.0 to 1.6 ms for every version; the one flight flown while the desktop was busy read 18.9 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 383 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
+- **Tests**: Python 388 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
   ctest 2/2 (355 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
@@ -170,9 +171,8 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 36 of 37.5 units = **96 %** (section 2): units 37 and 38, the punch list's items 6 and 7 (Alee:
-  "lets move on to punch list item 4-7", 2026-11-21), are open; units 35 (the prompt) and 36 (flight dynamics)
-  are done. Units 1-30 were done on 2026-11-12; units 31 (the
+- **Meter**: 36.5 of 37.5 units = **97.3 %** (section 2): unit 38, the user manual (the punch list's item 7), is
+  open; units 35 (the prompt), 36 (flight dynamics) and 37 (the mission phase and briefing) are done. Units 1-30 were done on 2026-11-12; units 31 (the
   EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18; unit 33
   (data recording, the punch list's item 2) and unit 34 (the display themes and the holographic PFD and MFD, the
   punch list's item 3) on 2026-11-21. Every unit is DONE or STRUCK. The punch list of
@@ -190,8 +190,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: unit 37, the mission phase driving the radars and the mission briefing, `IN PROGRESS
-  (Alee, 2026-11-21)`; unit 38 open. No `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: none claimed; unit 38 open, Alee's to take. No `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -303,10 +302,10 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 34 | Display themes and the holographic PFD and MFD, fed from the bus | 1.5 | DONE 2026-11-21 |
 | 35 | The prompt: upstream's canned messages as named shortcuts, the test suites, one mode for every display | 0.5 | DONE 2026-11-21 |
 | 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | DONE 2026-11-21 (flown by the FCS's commands; the surfaces terminal's loop is a ticket: section 2.36) |
-| 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | IN PROGRESS (Alee, 2026-11-21) |
+| 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | DONE 2026-11-21 |
 | 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | open |
 
-**Done: 36 / 37.5 = 96 %.** Open: units 37 and 38.
+**Done: 36.5 / 37.5 = 97.3 %.** Open: unit 38.
 
 ### 2.35 The prompt, 0.5
 
@@ -348,6 +347,8 @@ class leaves out (the turn of a banked aircraft, the climb of a pitched one, the
 as plant world; the surfaces terminal stays as ported and its reversed signs are an ICD README section 2 finding;
 the random walk stays the plant's default and the demo flies the dynamics (`--dynamics`).
 ### 2.37 Mission phase and mission data, 0.5
+
+DONE 2026-11-21 (section 7, ICD v1.29), as Alee chose below.
 
 Added 2026-11-21 (Alee, section 8), the punch list's item 6. Upstream's radar management had a mission-phase
 allocation (`update_mission_phase`) and the mission service objectives, rules of engagement and intelligence; nothing
@@ -1223,6 +1224,11 @@ Python tests and displays
   FlightDynamicsProcessor pitches the nose down for a positive elevator against its own comment, and the flight
   surfaces' ported laws push the wrong way under their message's documented convention. Before closing a loop
   between ported pieces, write down each one's sign convention and check the loop's sign on paper (unit 36).
+- A setting made inside a partition (the radars' mission allocation, unit 37) must not use a command number: the
+  ranges 1-100, 101-200 and 201-255 all belong to senders on the bus. Split the command into its number check and
+  its apply step (`apply_mode`) and call the apply step.
+- The mission computer is NORMAL only while it hears the FMS's flight data: an end-to-end test of anything that
+  follows its state needs the plant, the FCS, nav and the FMS beside it (`test_mission_briefing`).
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -2886,6 +2892,40 @@ done before this file existed are condensed from the private session notes.
   the walk unchanged, the relayed message; and over the bus the real FCS's elevator command pitching the aircraft up),
   ctest 2/2, cppcheck clean; load 111 messages, worst minor frame 8700 us (8852 before: the new relay moved the
   phases). Optimised build rebuilt. Meter 36 / 37.5 = 96 %.
+
+### 2026-11-21 - unit 37 the mission phase driving the radars, the mission briefing - ICD v1.29 - by Alee's agent
+- *What*: the punch list's item 6, built whole at Alee's word ("Build all of it", section 8) though upstream had little
+  behind it. **The radars**: `ofp/partitions/radar/{include/fmofp/radar,src}/mission_allocation.*` (new):
+  `configuration_for` (INGRESS, OBJECTIVE, EGRESS en route; COMPLETE the airport set; PLANNING nothing),
+  `allocation_for` (upstream's `_configure_enroute_surveillance` and `_configure_airport_*`, mode for mode),
+  `MissionAllocator` (applies a configuration when the one asked for changes, from a mission computer NORMAL or
+  DEGRADED); each radar's `command_mode` split into the number check and `apply_mode`, with `allocate(mode)` keeping
+  the radar's settings and its `last_cmd_seq`; the radar computer hears `BCAST_MSN_STATUS` and allocates before the
+  frame's commands. **The briefing**: `mission::Briefing` (up to 8 objectives, 8 rules of engagement, 8 intelligence
+  items; texts of 24 characters, keys of 8) and `MissionComputer::command_briefing`; `fmofp_mission_tool`'s `brief_*`
+  commands; `fmofp_bus/briefing.py` (new: the text packing); the prompt's `do objective`, `do roe`, `do intel`,
+  `do clear-*`; the demo's briefing at 1.7-2.1 s and `brief o/r/i` on its MSN line. ICD v1.29: `MSN_BRIEF_CMD` (6/14),
+  `MSN_STATUS` to 8 words, RT 9 a listener of 31/28, enum `briefing_command`.
+- *How*: scoped from the frozen `radarControl` and `missionControl` and put to Alee before the claim (section 2.37).
+- *Departures* (ICD README section 2, two rows): both are new behaviour. The phase mapping is the port's; the Python's
+  configurations are kept; the briefing's tables are bounded where the Python's were not, and CLEAR_INTELLIGENCE has
+  no Python call behind it.
+- *Warnings / lessons*: section 6's two lines (an internal setting takes no command number; the mission computer's
+  NORMAL needs the FMS's flight data). A patch script failed once on a string opened with `'''` and closed with
+  `"""`.
+- *Files*: `ofp/partitions/radar/{include/fmofp/radar/{mission_allocation,weather_radar,terrain_following,
+  targeting_radar,aewc_radar,sar_radar}.hpp, src/{mission_allocation,weather_radar,terrain_following,targeting_radar,
+  aewc_radar,sar_radar,main}.cpp}`, `ofp/partitions/mission/{include/fmofp/mission/mission_computer.hpp,
+  src/{mission_computer,main}.cpp, tools/mission_tool.cpp}`, `ofp/partitions/CMakeLists.txt`,
+  `ofp/tests/{mission_allocation_test.cpp, icd_messages_test.cpp, CMakeLists.txt}`, `fmofp_bus/briefing.py` (new),
+  `fmofp_cli/{shortcuts,cli}.py`, `fmofp_demo/demo.py`, `fmofp_bus/tests/{test_mission_briefing,test_messages}.py`,
+  `icd/fmofp_icd.xml` + README + generated files, `ofp/README.md`, this file.
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 388 OK (was 383: `test_mission_briefing.py` 6:
+  the packing, the configurations against the frozen methods, the two phase sets disjoint, 300 random briefings
+  against the frozen MissionControl, and over the bus the phase configuring the real radars, en route at INGRESS and
+  the airport set at COMPLETE, with the briefing counted 2/1/1), ctest 2/2 (359 gtests: four new for the mapping, the
+  allocator, the radars' allocate and the briefing), cppcheck clean, lint OK (44 flight sources); one gate run red on
+  `test_utilities_e2e` (the plant missed one poll in a 90 ms frame, a game running), green alone; load 8784 us. Meter 36.5 / 37.5 = 97.3 %.
 
 ---
 

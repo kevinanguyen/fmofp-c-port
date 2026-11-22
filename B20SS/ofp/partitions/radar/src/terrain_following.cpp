@@ -230,6 +230,10 @@ void TerrainFollowing::command_mode(const icd::RdrTfrModeCmd& cmd) noexcept {
         return;
     }
     status_.last_cmd_seq = cmd.cmd_seq;
+    apply_mode(cmd);
+}
+
+void TerrainFollowing::apply_mode(const icd::RdrTfrModeCmd& cmd) noexcept {
     if (!commandable(cmd.requested_state) || !icd::is_valid(cmd.requested_mode)) {
         status_.cmd_rejected = true;
         return;
@@ -394,6 +398,19 @@ bool TerrainFollowing::take_products_update() noexcept {
     const bool dirty = products_dirty_;
     products_dirty_ = false;
     return dirty;
+}
+
+void TerrainFollowing::allocate(icd::TfrMode requested) noexcept {
+    const icd::TerminalState wanted =
+        requested == icd::TfrMode::NONE ? icd::TerminalState::STANDBY : icd::TerminalState::NORMAL;
+    if (status_.state == wanted && mode_ == requested) {
+        return;
+    }
+    icd::RdrTfrModeCmd cmd{};
+    cmd.requested_state = wanted;
+    cmd.requested_mode = requested;
+    cmd.set_clearance = set_clearance_ft_;
+    apply_mode(cmd);
 }
 
 }  // namespace fmofp::radar

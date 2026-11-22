@@ -201,6 +201,10 @@ int main(int argc, char** argv) {
         if (take_fresh(terminal, cmd)) {
             g_mission.command(cmd);
         }
+        icd::MsnBriefCmd brief{};
+        if (take_fresh(terminal, brief)) {
+            g_mission.command_briefing(brief);
+        }
         icd::BcastFmsFlightData flight{};
         const bool have_flight = take_fresh(terminal, flight);
         g_mission.step(have_flight ? &flight : nullptr, frame);

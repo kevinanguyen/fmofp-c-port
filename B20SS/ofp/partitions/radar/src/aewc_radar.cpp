@@ -246,6 +246,10 @@ void AewcRadar::command_mode(const icd::RdrAewcModeCmd& cmd) noexcept {
         return;
     }
     status_.last_cmd_seq = cmd.cmd_seq;
+    apply_mode(cmd);
+}
+
+void AewcRadar::apply_mode(const icd::RdrAewcModeCmd& cmd) noexcept {
     if (!commandable(cmd.requested_state) || !icd::is_valid(cmd.requested_mode) || !std::isfinite(cmd.azimuth_start) ||
         !std::isfinite(cmd.azimuth_end) || !std::isfinite(cmd.elevation)) {
         status_.cmd_rejected = true;
@@ -510,6 +514,21 @@ void AewcRadar::fill_block() noexcept {
         rec.severity = s.ecm.severity;
     }
     block_.sector_count = static_cast<std::uint16_t>(kAewcSectorCount);
+}
+
+void AewcRadar::allocate(icd::AewcMode requested) noexcept {
+    const icd::TerminalState wanted =
+        requested == icd::AewcMode::NONE ? icd::TerminalState::STANDBY : icd::TerminalState::NORMAL;
+    if (status_.state == wanted && mode_ == requested) {
+        return;
+    }
+    icd::RdrAewcModeCmd cmd{};
+    cmd.requested_state = wanted;
+    cmd.requested_mode = requested;
+    cmd.azimuth_start = scan_start_deg_;
+    cmd.azimuth_end = scan_end_deg_;
+    cmd.elevation = 0.0;
+    apply_mode(cmd);
 }
 
 }  // namespace fmofp::radar

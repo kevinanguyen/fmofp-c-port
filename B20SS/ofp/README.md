@@ -402,6 +402,10 @@ zero, chaff released and a threat injected, and reads the list at the EICAS's bu
 `dbConfig.xml` and its rows to their dictionaries; `test_recorder_e2e.py` records eight terminals on a real
 bus in real time and reads the tables back (unit 33: `py -m fmofp_recorder`, or `py -m fmofp_demo --record`,
 writes them into `logs/recorder/`; `py -m fmofp_cli -c tables` and `-c "table fcs_data 5"` show them).
+`test_mission_briefing.py` holds unit 37: the radars' configurations to the frozen `radarControl._configure_*`
+methods, 300 random briefings to the frozen MissionControl through `fmofp_mission_tool` (`brief_objective`,
+`brief_roe`, `brief_intel`, `brief_clear_*`, `brief_dump`), and over the bus the mission phase putting the real radar
+computer's five radars en route and back, with the briefing counted in `MSN_STATUS`.
 `test_plant_dynamics.py` holds the plant's flight dynamics (unit 36, `py -m fmofp_plant --dynamics`, the demo's
 default): upstream's `FlightDynamicsProcessor` response against the frozen class, the turn, climb and speed the
 plant adds, the walk unchanged without `--dynamics`, and the real FCS's `FCS_SURFACE_CMD` pitching the plant's

@@ -328,6 +328,9 @@ class DebugCli:
                 self.out(line)
             return
         name = args[0].lower()
+        if name in shortcuts.BRIEFINGS:
+            self.out(self.send_message(shortcuts.briefing(name, args[1:])))
+            return None
         reading = shortcuts.READING_BY_NAME.get(name)
         if reading is not None:
             self.out(f"{reading.help}:")

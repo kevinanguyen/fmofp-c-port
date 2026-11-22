@@ -76,6 +76,35 @@ READINGS = (
 BY_NAME = {s.name: s for s in SHORTCUTS}
 READING_BY_NAME = {r.name: r for r in READINGS}
 
+# The mission briefing (unit 37, MSN_BRIEF_CMD): MissionControl's set_objectives, set_roe and update_intelligence,
+# one entry a command. name -> (command name, whether it takes a key, help).
+BRIEFINGS = {
+    "objective": ("ADD_OBJECTIVE", False, "add an objective: do objective TEXT (24 characters)"),
+    "roe": ("ADD_ROE", False, "add a rule of engagement: do roe TEXT"),
+    "intel": ("UPDATE_INTELLIGENCE", True, "set an intelligence item: do intel KEY TEXT (a key of 8 characters)"),
+    "clear-objectives": ("CLEAR_OBJECTIVES", False, "empty the objectives"),
+    "clear-roe": ("CLEAR_ROE", False, "empty the rules of engagement"),
+    "clear-intel": ("CLEAR_INTELLIGENCE", False, "empty the intelligence"),
+}
+
+
+def briefing(name, args):
+    """The MSN_BRIEF_CMD a briefing shortcut makes from its words."""
+    from fmofp_bus.briefing import brief_command
+    from fmofp_bus.icd.enums import BriefingCommand
+    command, takes_key, help_text = BRIEFINGS[name]
+    words = list(args)
+    key = ""
+    if takes_key:
+        if not words:
+            raise ValueError(f"do {name}: {help_text}")
+        key = words.pop(0)
+    text = " ".join(words)
+    if command.startswith("ADD") or command.startswith("UPDATE"):
+        if not text:
+            raise ValueError(f"do {name}: {help_text}")
+    return brief_command(BriefingCommand[command], text=text, key=key)
+
 # The six display terminals' mode commands (the HUD, RT 18, has none: unit 27 struck it).
 DISPLAY_MODE_COMMANDS = {"radar": m.DspRadarModeCmd, "pfd": m.DspPfdModeCmd, "mfd": m.DspMfdModeCmd,
                          "eicas": m.DspEicasModeCmd, "tsd": m.DspTsdModeCmd, "sms": m.DspSmsModeCmd}
@@ -94,6 +123,9 @@ def listing():
     for r in READINGS:
         lines.append(f"  do {r.name}")
         lines.append(f"      {r.help}: msg {r.message_id} (was {r.origin})")
+    for name, (_, _, help_text) in BRIEFINGS.items():
+        lines.append(f"  do {name}")
+        lines.append(f"      {help_text}; MSN_BRIEF_CMD (was MissionControl's briefing)")
     return lines
 
 

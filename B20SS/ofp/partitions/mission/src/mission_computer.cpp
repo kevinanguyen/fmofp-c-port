@@ -504,6 +504,122 @@ std::size_t OrderOfBattle::threats(std::uint8_t min_level, std::array<std::size_
 
 // ---- MissionComputer -------------------------------------------------------------------------
 
+namespace {
+
+// Characters two a word, the first in the high byte, up to the first 0 (MSN_BRIEF_CMD, ICD README section 2).
+template <std::size_t Words, std::size_t Chars>
+std::size_t unpack_text(const std::array<std::uint16_t, Words>& words, std::array<char, Chars>& out) noexcept {
+    static_assert(Chars == 2 * Words, "two characters a word");
+    out.fill('\0');
+    std::size_t length = 0;
+    for (const std::uint16_t word : words) {
+        const auto high = static_cast<std::uint8_t>((static_cast<unsigned>(word) >> 8U) & 0xFFU);
+        const auto low = static_cast<std::uint8_t>(static_cast<unsigned>(word) & 0xFFU);
+        if (high == 0U) {
+            return length;
+        }
+        out[length++] = static_cast<char>(high);
+        if (low == 0U) {
+            return length;
+        }
+        out[length++] = static_cast<char>(low);
+    }
+    return length;
+}
+
+std::array<std::uint16_t, kBriefingTextWords> text_words(const icd::MsnBriefCmd& c) noexcept {
+    return {c.text_0, c.text_1, c.text_2, c.text_3, c.text_4, c.text_5,
+            c.text_6, c.text_7, c.text_8, c.text_9, c.text_10, c.text_11};
+}
+
+std::array<std::uint16_t, kBriefingKeyWords> key_words(const icd::MsnBriefCmd& c) noexcept {
+    return {c.key_0, c.key_1, c.key_2, c.key_3};
+}
+
+bool same_key(const IntelligenceItem& item, const std::array<char, kBriefingKeyChars>& key, std::size_t length) noexcept {
+    return item.key_length == length && std::equal(key.begin(), key.begin() + static_cast<std::ptrdiff_t>(length),
+                                                   item.key.begin());
+}
+
+icd::CmdStatus append(std::array<BriefingText, kBriefingEntries>& table, std::size_t& count,
+                      const BriefingText& text) noexcept {
+    if (text.length == 0) {
+        return icd::CmdStatus::REJECTED_INVALID;
+    }
+    if (count >= kBriefingEntries) {
+        return icd::CmdStatus::FAILED;
+    }
+    table[count++] = text;
+    return icd::CmdStatus::ACCEPTED;
+}
+
+}  // namespace
+
+void Briefing::init() noexcept {
+    objectives_ = {};
+    roe_ = {};
+    intelligence_ = {};
+    objective_count_ = 0;
+    roe_count_ = 0;
+    intelligence_count_ = 0;
+}
+
+icd::CmdStatus Briefing::apply(const icd::MsnBriefCmd& cmd) noexcept {
+    BriefingText text{};
+    text.length = unpack_text(text_words(cmd), text.chars);
+    switch (cmd.command) {
+        case icd::BriefingCommand::CLEAR_OBJECTIVES:
+            objective_count_ = 0;  // set_objectives([])
+            return icd::CmdStatus::ACCEPTED;
+        case icd::BriefingCommand::ADD_OBJECTIVE:
+            return append(objectives_, objective_count_, text);
+        case icd::BriefingCommand::CLEAR_ROE:
+            roe_count_ = 0;
+            return icd::CmdStatus::ACCEPTED;
+        case icd::BriefingCommand::ADD_ROE:
+            return append(roe_, roe_count_, text);
+        case icd::BriefingCommand::UPDATE_INTELLIGENCE: {
+            // update_intelligence({key: value}): dict.update replaces a known key's value, appends a new key.
+            std::array<char, kBriefingKeyChars> key{};
+            const std::size_t key_length = unpack_text(key_words(cmd), key);
+            if (key_length == 0) {
+                return icd::CmdStatus::REJECTED_INVALID;
+            }
+            const auto end = intelligence_.begin() + static_cast<std::ptrdiff_t>(intelligence_count_);
+            const auto found = std::find_if(intelligence_.begin(), end, [&](const IntelligenceItem& item) {
+                return same_key(item, key, key_length);
+            });
+            if (found != end) {
+                found->value = text;
+                return icd::CmdStatus::ACCEPTED;
+            }
+            if (intelligence_count_ >= kBriefingEntries) {
+                return icd::CmdStatus::FAILED;
+            }
+            IntelligenceItem& item = intelligence_[intelligence_count_++];
+            item.key = key;
+            item.key_length = key_length;
+            item.value = text;
+            return icd::CmdStatus::ACCEPTED;
+        }
+        case icd::BriefingCommand::CLEAR_INTELLIGENCE:
+            intelligence_count_ = 0;
+            return icd::CmdStatus::ACCEPTED;
+        case icd::BriefingCommand::NONE:
+            break;
+    }
+    return icd::CmdStatus::NONE;
+}
+
+void MissionComputer::command_briefing(const icd::MsnBriefCmd& cmd) noexcept {
+    if (!brief_seq_.accept(cmd.cmd_seq)) {
+        return;
+    }
+    status_.last_brief_cmd_seq = cmd.cmd_seq;
+    brief_status_ = briefing_.apply(cmd);
+    fill_status();
+}
+
 Status MissionComputer::init() noexcept {
     status_ = icd::MsnStatus{};
     status_.state = TerminalState::INITIALIZING;
@@ -512,8 +628,10 @@ Status MissionComputer::init() noexcept {
     route_.init();
     targeting_.init();
     oob_.init();
+    briefing_.init();
     phase_ = icd::MissionPhase::PLANNING;
     cmd_status_ = icd::CmdStatus::NONE;
+    brief_status_ = icd::CmdStatus::NONE;
     position_valid_ = false;
     have_flight_ = false;
     last_flight_frame_ = 0;
@@ -528,6 +646,7 @@ Status MissionComputer::init() noexcept {
     bit_ = bus::BitWord{};
     mode_seq_ = bus::CommandSequence{};
     cmd_seq_ = bus::CommandSequence{};
+    brief_seq_ = bus::CommandSequence{};
     fill_status();
     fill_plan();
     plan_ready_ = true;  // the first plan (an empty route) goes out at once
@@ -773,6 +892,10 @@ void MissionComputer::fill_status() noexcept {
     status_.neutral_units = static_cast<std::uint8_t>(oob_.neutral());
     status_.distance_to_next = route_.distance_to_next_nm();
     status_.bearing_to_next = route_.bearing_to_next_deg();
+    status_.objective_count = static_cast<std::uint8_t>(briefing_.objective_count());
+    status_.roe_count = static_cast<std::uint8_t>(briefing_.roe_count());
+    status_.intelligence_count = static_cast<std::uint8_t>(briefing_.intelligence_count());
+    status_.brief_cmd_status = brief_status_;
 }
 
 void MissionComputer::fill_plan() noexcept {

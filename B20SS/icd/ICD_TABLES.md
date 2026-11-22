@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.28 (DRAFT, 2026-11-21). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.29 (DRAFT, 2026-11-21). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -72,8 +72,9 @@ RT 31 is broadcast. Unused: 24, 25, 29, 30.
 | [`FCS_PERF_STATUS`](#fcs_perf_status) | 5 | 15 | T | 4 | 1 | Flight envelope monitoring | DRAFT |
 | [`FCS_TERRAIN`](#fcs_terrain) | 5 | 16 | R | 8 | 10 | Terrain clearance as received by the flight control computer | DRAFT |
 | [`MSN_MODE_CMD`](#msn_mode_cmd) | 6 | 10 | R | 1 | aperiodic | Mission computer mode command | DRAFT |
-| [`MSN_STATUS`](#msn_status) | 6 | 10 | T | 6 | 5 | Mission computer status | DRAFT |
+| [`MSN_STATUS`](#msn_status) | 6 | 10 | T | 8 | 5 | Mission computer status | DRAFT |
 | [`MSN_CMD`](#msn_cmd) | 6 | 11 | R | 13 | aperiodic | Mission command | DRAFT |
+| [`MSN_BRIEF_CMD`](#msn_brief_cmd) | 6 | 14 | R | 17 | aperiodic | Mission briefing command | DRAFT |
 | [`NAV_SENSORS`](#nav_sensors) | 7 | 13 | R | 11 | 50 | Sensed flight state, for navigation | DRAFT |
 | [`NAV_GPS`](#nav_gps) | 7 | 14 | R | 25 | 1 | GPS pseudoranges, for navigation | DRAFT |
 | [`NAV_SOLUTION`](#nav_solution) | 7 | 15 | T | 8 | 10 | Navigation solution | DRAFT |
@@ -205,7 +206,7 @@ RT 31 is broadcast. Unused: 24, 25, 29, 30.
 | [`BCAST_FMS_FLIGHT_DATA`](#bcast_fms_flight_data) | 31 | 25 | R | 21 | 10 | FMS flight data, broadcast | DRAFT |
 | [`BCAST_FMS_STATUS`](#bcast_fms_status) | 31 | 26 | R | 3 | 5 | FMS status, broadcast to the displays | DRAFT |
 | [`BCAST_FMS_ATTITUDE_STATUS`](#bcast_fms_attitude_status) | 31 | 27 | R | 8 | 10 | Attitude command status, broadcast to the displays | DRAFT |
-| [`BCAST_MSN_STATUS`](#bcast_msn_status) | 31 | 28 | R | 6 | 5 | Mission status, broadcast to the displays | DRAFT |
+| [`BCAST_MSN_STATUS`](#bcast_msn_status) | 31 | 28 | R | 8 | 5 | Mission status, broadcast to the displays | DRAFT |
 | [`TERM_CMD`](#term_cmd) | all | 29 | R | 1 | aperiodic | Terminal command | DRAFT |
 | [`TERM_STATUS`](#term_status) | all | 29 | T | 5 | 1 | Terminal status | DRAFT |
 
@@ -292,7 +293,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`RDR_SAR_IMAGE`](#rdr_sar_image) | `MFD_RDR_SAR_IMAGE` | block: 4 + 32 per frame | 25 |
 | [`PLANT_RF`](#plant_rf) | [`COM_RF`](#com_rf) | 7 | 1 |
 | [`COM_LINK_STATUS`](#com_link_status) | [`MFD_COM_LINK_STATUS`](#mfd_com_link_status) | 11 | 1 |
-| [`MSN_STATUS`](#msn_status) | [`BCAST_MSN_STATUS`](#bcast_msn_status) (broadcast, heard by RT 13, 16) | 6 | 5 |
+| [`MSN_STATUS`](#msn_status) | [`BCAST_MSN_STATUS`](#bcast_msn_status) (broadcast, heard by RT 9, 13, 16) | 8 | 5 |
 | [`MSN_PLAN`](#msn_plan) | `BCAST_MSN_PLAN` (broadcast, heard by RT 13, 16) | block: 4 + 32 per frame | 10 |
 | [`PLANT_ESM`](#plant_esm) | [`DEF_ESM`](#def_esm) | 26 | 5 |
 | [`DEF_STATUS`](#def_status) | [`EICAS_DEF_STATUS`](#eicas_def_status) | 6 | 5 |
@@ -1306,6 +1307,20 @@ What SMS_CMD asks of the stores management terminal (v1.26; the frozen display h
 | 5 | SAFE_STATION |  |  |
 | 6 | RELEASE |  |  |
 | 7 | JETTISON |  |  |
+
+### `briefing_command` (4 bits)
+
+What MSN_BRIEF_CMD asks of the mission computer (v1.29): MissionControl's set_objectives, set_roe and update_intelligence, one entry per command (the Python took whole lists and a dictionary)
+
+| Value | Name | Legacy value | Note |
+|---|---|---|---|
+| 0 | NONE |  |  |
+| 1 | CLEAR_OBJECTIVES |  | set_objectives([]): the list emptied |
+| 2 | ADD_OBJECTIVE |  | set_objectives(old + [text]): the text appended |
+| 3 | CLEAR_ROE |  | set_roe([]) |
+| 4 | ADD_ROE |  | set_roe(old + [text]) |
+| 5 | UPDATE_INTELLIGENCE |  | update_intelligence({key: text}): a new key appended, a known key's value replaced |
+| 6 | CLEAR_INTELLIGENCE |  | the dictionary emptied (the Python had no call for it: a new mission's briefing needs one) |
 
 ## Messages
 
@@ -2716,7 +2731,7 @@ The tanks of fuelControl.FuelManagementSystem.setup_aircraft (Main Left and Main
 
 ### MSN_STATUS
 
-**Mission computer status** — RT 6 · SA 10 · transmit (terminal to bus) · 6 words · 5 Hz
+**Mission computer status** — RT 6 · SA 10 · transmit (terminal to bus) · 8 words · 5 Hz
 
 The terminal's state and command handling as the other subsystems report them, plus what missionService.get_data() summarised: the phase (MissionControl), the route's progress (RouteManager.get_nav_data: the active waypoint's index, the distance and bearing to it), and the counts of waypoints, active targets and units by affiliation. The plan itself is the MSN_PLAN block. mission_cmd_status is the outcome of the last MSN_CMD.
 
@@ -2743,6 +2758,12 @@ The terminal's state and command handling as the other subsystems report them, p
 | 3 | 0 | `spare_3` | spare |  |  |
 | 4 | 15-0 | `distance_to_next` | uint | LSB 1/10 nm, range 0 to 6553.5 | get_nav_data's distance_to_next_nm: great-circle, from the FMS position to the active waypoint; 0 without one |
 | 5 | 15-0 | `bearing_to_next` | uint | LSB 360/65536 deg, range 0 to 359.9945 | get_nav_data's bearing_to_next_deg, true; 0 without an active waypoint |
+| 6 | 15-12 | `objective_count` | uint | raw counts | MissionControl._objectives: entries held (v1.29, up to 8) |
+| 6 | 11-8 | `roe_count` | uint | raw counts | MissionControl._roe: entries held (up to 8) |
+| 6 | 7-4 | `intelligence_count` | uint | raw counts | MissionControl._intelligence: keys held (up to 8) |
+| 6 | 3-0 | `brief_cmd_status` | enum | enum `cmd_status` | Outcome of the last MSN_BRIEF_CMD: ACCEPTED, FAILED when the list is full, REJECTED_INVALID for an empty text or key |
+| 7 | 15-8 | `last_brief_cmd_seq` | uint | raw counts | cmd_seq of the last MSN_BRIEF_CMD processed |
+| 7 | 7-0 | `spare_7` | spare |  |  |
 
 ### MSN_MODE_CMD
 
@@ -2753,6 +2774,34 @@ The terminal's state and command handling as the other subsystems report them, p
 | 0 | 15-12 | `requested_state` | enum | enum `terminal_state` |  |
 | 0 | 11-8 | `spare_0` | spare |  |  |
 | 0 | 7-0 | `cmd_seq` | uint | raw counts | Incremented by the sender for each new command |
+
+### MSN_BRIEF_CMD
+
+**Mission briefing command** — RT 6 · SA 14 · receive (bus to terminal) · 17 words · aperiodic
+
+MissionControl's set_objectives, set_roe and update_intelligence on the bus (v1.29; nothing called them upstream, and nothing read what they stored). One entry per command: an objective or a rule of engagement of up to 24 characters in text_0..text_11, an intelligence item as a key of up to 8 characters in key_0..key_3 and its value in the text, two characters a word, the first in the high byte, 0 padding (fmofp_bus.avionics.key_fields' packing). The mission computer holds up to 8 of each and reports the counts in MSN_STATUS.
+
+| Word | Bits | Field | Type | Scaling | Notes |
+|---|---|---|---|---|---|
+| 0 | 15-12 | `command` | enum | enum `briefing_command` |  |
+| 0 | 11-8 | `spare_0` | spare |  |  |
+| 0 | 7-0 | `cmd_seq` | uint | raw counts |  |
+| 1 | 15-0 | `key_0` | uint | raw counts | Intelligence key, characters 1 and 2 |
+| 2 | 15-0 | `key_1` | uint | raw counts | Intelligence key, characters 3 and 4 |
+| 3 | 15-0 | `key_2` | uint | raw counts | Intelligence key, characters 5 and 6 |
+| 4 | 15-0 | `key_3` | uint | raw counts | Intelligence key, characters 7 and 8 |
+| 5 | 15-0 | `text_0` | uint | raw counts | Text, characters 1 and 2 |
+| 6 | 15-0 | `text_1` | uint | raw counts | Text, characters 3 and 4 |
+| 7 | 15-0 | `text_2` | uint | raw counts | Text, characters 5 and 6 |
+| 8 | 15-0 | `text_3` | uint | raw counts | Text, characters 7 and 8 |
+| 9 | 15-0 | `text_4` | uint | raw counts | Text, characters 9 and 10 |
+| 10 | 15-0 | `text_5` | uint | raw counts | Text, characters 11 and 12 |
+| 11 | 15-0 | `text_6` | uint | raw counts | Text, characters 13 and 14 |
+| 12 | 15-0 | `text_7` | uint | raw counts | Text, characters 15 and 16 |
+| 13 | 15-0 | `text_8` | uint | raw counts | Text, characters 17 and 18 |
+| 14 | 15-0 | `text_9` | uint | raw counts | Text, characters 19 and 20 |
+| 15 | 15-0 | `text_10` | uint | raw counts | Text, characters 21 and 22 |
+| 16 | 15-0 | `text_11` | uint | raw counts | Text, characters 23 and 24 |
 
 ### MSN_CMD
 
@@ -2789,7 +2838,7 @@ missionService.py's entry points on the bus (the scenario engine injected waypoi
 
 ### BCAST_MSN_STATUS
 
-**Mission status, broadcast to the displays** — RT 31 · SA 28 · receive (bus to terminal) · 6 words · 5 Hz
+**Mission status, broadcast to the displays** — RT 31 · SA 28 · receive (bus to terminal) · 8 words · 5 Hz
 
 The MFD's mission page header and route progress, the TSD's route (v1.16). Subaddress 28 carried the energy maneuverability until v1.15.
 

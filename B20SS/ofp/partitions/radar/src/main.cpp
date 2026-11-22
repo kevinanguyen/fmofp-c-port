@@ -32,6 +32,7 @@
 #include <fmofp/icd/messages.hpp>
 #include <fmofp/icd/version.hpp>
 #include <fmofp/radar/aewc_radar.hpp>
+#include <fmofp/radar/mission_allocation.hpp>
 #include <fmofp/radar/sar_radar.hpp>
 #include <fmofp/radar/targeting_radar.hpp>
 #include <fmofp/radar/terrain_following.hpp>
@@ -64,6 +65,17 @@ radar::TargetingRadar g_targeting;
 radar::AewcRadar g_aewc;
 radar::SarRadar g_sar;
 radar::TrackFusion g_fusion;
+radar::MissionAllocator g_allocator;
+
+// The radars as the mission phase's configuration has them (v1.29, unit 37).
+void allocate(radar::RadarConfiguration configuration) noexcept {
+    const radar::RadarAllocation a = radar::allocation_for(configuration);
+    g_weather.allocate(a.weather);
+    g_tfr.allocate(a.tfr);
+    g_targeting.allocate(a.targeting);
+    g_aewc.allocate(a.aewc);
+    g_sar.allocate(a.sar);
+}
 std::array<bus::Word, WxProducts::kMaxPayloadWords> g_wx_storage{};
 std::array<bus::Word, WxProducts::kMaxPayloadWords> g_wx_payload{};
 std::array<bus::Word, TfrProducts::kMaxPayloadWords> g_tfr_storage{};
@@ -421,6 +433,11 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "radar: cannot accept the flight data broadcast\n");
         return 1;
     }
+    // The radars follow the mission phase (v1.29).
+    if (terminal.accept_broadcast(icd::BcastMsnStatus::kSubaddress) != Status::kOk) {
+        std::fprintf(stderr, "radar: cannot accept the mission status broadcast\n");
+        return 1;
+    }
     LastCommand last_command = LastCommand::kNone;
     (void)load_outputs(terminal, last_command, 0);
     (void)serve_blocks(terminal, blocks);
@@ -441,6 +458,7 @@ int main(int argc, char** argv) {
                 g_aewc.reset();
                 g_sar.reset();
                 (void)g_fusion.init();
+                g_allocator.reset();
                 (void)init_blocks(blocks);
                 last_command = LastCommand::kNone;
                 (void)load_outputs(terminal, last_command, 0);
@@ -458,6 +476,13 @@ int main(int argc, char** argv) {
             g_sar.start_self_test();
         }
         terminal.set_bit(combined_bit());
+
+        // The mission phase's configuration first, so that a command heard in the same frame still has the last word.
+        icd::BcastMsnStatus mission{};
+        radar::RadarConfiguration configuration = radar::RadarConfiguration::kNone;
+        if (take_fresh(terminal, mission) && g_allocator.observe(mission.payload, configuration)) {
+            allocate(configuration);
+        }
 
         icd::RdrWxModeCmd wx_cmd{};
         if (take_fresh(terminal, wx_cmd)) {
@@ -536,11 +561,11 @@ int main(int argc, char** argv) {
     const bus::RtCounters& c = terminal.counters();
     std::printf("radar: syncs=%lu commands=%u receives=%u transmits=%u message_errors=%u scans=%u profiles=%u "
                 "terrain_blocks=%u traffic_blocks=%u track_updates=%u aewc_updates=%u sar_images=%u scene_blocks=%u "
-                "fusion_epochs=%u state=%s\n",
+                "fusion_epochs=%u mission_allocations=%u state=%s\n",
                 syncs, c.commands, c.receives, c.transmits, c.message_errors, g_weather.scans_completed(),
                 g_tfr.profiles_assessed(), blocks.terrain.receiver().completed_blocks(),
                 blocks.traffic.receiver().completed_blocks(), g_targeting.updates(), g_aewc.updates(), g_sar.images(),
                 blocks.scene.receiver().completed_blocks(), static_cast<unsigned>(g_fusion.epochs()),
-                icd::to_string(combined_state()));
+                static_cast<unsigned>(g_allocator.allocations()), icd::to_string(combined_state()));
     return 0;
 }

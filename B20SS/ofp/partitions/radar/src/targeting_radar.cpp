@@ -157,6 +157,10 @@ void TargetingRadar::command_mode(const icd::RdrTgtModeCmd& cmd) noexcept {
         return;
     }
     status_.last_cmd_seq = cmd.cmd_seq;
+    apply_mode(cmd);
+}
+
+void TargetingRadar::apply_mode(const icd::RdrTgtModeCmd& cmd) noexcept {
     if (!commandable(cmd.requested_state) || !icd::is_valid(cmd.requested_mode) || !icd::is_valid(cmd.track_filter)) {
         status_.cmd_rejected = true;
         return;
@@ -376,6 +380,20 @@ void TargetingRadar::fill_block() noexcept {
         rec.stealth_probability = track.stealth_probability;
     }
     block_.track_count = static_cast<std::uint16_t>(reported);
+}
+
+void TargetingRadar::allocate(icd::TargetingMode requested) noexcept {
+    const icd::TerminalState wanted =
+        requested == icd::TargetingMode::NONE ? icd::TerminalState::STANDBY : icd::TerminalState::NORMAL;
+    if (status_.state == wanted && mode_ == requested) {
+        return;
+    }
+    icd::RdrTgtModeCmd cmd{};
+    cmd.requested_state = wanted;
+    cmd.requested_mode = requested;
+    cmd.track_filter = filter_;
+    cmd.lock_track_id = 0;
+    apply_mode(cmd);
 }
 
 }  // namespace fmofp::radar

@@ -205,6 +205,48 @@ private:
     std::uint8_t next_id_{1};
 };
 
+// MissionControl's objectives, rules of engagement and intelligence (v1.29, MSN_BRIEF_CMD): what set_objectives,
+// set_roe and update_intelligence stored, one entry per command, in fixed tables. Nothing upstream read them.
+constexpr std::size_t kBriefingEntries = 8;
+constexpr std::size_t kBriefingTextWords = 12;
+constexpr std::size_t kBriefingTextChars = 2 * kBriefingTextWords;
+constexpr std::size_t kBriefingKeyWords = 4;
+constexpr std::size_t kBriefingKeyChars = 2 * kBriefingKeyWords;
+
+struct BriefingText {
+    std::array<char, kBriefingTextChars> chars{};
+    std::size_t length{0};
+};
+
+struct IntelligenceItem {
+    std::array<char, kBriefingKeyChars> key{};
+    std::size_t key_length{0};
+    BriefingText value{};
+};
+
+class Briefing {
+public:
+    void init() noexcept;
+    // One MSN_BRIEF_CMD: ACCEPTED, FAILED when the table is full, REJECTED_INVALID for an empty text or key, NONE for
+    // the NONE command.
+    [[nodiscard]] icd::CmdStatus apply(const icd::MsnBriefCmd& cmd) noexcept;
+
+    [[nodiscard]] std::size_t objective_count() const noexcept { return objective_count_; }
+    [[nodiscard]] std::size_t roe_count() const noexcept { return roe_count_; }
+    [[nodiscard]] std::size_t intelligence_count() const noexcept { return intelligence_count_; }
+    [[nodiscard]] const BriefingText& objective(std::size_t i) const noexcept { return objectives_[i]; }
+    [[nodiscard]] const BriefingText& roe(std::size_t i) const noexcept { return roe_[i]; }
+    [[nodiscard]] const IntelligenceItem& intelligence(std::size_t i) const noexcept { return intelligence_[i]; }
+
+private:
+    std::array<BriefingText, kBriefingEntries> objectives_{};
+    std::array<BriefingText, kBriefingEntries> roe_{};
+    std::array<IntelligenceItem, kBriefingEntries> intelligence_{};
+    std::size_t objective_count_{0};
+    std::size_t roe_count_{0};
+    std::size_t intelligence_count_{0};
+};
+
 class MissionComputer {
 public:
     [[nodiscard]] Status init() noexcept;
@@ -215,6 +257,7 @@ public:
     // Commands, each applied only when its cmd_seq is new (ICD README section 5).
     void command_mode(const icd::MsnModeCmd& cmd) noexcept;
     void command(const icd::MsnCmd& cmd) noexcept;
+    void command_briefing(const icd::MsnBriefCmd& cmd) noexcept;
 
     // Mode code effects, relayed by the process from its RemoteTerminal.
     void reset() noexcept;
@@ -234,6 +277,7 @@ public:
     [[nodiscard]] const RouteManager& route() const noexcept { return route_; }
     [[nodiscard]] const Targeting& targeting() const noexcept { return targeting_; }
     [[nodiscard]] const OrderOfBattle& oob() const noexcept { return oob_; }
+    [[nodiscard]] const Briefing& briefing() const noexcept { return briefing_; }
     [[nodiscard]] bool position_valid() const noexcept { return position_valid_; }
 
 private:
@@ -246,8 +290,10 @@ private:
     RouteManager route_{};
     Targeting targeting_{};
     OrderOfBattle oob_{};
+    Briefing briefing_{};
     icd::MissionPhase phase_{icd::MissionPhase::PLANNING};
     icd::CmdStatus cmd_status_{icd::CmdStatus::NONE};
+    icd::CmdStatus brief_status_{icd::CmdStatus::NONE};
     bool position_valid_{false};
     bool have_flight_{false};
     std::uint32_t last_flight_frame_{0};
@@ -262,6 +308,7 @@ private:
     bus::BitWord bit_{};
     bus::CommandSequence mode_seq_{};
     bus::CommandSequence cmd_seq_{};
+    bus::CommandSequence brief_seq_{};
 };
 
 }  // namespace fmofp::mission

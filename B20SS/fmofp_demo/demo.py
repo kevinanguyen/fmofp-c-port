@@ -239,7 +239,19 @@ def default_events():
               m.ComCmd(cmd_seq=203, command=CommsCommand.DATALINK_SEND, message_id=1, priority=2)),
         Event(86.0, "comms: a radio transmission (FAILED while the field strength is under 20 %)",
               m.ComCmd(cmd_seq=204, command=CommsCommand.RADIO_TRANSMIT, message_id=2)),
-    ] + surface_events(), key=lambda event: event.seconds)
+    ] + surface_events() + briefing_events(), key=lambda event: event.seconds)
+
+
+def briefing_events():
+    """The mission briefing (unit 37): two objectives, a rule of engagement and an intelligence item, counted on the
+    MSN line ("brief 2/1/1"). The phase set at 1.6 s already put the radars in their en-route configuration."""
+    from fmofp_bus.briefing import brief_command
+    from fmofp_bus.icd.enums import BriefingCommand as BC
+    return [Event(1.7, "briefing: objective, the bridge", brief_command(BC.ADD_OBJECTIVE, "Destroy the bridge", cmd_seq=201)),
+            Event(1.8, "briefing: objective, home", brief_command(BC.ADD_OBJECTIVE, "Return to base", cmd_seq=202)),
+            Event(1.9, "briefing: rules of engagement", brief_command(BC.ADD_ROE, "Weapons tight", cmd_seq=203)),
+            Event(2.1, "briefing: intelligence", brief_command(BC.UPDATE_INTELLIGENCE, "SAM site north",
+                                                               key="threat", cmd_seq=204))]
 
 
 def surface_events():
@@ -508,6 +520,8 @@ class Dashboard:
                 text += f" route flown ({msn.waypoint_count} wp)"
             if msn.target_count:
                 text += f" tgt {msn.target_count}"
+            if msn.objective_count or msn.roe_count or msn.intelligence_count:
+                text += f" brief {msn.objective_count}/{msn.roe_count}/{msn.intelligence_count}"
             if msn.enemy_units:
                 text += f" hostile {msn.enemy_units}"
             parts.append(text)

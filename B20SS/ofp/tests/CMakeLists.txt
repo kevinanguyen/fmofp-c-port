@@ -38,6 +38,7 @@ add_executable(ofp_tests
     rt_process_test.cpp
     avionics_test.cpp
     crew_alerting_test.cpp
+    mission_allocation_test.cpp
     stores_management_test.cpp
     icd_messages_test.cpp)
 add_dependencies(ofp_tests ofp_icd_generate)

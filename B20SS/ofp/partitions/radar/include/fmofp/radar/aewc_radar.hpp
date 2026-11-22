@@ -139,6 +139,11 @@ public:
 
     // Applied only when its cmd_seq is new (ICD README section 5).
     void command_mode(const icd::RdrAewcModeCmd& cmd) noexcept;
+    // The mission phase's allocation (v1.29, radar::MissionAllocator): the mode change of a command without
+    // its number, and allocate() makes one from a mode, the radar's other settings kept; nothing when the
+    // radar is already in it.
+    void apply_mode(const icd::RdrAewcModeCmd& cmd) noexcept;
+    void allocate(icd::AewcMode requested) noexcept;
 
     void reset() noexcept;
     void start_self_test() noexcept;

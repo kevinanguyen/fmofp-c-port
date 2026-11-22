@@ -187,6 +187,10 @@ void WeatherRadar::command_mode(const icd::RdrWxModeCmd& cmd) noexcept {
         return;
     }
     status_.last_cmd_seq = cmd.cmd_seq;
+    apply_mode(cmd);
+}
+
+void WeatherRadar::apply_mode(const icd::RdrWxModeCmd& cmd) noexcept {
     if (!commandable(cmd.requested_state) || !icd::is_valid(cmd.requested_mode)) {
         status_.cmd_rejected = true;
         return;
@@ -438,6 +442,20 @@ void WeatherRadar::scan_now(const WeatherTruth& truth, WeatherMode scan_mode, st
     finish_scan(frame);
     status_.mode_transition = false;
     scan_.scanning = false;
+}
+
+void WeatherRadar::allocate(icd::WeatherMode requested) noexcept {
+    const icd::TerminalState wanted =
+        requested == icd::WeatherMode::NONE ? icd::TerminalState::STANDBY : icd::TerminalState::NORMAL;
+    if (status_.state == wanted && mode_ == requested) {
+        return;
+    }
+    icd::RdrWxModeCmd cmd{};
+    cmd.requested_state = wanted;
+    cmd.requested_mode = requested;
+    cmd.range_km = range_km_;
+    cmd.tilt = tilt_deg_;
+    apply_mode(cmd);
 }
 
 }  // namespace fmofp::radar

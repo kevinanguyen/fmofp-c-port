@@ -455,6 +455,10 @@ void SarRadar::command_mode(const icd::RdrSarModeCmd& cmd) noexcept {
         return;
     }
     status_.last_cmd_seq = cmd.cmd_seq;
+    apply_mode(cmd);
+}
+
+void SarRadar::apply_mode(const icd::RdrSarModeCmd& cmd) noexcept {
     if (!commandable(cmd.requested_state) || !icd::is_valid(cmd.requested_mode) || !std::isfinite(cmd.resolution) ||
         cmd.resolution < kSarMinResolutionM || cmd.resolution > kSarMaxResolutionM) {
         status_.cmd_rejected = true;
@@ -584,6 +588,19 @@ void SarRadar::fill_block() noexcept {
         rec.log_ratio = e.log_ratio_mean;
     }
     block_.change_count = static_cast<std::uint16_t>(n);
+}
+
+void SarRadar::allocate(icd::SarMode requested) noexcept {
+    const icd::TerminalState wanted =
+        requested == icd::SarMode::NONE ? icd::TerminalState::STANDBY : icd::TerminalState::NORMAL;
+    if (status_.state == wanted && mode_ == requested) {
+        return;
+    }
+    icd::RdrSarModeCmd cmd{};
+    cmd.requested_state = wanted;
+    cmd.requested_mode = requested;
+    cmd.resolution = resolution_m_;
+    apply_mode(cmd);
 }
 
 }  // namespace fmofp::radar
