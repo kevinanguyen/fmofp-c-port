@@ -8,7 +8,7 @@
   bits="11-8" means (word >> 8) & 0xF. A field may span two consecutive words
   (word="3-4" bits="31-0", most significant word first) for one 32-bit value.
 -->
-<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="27" status="DRAFT" date="2026-11-21">
+<icd name="FMOFP MIL-STD-1553B Bus ICD" version_major="1" version_minor="28" status="DRAFT" date="2026-11-21">
   <revision version="1.0-draft" date="2026-10-04" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">First draft, derived from FMOFP/rtAddressConfig.xml and FMOFP/MIL_STD_1553B/message_schemas.py.</revision>
   <revision version="1.0-draft.2" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 1-3: display addresses accepted; BIT merged into avionics (RT 1), FM fitness and SW configuration folded in as well; bus controller confirmed as its own process. RT 24-26 freed.</revision>
   <revision version="1.0-draft.3" date="2026-10-10" owner="Alee (TubAleeLo)" author="Claude, for Kevin Nguyen">Alee's answers 4-10: UDP transport accepted; legacy WEATHER mode dropped as unnecessary; every TBD value defined from the code that uses it; heading and yaw are true. Command parameters nothing consumed were removed.</revision>
@@ -1374,6 +1374,9 @@
       <field name="vibration_2" word="17" bits="15-0" type="uint" lsb="1/1000" units="EU" min="0" max="10" doc="Engine units, as the ECU reports them"/>
       <field name="compressor_efficiency_2" word="18" bits="15-0" type="uint" lsb="1/100" units="%" min="0" max="100"/>
     </message>
+    <message id="PLANT_FCS_SURFACES" rt="27" sa="23" dir="R" rate="10" title="Commanded control surfaces as received by the plant" layout_of="FCS_SURFACE_STATUS">
+      <doc>FCS_SURFACE_STATUS relayed to the plant (v1.28): the deflections the flight control computer commands, percent of travel, which the plant's flight dynamics model flies (fmofp_plant.dynamics, with --dynamics; README section 2). Ailerons + roll right, elevator + nose up, rudder + nose right; a surface whose SSM is not NORMAL counts as neutral.</doc>
+    </message>
     <message id="PLANT_THRUST_CMD" rt="27" sa="7" dir="R" words="3" rate="10" title="Thrust command as received by the plant" layout_of="ENG_THRUST_CMD">
       <doc>ENG_THRUST_CMD relayed to the plant: the thrust each engine runs at, taken while commands_valid is 1.</doc>
     </message>
@@ -2423,6 +2426,7 @@
     <relay from="FMS_CONTROL_STATUS" to="ENG_FMS_CONTROL"/>
     <relay from="PLANT_ENGINE" to="ENG_ENGINE_IN"/>
     <relay from="ENG_THRUST_CMD" to="PLANT_THRUST_CMD"/>
+    <relay from="FCS_SURFACE_STATUS" to="PLANT_FCS_SURFACES"/>
     <relay from="ENG_ENGINE_STATUS" to="BCAST_ENG_ENGINE_STATUS"/>
     <relay from="ENG_FUEL_STATUS" to="BCAST_ENG_FUEL_STATUS"/>
     <relay from="PLANT_TRAFFIC" to="RDR_TRAFFIC"/>

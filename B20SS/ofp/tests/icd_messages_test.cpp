@@ -16,7 +16,7 @@ using namespace fmofp::icd;  // NOLINT: test
 
 TEST(IcdVersion, MatchesTheDocument) {
     EXPECT_EQ(1, kIcdMajor);
-    EXPECT_EQ(27, kIcdMinor);
+    EXPECT_EQ(28, kIcdMinor);
 }
 
 TEST(FcsAttitude, ConstantsMatchTheIcd) {
@@ -180,8 +180,8 @@ TEST(MessageTable, NoTwoMessagesShareAnAddress) {
             EXPECT_FALSE(clash) << a.id << " and " << b.id;
         }
     }
-    EXPECT_EQ(166U, kMessages.size());
-    EXPECT_EQ(57U, kRelays.size());
+    EXPECT_EQ(167U, kMessages.size());
+    EXPECT_EQ(58U, kRelays.size());
 }
 
 }  // namespace

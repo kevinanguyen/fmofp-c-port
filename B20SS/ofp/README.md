@@ -402,6 +402,10 @@ zero, chaff released and a threat injected, and reads the list at the EICAS's bu
 `dbConfig.xml` and its rows to their dictionaries; `test_recorder_e2e.py` records eight terminals on a real
 bus in real time and reads the tables back (unit 33: `py -m fmofp_recorder`, or `py -m fmofp_demo --record`,
 writes them into `logs/recorder/`; `py -m fmofp_cli -c tables` and `-c "table fcs_data 5"` show them).
+`test_plant_dynamics.py` holds the plant's flight dynamics (unit 36, `py -m fmofp_plant --dynamics`, the demo's
+default): upstream's `FlightDynamicsProcessor` response against the frozen class, the turn, climb and speed the
+plant adds, the walk unchanged without `--dynamics`, and the real FCS's `FCS_SURFACE_CMD` pitching the plant's
+aircraft up over the bus (`do surface ELEVATOR 20` from the prompt does the same beside the demo).
 `test_cli_shortcuts.py` holds the prompt's unit 35 commands: `do NAME` (upstream's canned messages by name, each
 an ICD command: `do wx SURVEILLANCE 150`, `do tgt-lock 3`, `do attitude roll=10`; `do` lists them), `mode
 DAY|NIGHT|NVG [display ...]` (every display's mode command; the demo's `--mode`), and `test SUITE` (upstream's

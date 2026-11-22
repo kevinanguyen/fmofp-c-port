@@ -1,6 +1,6 @@
 # FMOFP 1553B ICD — tables
 
-> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.27 (DRAFT, 2026-11-21). Conventions, timing and transport are in [README.md](README.md).
+> Generated from `fmofp_icd.xml` by `tools/icd_tool.py render`. **Do not edit by hand.** ICD version 1.28 (DRAFT, 2026-11-21). Conventions, timing and transport are in [README.md](README.md).
 
 ## Terminals
 
@@ -187,6 +187,7 @@ RT 31 is broadcast. Unused: 24, 25, 29, 30.
 | [`PLANT_AIRFRAME`](#plant_airframe) | 27 | 20 | T | 4 | 1 | Airframe sensor readings from the plant | DRAFT |
 | [`PLANT_INJECT_CONTACT`](#plant_inject_contact) | 27 | 21 | R | 9 | aperiodic | A radar contact injected into the plant's traffic | DRAFT |
 | [`PLANT_INJECT_WEATHER`](#plant_inject_weather) | 27 | 22 | R | 6 | aperiodic | A storm cell injected into the plant's weather | DRAFT |
+| [`PLANT_FCS_SURFACES`](#plant_fcs_surfaces) | 27 | 23 | R | 7 | 10 | Commanded control surfaces as received by the plant | DRAFT |
 | [`SMS_MODE_CMD`](#sms_mode_cmd) | 28 | 10 | R | 1 | aperiodic | Stores management mode command | DRAFT |
 | [`SMS_STATUS`](#sms_status) | 28 | 10 | T | 16 | 5 | Stores management status | DRAFT |
 | [`SMS_CMD`](#sms_cmd) | 28 | 11 | R | 2 | aperiodic | Stores management command | DRAFT |
@@ -276,6 +277,7 @@ A relay between two block streams forwards the descriptor and each segment the s
 | [`FMS_CONTROL_STATUS`](#fms_control_status) | [`ENG_FMS_CONTROL`](#eng_fms_control) | 3 | 5 |
 | [`PLANT_ENGINE`](#plant_engine) | [`ENG_ENGINE_IN`](#eng_engine_in) | 19 | 10 |
 | [`ENG_THRUST_CMD`](#eng_thrust_cmd) | [`PLANT_THRUST_CMD`](#plant_thrust_cmd) | 3 | 10 |
+| [`FCS_SURFACE_STATUS`](#fcs_surface_status) | [`PLANT_FCS_SURFACES`](#plant_fcs_surfaces) | 7 | 10 |
 | [`ENG_ENGINE_STATUS`](#eng_engine_status) | [`BCAST_ENG_ENGINE_STATUS`](#bcast_eng_engine_status) (broadcast, heard by RT 5, 13, 14, 26) | 20 | 5 |
 | [`ENG_FUEL_STATUS`](#eng_fuel_status) | [`BCAST_ENG_FUEL_STATUS`](#bcast_eng_fuel_status) (broadcast, heard by RT 11, 13, 14, 26) | 7 | 1 |
 | [`PLANT_TRAFFIC`](#plant_traffic) | `RDR_TRAFFIC` | block: 4 + 32 per frame | 25 |
@@ -2544,6 +2546,14 @@ What the two turbofans' sensors read, from engineControlUnit.py's engine model r
 | 16 | 15-0 | `oil_temperature_2` | sint | LSB 1/100 degC, range -100 to 300 |  |
 | 17 | 15-0 | `vibration_2` | uint | LSB 1/1000 EU, range 0 to 10 | Engine units, as the ECU reports them |
 | 18 | 15-0 | `compressor_efficiency_2` | uint | LSB 1/100 %, range 0 to 100 |  |
+
+### PLANT_FCS_SURFACES
+
+**Commanded control surfaces as received by the plant** — RT 27 · SA 23 · receive (bus to terminal) · 7 words · 10 Hz
+
+FCS_SURFACE_STATUS relayed to the plant (v1.28): the deflections the flight control computer commands, percent of travel, which the plant's flight dynamics model flies (fmofp_plant.dynamics, with --dynamics; README section 2). Ailerons + roll right, elevator + nose up, rudder + nose right; a surface whose SSM is not NORMAL counts as neutral.
+
+Same layout as [`FCS_SURFACE_STATUS`](#fcs_surface_status).
 
 ### PLANT_THRUST_CMD
 

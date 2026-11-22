@@ -58,7 +58,7 @@ from fmofp_bus.icd.enums import (Affiliation, AvionicsCommand, LruHealth, CommsC
                                  PowerCommand, RadioMode, SensorCommand, SensorId, SmsCommand, SurfaceCommand, EcsCommand,
                                  FdmCommand, GearPosition, HydraulicCommand,
                                  RwrBand, TargetKind, ThreatType, UnitKind, WaypointType, Weapon, AewcMode, EngineCommand, EngineSelect, FmsFlightMode, FuelTank, LockStatus, SarMode,
-                                 Ssm,
+                                 Ssm, ControlSurface,
                                  TargetingMode, TerminalState, TfrMode, TrackFilter, WeatherMode)
 from fmofp_bus.monitor import Monitor
 from fmofp_bus.status import Status
@@ -118,7 +118,7 @@ def mode_events(mode_name, seconds=0.5):
 def default_events():
     """The scripted flight. The cmd_seq values start at 201 so they never collide with the radar display
     window's own numbering, which starts at 1 (a command with the same cmd_seq as the last one is ignored)."""
-    return [
+    return sorted([
         # The route runs up the northbound track the plant flies (home 0 N 0 E, 450 kt, heading 0): the
         # crossroad bridge 5 km out is a designated target, the initial point is at 8 km, the turn at 16 km,
         # the egress at 30 km; each is reached within 0.5 nm as the aircraft passes.
@@ -239,7 +239,23 @@ def default_events():
               m.ComCmd(cmd_seq=203, command=CommsCommand.DATALINK_SEND, message_id=1, priority=2)),
         Event(86.0, "comms: a radio transmission (FAILED while the field strength is under 20 %)",
               m.ComCmd(cmd_seq=204, command=CommsCommand.RADIO_TRANSMIT, message_id=2)),
-    ]
+    ] + surface_events(), key=lambda event: event.seconds)
+
+
+def surface_events():
+    """The flight control computer's surface commands the plant flies (unit 36): a climb of a few hundred feet and
+    back, a bank to the right and back. Each command holds until the next; heading and speed are held by default
+    (--hold), so the bank shows as roll on the PFD while the track stays the SAR's."""
+    def surface(seq, seconds, what, which, position):
+        return Event(seconds, f"FCS: {what}", m.FcsSurfaceCmd(cmd_seq=seq, surface=which, position=position))
+    return [surface(201, 53.0, "elevator 10 % nose up (the PFD's pitch rises)", ControlSurface.ELEVATOR, 10.0),
+            surface(202, 54.0, "elevator neutral (the pitch holds, the aircraft climbs)", ControlSurface.ELEVATOR, 0.0),
+            surface(203, 57.0, "elevator 10 % nose down (back to level)", ControlSurface.ELEVATOR, -10.0),
+            surface(204, 58.0, "elevator neutral", ControlSurface.ELEVATOR, 0.0),
+            surface(205, 64.0, "ailerons 10 % right (a bank to the right)", ControlSurface.AILERONS, 10.0),
+            surface(206, 64.5, "ailerons neutral (the bank holds)", ControlSurface.AILERONS, 0.0),
+            surface(207, 66.0, "ailerons 10 % left (wings level)", ControlSurface.AILERONS, -10.0),
+            surface(208, 66.5, "ailerons neutral", ControlSurface.AILERONS, 0.0)]
 
 
 def event_frame(event):
@@ -694,6 +710,8 @@ def main(argv=None):
                              "py -m fmofp_cli -c tables reads it")
     parser.add_argument("--theme", choices=("classic", "modern", "night"), default="classic",
                         help="the display windows' theme (modern: the holographic PFD and MFD, fed from the bus)")
+    parser.add_argument("--walk", action="store_true",
+                        help="the plant's random walk instead of the flight dynamics the FCS's surfaces fly (unit 36)")
     parser.add_argument("--mode", choices=("day", "night", "nvg"), type=str.lower, default=None,
                         help="the six displays' lighting mode, sent on the bus at 0.5 s (their DSP_*_MODE_CMD)")
     args = parser.parse_args(argv)
@@ -733,6 +751,8 @@ def main(argv=None):
     code = 1
     try:
         plant = [sys.executable, "-m", "fmofp_plant", "--port-base", str(args.port_base), "--quiet"]
+        if not args.walk:
+            plant.append("--dynamics")  # the aircraft flies the FCS's commanded surfaces (unit 36)
         if args.seed is not None:
             plant += ["--seed", str(args.seed)]
         if args.hold:

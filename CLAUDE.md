@@ -109,8 +109,8 @@ person may continue it in their next session; when it is green it is rebased ont
   one unanswered poll in the display e2e on the slow runner, the same code green on the next run, the Linux 3.13
   Python leg red on the flaky `test_weather_radar_live`), `782078f` (the rename and Alee), `8d67afd` (this file and
   `B20SS/verify.sh`), `d82173f` (merge of upstream/main `4c25f52`), `051e57d` (mission computer + comms, ICD v1.16).
-- **ICD** v1.27 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.28): 28 terminals, 166 message definitions
-  (216 after per-terminal expansion), 57 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
+- **ICD** v1.28 (`B20SS/icd/fmofp_icd.xml`; the next change takes v1.29): 28 terminals, 167 message definitions
+  (217 after per-terminal expansion), 58 message relays (15 broadcast), 24 block streams (12 layouts, 12 relayed
   copies), 9 mode codes, 89/89 legacy types mapped. The bus controller has a **command port** at `port_base + 34`
   since v1.23 (ICD README section 7): a client queues a receive transaction and is acknowledged with the
   controller's frame count; `fmofp_bus/command_port.py` is the Python client, `fmofp_bus/bus_view.py` the picture
@@ -119,7 +119,8 @@ person may continue it in their next session; when it is green it is rebased ont
   counted by the controller for all clients) and **gives each client its own copy of the monitor stream** (a
   monitor request, frame type 7: up to four listeners beside the fixed monitor port, three seconds a request);
   a view's frame count is the controller's own. v1.25 adds the crew alerting terminal (RT 26, unit 31), v1.26 the stores management terminal (RT 28, unit 32), v1.27
-  what the holographic PFD and MFD read (unit 34: the fuel and the warning contacts to the PFD, the stores to the MFD).
+  what the holographic PFD and MFD read (unit 34: the fuel and the warning contacts to the PFD, the stores to the MFD),
+  v1.28 the FCS's commanded deflections to the plant (`PLANT_FCS_SURFACES`, unit 36).
 - **C++ partitions (processes)**: FCS (RT 5), nav (RT 7), FMS (RT 12), radar computer
   (RT 9: weather, terrain-following, targeting + track fusion, AEWC, synthetic aperture),
   engine management (RT 3), mission computer (RT 6), communications (RT 2), defensive
@@ -134,7 +135,8 @@ person may continue it in their next session; when it is green it is rebased ont
   `fmofp_sensor_tool`, `fmofp_power_tool`, `fmofp_surfaces_tool`, `fmofp_utilities_tool`,
   `fmofp_avionics_tool`, `fmofp_cas_tool`, `fmofp_stores_tool` (stdin oracles for the Python tests).
 - **Python test equipment on the bus**: the plant `py -m fmofp_plant` (RT 27: the aircraft's
-  random-walk flight state, GPS pseudoranges, weather, terrain, two engines, air traffic, the
+  random-walk flight state, or with `--dynamics` (the demo's, unit 36) upstream's flight dynamics flown by the FCS's
+  commanded deflections, GPS pseudoranges, weather, terrain, two engines, air traffic, the
   ground scene, the RF environment, the ESM intercepts, the sensor scans, the electrical
   readings, the cabin, the hydraulic pressures, the airframe gauges; since v1.23 it takes the scenario engine's
   injections, an aircraft into its traffic and a storm cell into its sky); six display terminals
@@ -150,7 +152,7 @@ person may continue it in their next session; when it is green it is rebased ont
   (`fmofp_recorder/`: upstream's services' SQLite tables written from a copy of the monitor stream into
   `logs/recorder/`; `py -m fmofp_demo --record` runs it beside the demo); the bus library `fmofp_bus` with
   generated `fmofp_bus/icd/`.
-- **Load**: 25 terminals, 111 scheduled messages, worst minor frame 8852 us of the 10000 us budget since v1.27 (the
+- **Load**: 25 terminals, 111 scheduled messages, worst minor frame 8700 us of the 10000 us budget since v1.28 (the
   schedule's estimate; 23 terminals and 8612 us before unit 31). On Alee's machine after unit 32 (2026-11-18,
   optimised build): a 45 s headless demo, 2250 frames, 1 overrun, 25/25 answering. The numbers below are from
   before unit 31. The real-time demo, thirty seconds headless with the scripted events, 1500 frames, 23/23
@@ -160,7 +162,7 @@ person may continue it in their next session; when it is green it is rebased ont
   before that part: 2-3 overruns with 23 terminals (13 right after the gate), 0 with 22; after it, with the
   optimised build (2026-11-11, section 7): three runs, 1500 frames each, 0 overruns in all three, worst frame 11.5, 9.5 and 9.7 ms (24-26 ms on the debug build the day before), 23/23 answering, 19 scripted commands sent; after unit 29 (2026-11-14, section 7): four runs, 0 overruns in each, worst frame 7.6-8.3 ms, every terminal's worst answer under 1.8 ms; after the repairs of that day, the machine hours into builds: four runs, 0 overruns in each, worst frame 11.7-14.9 ms. **That rise was the machine that afternoon, not the repairs** (measured 2026-11-17, section 7): the code before the repairs and each step after them, flown in turn with two fixed plant seeds, thirty flights: 0 overruns in every one, the five versions' median worst frame 6.8 to 7.6 ms (7.0 before the repairs, 7.4 at the head), the radar computer's mean answer 40 us and its worst 1.0 to 1.6 ms for every version; the one flight flown while the desktop was busy read 18.9 ms. `fmofp_bc --report` now says which terminal held each overrun frame up (section
   5.5).
-- **Tests**: Python 372 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
+- **Tests**: Python 383 OK (`fmofp_bus/tests`, about 75 s on Kevin's machine, 90 s on Alee's); C++
   ctest 2/2 (355 hand-written gtests + generated ICD round-trip tests) on the debug build and on the optimised
   one, cppcheck clean; the whole Python suite also passes against the optimised build (`PRESET=<preset>-release
   bash B20SS/verify.sh cpp py load`); line coverage of the flight code 93.8 %, every module (bus, osal, bc, each
@@ -168,8 +170,9 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 34.5 of 37.5 units = **92 %** (section 2): units 36 to 38, the punch list's items 5 to 7 (Alee:
-  "lets move on to punch list item 4-7", 2026-11-21), are open; unit 35 (item 4, the prompt) is done. Units 1-30 were done on 2026-11-12; units 31 (the
+- **Meter**: 36 of 37.5 units = **96 %** (section 2): units 37 and 38, the punch list's items 6 and 7 (Alee:
+  "lets move on to punch list item 4-7", 2026-11-21), are open; units 35 (the prompt) and 36 (flight dynamics)
+  are done. Units 1-30 were done on 2026-11-12; units 31 (the
   EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18; unit 33
   (data recording, the punch list's item 2) and unit 34 (the display themes and the holographic PFD and MFD, the
   punch list's item 3) on 2026-11-21. Every unit is DONE or STRUCK. The punch list of
@@ -187,8 +190,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: unit 36, flight dynamics in the plant, `IN PROGRESS (Alee, 2026-11-21)`; units 37 and
-  38 open, Alee's to take in order. No `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: none claimed; units 37 and 38 open, Alee's to take in order. No `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -299,11 +301,11 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 33 | Data recording: the Python services' SQLite tables written from the bus, and the prompt's table commands | 1 | DONE 2026-11-21 |
 | 34 | Display themes and the holographic PFD and MFD, fed from the bus | 1.5 | DONE 2026-11-21 |
 | 35 | The prompt: upstream's canned messages as named shortcuts, the test suites, one mode for every display | 0.5 | DONE 2026-11-21 |
-| 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | IN PROGRESS (Alee, 2026-11-21) |
+| 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | DONE 2026-11-21 (flown by the FCS's commands; the surfaces terminal's loop is a ticket: section 2.36) |
 | 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | open |
 | 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | open |
 
-**Done: 34.5 / 37.5 = 92 %.** Open: units 36 to 38.
+**Done: 36 / 37.5 = 96 %.** Open: units 37 and 38.
 
 ### 2.35 The prompt, 0.5
 
@@ -323,6 +325,8 @@ test modules for each of upstream's nine suites (and the rest), run in a child p
 binaries; the demo's `--mode` (the displays' mode commands among its scripted events). No C++, no ICD change.
 
 ### 2.36 Flight dynamics in the plant, 1.5
+
+DONE 2026-11-21 (section 7, ICD v1.28), as Alee chose below.
 
 Added 2026-11-21 (Alee, section 8), the punch list's item 5. Upstream's FMS carried a flight-control package nothing
 ran (`attitude_calculator`, `control_surface_manager`, `flight_dynamics_processor`, `flight_control_system`, 1,773
@@ -910,7 +914,8 @@ Python suite by hand needs the `FMOFP_*` environment variables pointing at the b
 From `B20SS/`: `py -m fmofp_demo` starts the plant, every C++ partition, the six display
 windows and the bus controller, prints one dashboard line per second and drives the scripted
 events; Ctrl-C stops everything. Options: `--seconds S`, `--headless`, `--no-displays`,
-`--no-events`, `--hold heading=0,speed=450`, `--seed N`, `--port-base N`, `--build DIR`.
+`--no-events`, `--hold heading=0,speed=450`, `--seed N`, `--port-base N`, `--build DIR`, `--walk` (the plant's random walk instead
+of the flight dynamics, unit 36).
 Logs in `B20SS/logs/demo/` (ignored by git; the display programs log warnings and errors only, `py -m fmofp_display mfd --verbose` for everything). `B20SS/ofp/README.md` has the per-process
 command lines, `fmofp_bc --schedule --rt ...` prints the schedule and its load, and
 `fmofp_bc --report` the per-terminal statistics and, when it stops, where the frames' time went (unit 30: `bc: timing: overruns_late_start` and, per terminal, `mean_response_us`, `worst_response_us`, `overruns_slowest`; the demo's `logs/demo/bc.log` has them).
@@ -1203,6 +1208,10 @@ Python tests and displays
   `< /dev/null` in front of another command: it hung the tool for two minutes twice (section 4.8).
 - A radar command with a range, clearance or resolution of 0 encodes CLAMPED (the field's minimum): the prompt's
   shortcuts start from the radar window's values (200 km, 1000 ft, 1 m) and an argument overrides them.
+- Two Python classes that never ran together can each be right alone and wrong together: upstream's
+  FlightDynamicsProcessor pitches the nose down for a positive elevator against its own comment, and the flight
+  surfaces' ported laws push the wrong way under their message's documented convention. Before closing a loop
+  between ported pieces, write down each one's sign convention and check the loop's sign on paper (unit 36).
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -2837,6 +2846,35 @@ done before this file existed are condensed from the private session notes.
   process, the demo's events, and on the bus: `do wx SURVEILLANCE 150` moves the real radar computer and `mode NIGHT
   pfd` a display terminal). By hand: `py -m fmofp_cli -c "test fcs"` ran the suite (2 tests OK); `py -m fmofp_demo
   --mode night` sent its six commands. Meter 34.5 / 37.5 = 92 %.
+
+### 2026-11-21 - unit 36 flight dynamics in the plant - ICD v1.28 - by Alee's agent
+- *What*: the punch list's item 5, in the design Alee chose ("FCS commands fly it", section 8). `fmofp_plant/dynamics.py`
+  (new): `simplified_response`, upstream's `FlightDynamicsProcessor._calculate_simplified_response` step for step (the
+  one path the class runs), and `FlightDynamics`, which flies the plant's flight state from the flight control
+  computer's commanded deflections and adds what the class leaves out as plant world (the coordinated turn of a bank,
+  the climb of a pitch, the speed the engines' thrust holds). `PlantModel(dynamics=True)` / `py -m fmofp_plant
+  --dynamics`; `PlantModel.fly` (the walk without it), `surface_command`; the terminal takes `PLANT_FCS_SURFACES` each
+  frame. ICD v1.28: `PLANT_FCS_SURFACES` (27/23), `FCS_SURFACE_STATUS`'s relay. The demo flies the dynamics (`--walk`
+  for the random walk) and has eight FCS surface commands: a climb of about 380 ft between 53 and 58 s and back to
+  level, a bank to the right at 64 s and back at 66 s. `do surface ELEVATOR 20` from the prompt flies it too.
+- *How*: scoped from the frozen package; the plan's loop through the flight surfaces terminal was found to diverge
+  (section 2.36) and put to Alee before the claim. The random walk stays the plant's default, so no seeded flight and
+  no test changed.
+- *Departures and findings* (ICD README section 2, two rows): the class's elevator sign contradicts its comment (the
+  plant hands it minus the FCS's elevator, so nose up is nose up); the turn, climb and speed are the plant's; the
+  flight surfaces terminal's ported laws push the wrong way (unchanged, a ticket in section 12).
+- *Warnings / lessons*: section 6's line on sign conventions. The demo flight here had 409 overruns in 3500 frames with
+  a game running (175 late starts, a wake 102 ms late): not a measurement; the plant's mean answer was 241 us, as
+  before.
+- *Files*: `fmofp_plant/{dynamics,plant}.py`, `fmofp_demo/demo.py`, `fmofp_bus/tests/{test_plant_dynamics,
+  test_messages}.py`, `ofp/tests/icd_messages_test.cpp`, `icd/fmofp_icd.xml` + README + generated files,
+  `ofp/README.md`, this file.
+- *Tests and numbers*: `verify.sh` OK (icd cpp py load): Python 383 OK (was 372: `test_plant_dynamics.py` 11: the
+  constants and 500 random states against the frozen class, its elevator sign, level flight, a pitch-up that climbs
+  and holds, a bank that turns at g tan(roll)/V, the rudder, an unvouched surface neutral, the speed after the thrust,
+  the walk unchanged, the relayed message; and over the bus the real FCS's elevator command pitching the aircraft up),
+  ctest 2/2, cppcheck clean; load 111 messages, worst minor frame 8700 us (8852 before: the new relay moved the
+  phases). Optimised build rebuilt. Meter 36 / 37.5 = 96 %.
 
 ---
 

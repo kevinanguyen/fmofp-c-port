@@ -33,7 +33,10 @@ as PLANT_ELECTRICAL once a second, the generator held where the power management
 terminal commands it (PLANT_GEN_CMD).
 
 --hold freezes named quantities at fixed values, which is how the tests put the
-aircraft into a known situation.
+aircraft into a known situation. --dynamics (unit 36, the demo's) flies the aircraft
+instead of walking it: upstream's FlightDynamicsProcessor driven by the flight
+control computer's commanded deflections (PLANT_FCS_SURFACES), with the turn, the
+climb and the thrust's speed added (fmofp_plant.dynamics).
 """
 
 import argparse
@@ -44,7 +47,8 @@ import sys
 from fmofp_bus.block import BlockPublisher
 from fmofp_bus.icd.blocks import PlantGround, PlantSensorScan, PlantTerrain, PlantTraffic
 from fmofp_bus.icd.enums import GearPosition, Ssm
-from fmofp_bus.icd.messages import (PlantAirframe, PlantCabin, PlantElectrical, PlantEsm, PlantGenCmd, PlantGps,
+from fmofp_bus.icd.messages import (PlantAirframe, PlantCabin, PlantElectrical, PlantEsm, PlantFcsSurfaces,
+                                    PlantGenCmd, PlantGps,
                                     PlantHydraulics, PlantInjectContact, PlantInjectWeather, PlantRf, PlantSensors,
                                     PlantThrustCmd, PlantWeather)
 from fmofp_bus.rt_process import RtProcess
@@ -57,6 +61,7 @@ from fmofp_plant.esm import EsmWorld
 from fmofp_plant.rf import RfWorld
 from fmofp_plant.sensors import SensorScanWorld
 from fmofp_plant.terrain import FlatTerrain, HillTerrain, profile_message
+from fmofp_plant.dynamics import FlightDynamics
 from fmofp_plant.traffic import TrafficWorld, ownship_enu, ownship_velocity
 from fmofp_plant.weather import WeatherWorld
 
@@ -170,8 +175,11 @@ class PlantModel:
     def __init__(self, seed=None, terrain=None, latitude=HOME_LATITUDE, longitude=HOME_LONGITUDE,
                  gps_noise_m=3.0, gps_clock_bias_us=1.0, gps_outage=False, weather=True, traffic=True,
                  ground=True, rf=True, satellite_after_s=None, esm=True, scan_sensors=True, electrical=True,
-                 utilities=True):
+                 utilities=True, dynamics=False):
         self.rng = random.Random(seed)
+        # With dynamics the aircraft flies the FCS's commanded deflections (unit 36, fmofp_plant.dynamics) instead of
+        # the FCC's random walk; the walk's generator is then not drawn from, the other worlds' are unchanged.
+        self.dynamics = FlightDynamics() if dynamics else None
         # The weather draws from its own generator so adding it changed nothing else about a seeded run.
         self.weather = WeatherWorld(random.Random(None if seed is None else seed ^ 0x5745)) if weather else None
         self.weather_seq = 0
@@ -251,6 +259,24 @@ class PlantModel:
         self.pitch = max(-45, min(45, self.pitch))
         self.roll = max(-60, min(60, self.roll))
         self.angle_of_attack = min(25, self.angle_of_attack)
+
+    def fly(self, dt):
+        """One step of the flight state: the dynamics model with --dynamics, the FCC's random walk otherwise."""
+        if self.dynamics is None:
+            self.adjust()
+            return
+        engines = self.engines.engines
+        self.dynamics.step(self, dt, sum(e.thrust for e in engines) / len(engines))
+
+    def surface_command(self, words):
+        """A PLANT_FCS_SURFACES received: the deflections the dynamics model flies. True when applied."""
+        if self.dynamics is None:
+            return False
+        status, message = PlantFcsSurfaces.decode(words)
+        if status != Status.OK:
+            return False
+        self.dynamics.command(message.payload)
+        return True
 
     def move(self, dt):
         """Advance the position by the (held) speed and heading for dt seconds.
@@ -460,6 +486,7 @@ class PlantTerminal:
         self.syncs = 0
         self.publish_failures = 0
         self.thrust_commands = 0
+        self.surface_commands = 0
         self.generator_commands = 0
         self.injections = 0
         self.terrain_block = BlockPublisher(PlantTerrain.MAX_PAYLOAD_WORDS)
@@ -512,6 +539,12 @@ class PlantTerminal:
         status, words, fresh = self.process.terminal.get_received(PlantThrustCmd.SUBADDRESS)
         if status == Status.OK and fresh and self.model.thrust_command(words):
             self.thrust_commands += 1
+
+    def take_surface_command(self):
+        """Applies a PLANT_FCS_SURFACES that arrived since the last frame (unit 36: flown with --dynamics)."""
+        status, words, fresh = self.process.terminal.get_received(PlantFcsSurfaces.SUBADDRESS)
+        if status == Status.OK and fresh and self.model.surface_command(words):
+            self.surface_commands += 1
 
     def publish_terrain(self):
         status, words = self.model.terrain_message().encode()
@@ -617,6 +650,7 @@ class PlantTerminal:
             return False
         self.syncs += 1
         self.take_thrust_command()
+        self.take_surface_command()
         self.take_generator_command()
         self.take_injections()
         if self.syncs % SYNCS_PER_ECU_STEP == 0:
@@ -626,7 +660,7 @@ class PlantTerminal:
         if self.syncs % SYNCS_PER_GPS == 0:
             self.model.new_gps_epoch()
         if self.syncs % SYNCS_PER_WALK == 0:
-            self.model.adjust()
+            self.model.fly(1.0 / WALK_HZ)
             self.model.move(1.0 / WALK_HZ)
             self.publish_gps()  # the receiver's output follows the aircraft; the epoch count says when a fix is new
         if self.syncs % SYNCS_PER_WEATHER == 0:
@@ -703,6 +737,9 @@ def main(argv=None):
     parser.add_argument("--satellite-after", type=float, default=None,
                         help="a satellite comes into view after this many seconds instead of by chance")
     parser.add_argument("--hold", type=parse_hold, default={}, help="name=value,... held constant")
+    parser.add_argument("--dynamics", action="store_true",
+                        help="fly the flight control computer's commanded deflections (PLANT_FCS_SURFACES) with the "
+                             "flight dynamics model instead of the random walk")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
 
@@ -712,7 +749,7 @@ def main(argv=None):
                        gps_outage=args.gps_outage, weather=not args.no_weather, traffic=not args.no_traffic,
                        ground=not args.no_ground, rf=not args.no_rf, satellite_after_s=args.satellite_after,
                        esm=not args.no_esm, scan_sensors=not args.no_sensors, electrical=not args.no_electrical,
-                       utilities=not args.no_utilities)
+                       utilities=not args.no_utilities, dynamics=args.dynamics)
     model.hold = args.hold
     plant = PlantTerminal(model, args.port_base)
     status = plant.init()
@@ -735,7 +772,7 @@ def main(argv=None):
     c = plant.process.terminal.counters
     print(f"plant: syncs={plant.syncs} transmits={c.transmits} message_errors={c.message_errors} "
           f"publish_failures={plant.publish_failures} thrust_commands={plant.thrust_commands} "
-          f"generator_commands={plant.generator_commands}")
+          f"surface_commands={plant.surface_commands} generator_commands={plant.generator_commands}")
     return 0
 
 
