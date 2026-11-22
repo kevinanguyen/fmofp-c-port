@@ -190,7 +190,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: none claimed; unit 38 open, Alee's to take. No `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: unit 38, the user manual, `IN PROGRESS (Alee, 2026-11-22)`. No `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -303,7 +303,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 35 | The prompt: upstream's canned messages as named shortcuts, the test suites, one mode for every display | 0.5 | DONE 2026-11-21 |
 | 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | DONE 2026-11-21 (flown by the FCS's commands; the surfaces terminal's loop is a ticket: section 2.36) |
 | 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | DONE 2026-11-21 |
-| 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | open |
+| 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | IN PROGRESS (Alee, 2026-11-22) |
 
 **Done: 36.5 / 37.5 = 97.3 %.** Open: unit 38.
 
@@ -372,6 +372,11 @@ Added 2026-11-21 (Alee, section 8), the punch list's item 7. `B20SS/FMOFP_User_M
 `FMOFP/docs/` describe the Python application and its deleted messaging. Plan: rewrite the 13 stale chapters for the
 bus, the C++ partitions, the displays, the demo, the prompt, the scenario engine and the recorder, every command in
 them run before it is written; retire `FMOFP/docs`' Messaging and Threads pages.
+
+Scoped 2026-11-22, at the claim: all seventeen files (10,600 lines) describe the single Python application, its
+MIL-STD-1553B library, its messengers and its old CLI; the radar and display chapters describe the display classes
+the port still embeds, but their data paths and procedures are the deleted ones. The rewrite keeps the seventeen
+file names (the TOC and any link stay valid) and replaces their contents.
 
 ### 2.34 Display themes and holographic variants, 1.5
 
