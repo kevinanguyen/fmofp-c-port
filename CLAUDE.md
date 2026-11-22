@@ -187,7 +187,8 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: none claimed; units 36 to 38 open, Alee's to take in order. No `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: unit 36, flight dynamics in the plant, `IN PROGRESS (Alee, 2026-11-21)`; units 37 and
+  38 open, Alee's to take in order. No `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -298,7 +299,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 33 | Data recording: the Python services' SQLite tables written from the bus, and the prompt's table commands | 1 | DONE 2026-11-21 |
 | 34 | Display themes and the holographic PFD and MFD, fed from the bus | 1.5 | DONE 2026-11-21 |
 | 35 | The prompt: upstream's canned messages as named shortcuts, the test suites, one mode for every display | 0.5 | DONE 2026-11-21 |
-| 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | open |
+| 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | IN PROGRESS (Alee, 2026-11-21) |
 | 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | open |
 | 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | open |
 
@@ -331,6 +332,16 @@ the claim: that package as the plant's aircraft model (world, not flight logic),
 positions and the engines' thrust, its attitude, airspeed and altitude published as `PLANT_SENSORS` is today; the
 random walk kept as a plant option so seeded flights and the tests that hold a quantity still work.
 
+Scoped 2026-11-21, before the claim: the plan's loop cannot close through the flight surfaces terminal. Its
+positions are documented trailing edge down positive (`FSF_POSITIONS`), and under that convention the laws ported
+from FlightSurfaceService push the wrong way on both axes: elevator = -0.8 x pitch raises a raised nose further,
+right aileron = -0.5 x roll rolls a right roll further. The Python never closed the loop, so nothing showed it.
+Alee chose (section 8): the plant flies upstream's `FlightDynamicsProcessor` (its simplified response, the one
+path the class runs) from the flight control computer's commanded deflections, `FCS_SURFACE_STATUS` relayed to the
+plant (aileron + rolls right, elevator + nose up, rudder + nose right, percent of travel), with the kinematics the
+class leaves out (the turn of a banked aircraft, the climb of a pitched one, the speed the engines' thrust holds)
+as plant world; the surfaces terminal stays as ported and its reversed signs are an ICD README section 2 finding;
+the random walk stays the plant's default and the demo flies the dynamics (`--dynamics`).
 ### 2.37 Mission phase and mission data, 0.5
 
 Added 2026-11-21 (Alee, section 8), the punch list's item 6. Upstream's radar management had a mission-phase
@@ -3038,3 +3049,8 @@ done before this file existed are condensed from the private session notes.
   (the prompt, 0.5), 36 (flight dynamics in the plant, 1.5), 37 (mission phase and mission data, 0.5) and 38 (the
   user manual, 1). The total becomes 37.5, the meter 34 / 37.5 = 90.7 % until they land. They are taken in order,
   one claim at a time.
+- 2026-11-21, Alee ("FCS commands fly it") and Alee's agent: unit 36 flies the plant's aircraft with upstream's
+  FlightDynamicsProcessor driven by the flight control computer's commanded deflections (FCS_SURFACE_STATUS relayed
+  to the plant, ICD v1.28), not by the flight surfaces terminal's positions, whose ported laws are reversed in pitch
+  and roll (section 2.36); the surfaces terminal is not changed and the reversal is recorded as a finding. The random
+  walk stays the plant's default; `--dynamics` (the demo's) flies the model.
