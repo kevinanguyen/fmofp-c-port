@@ -171,12 +171,12 @@ person may continue it in their next session; when it is green it is rebased ont
   every partition's mean answer to the bus under 4 ms (measured 0.05-0.6 ms) and the schedule's estimate under
   9500 us (8612). CI (`.github/workflows/ci.yml` job `cpp`: linux-gcc, linux-asan, linux-gcc-release and, since
   unit 30 part 2, coverage; and Alee's eight Python legs).
-- **Meter**: 36.5 of 37.5 units = **97.3 %** (section 2): unit 38, the user manual (the punch list's item 7), is
-  open; units 35 (the prompt), 36 (flight dynamics) and 37 (the mission phase and briefing) are done. Units 1-30 were done on 2026-11-12; units 31 (the
+- **Meter**: 37.5 of 37.5 units = **100 %** (section 2): units 35 (the prompt), 36 (flight dynamics), 37 (the
+  mission phase and briefing) on 2026-11-21 and 38 (the user manual) on 2026-11-22 are done. Units 1-30 were done on 2026-11-12; units 31 (the
   EICAS's crew alert rules to C++) and 32 (a stores management computer for the SMS) on 2026-11-18; unit 33
   (data recording, the punch list's item 2) and unit 34 (the display themes and the holographic PFD and MFD, the
   punch list's item 3) on 2026-11-21. Every unit is DONE or STRUCK. The punch list of
-  2026-11-21 (section 7) has items 4 to 7 in the meter as units 35 to 38; item 1 is Kevin's. What comes next is not in the number: the intern-ticket authoring phase, which starts with
+  2026-11-21 (section 7) had items 2 to 7 in the meter as units 33 to 38, all done; item 1 is Kevin's. What comes next is not in the number: the intern-ticket authoring phase, which starts with
   the five open questions at the end of `ofp/docs/TICKETS.md`.
 - **The old Python application is retired** (unit 29, 2026-11-12, section 7): `FMOFP/local_messaging/`,
   `FMOFP/MIL_STD_1553B/`, `Interfaces/userInterface/messaging/`, `Interfaces/predefinedMessages/`, the boot
@@ -190,7 +190,7 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: unit 38, the user manual, `IN PROGRESS (Alee, 2026-11-22)`. No `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: none; no `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -207,7 +207,8 @@ person may continue it in their next session; when it is green it is rebased ont
   settings and a deletion); the optimised build as a leg of the gate (about a minute and a half more); and an
   answer proposed for each of the five ticket questions. (6) *Done 2026-11-17*: the worst frame after the
   repairs is explained (the Load line above). Backlog,
-  nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-21 (the fork compared with upstream: a
+  nobody's yet: the ICD README's section 12. Last session: Alee's, 2026-11-21/22 (units 35 to 38: the prompt, flight dynamics, the mission phase and
+  briefing, the user manual rewritten); before that, the same day, Alee's (the fork compared with upstream: a
   punch list of seven items, section 7; then unit 33, data recording, and unit 34, display variants, done); before it Alee's, 2026-11-18 (Kevin's
   `d334684` checked on his machine; units 31, crew alerting, and 32, stores management, added and done); before it Kevin's, 2026-11-17 (Alee's repair checked, the worst frame explained, a
   first-start failure repaired, section 7).
@@ -303,9 +304,9 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 35 | The prompt: upstream's canned messages as named shortcuts, the test suites, one mode for every display | 0.5 | DONE 2026-11-21 |
 | 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | DONE 2026-11-21 (flown by the FCS's commands; the surfaces terminal's loop is a ticket: section 2.36) |
 | 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | DONE 2026-11-21 |
-| 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | IN PROGRESS (Alee, 2026-11-22) |
+| 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | DONE 2026-11-22 |
 
-**Done: 36.5 / 37.5 = 97.3 %.** Open: unit 38.
+**Done: 37.5 / 37.5 = 100 %.** Open: none.
 
 ### 2.35 The prompt, 0.5
 
@@ -377,6 +378,11 @@ Scoped 2026-11-22, at the claim: all seventeen files (10,600 lines) describe the
 MIL-STD-1553B library, its messengers and its old CLI; the radar and display chapters describe the display classes
 the port still embeds, but their data paths and procedures are the deleted ones. The rewrite keeps the seventeen
 file names (the TOC and any link stay valid) and replaces their contents.
+
+DONE 2026-11-22 (section 7): the seventeen chapters rewritten (about 1,470 lines in place of 10,600), the
+prompt's commands of chapters 10 and 12 run against a flying aircraft before they were written down;
+`FMOFP/docs/Threads.md` and `FMOFP/docs/Messaging/` deleted (`FMOFP/docs/Displays/` stays: the display code's
+design notes, still true of the classes the port embeds).
 
 ### 2.34 Display themes and holographic variants, 1.5
 
@@ -1234,6 +1240,9 @@ Python tests and displays
   its apply step (`apply_mode`) and call the apply step.
 - The mission computer is NORMAL only while it hears the FMS's flight data: an end-to-end test of anything that
   follows its state needs the plant, the FCS, nav and the FMS beside it (`test_mission_briefing`).
+- A shortcut that names a mode must be checked against the terminal's own rule for it, not only encoded:
+  `do tgt-lock` sent the targeting radar's LOCK mode, which takes no lock (a lock is taken in TARGET_TRACK);
+  the shortcut test checked the encoding and passed. Found while writing the manual (unit 38).
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -2931,6 +2940,34 @@ done before this file existed are condensed from the private session notes.
   the airport set at COMPLETE, with the briefing counted 2/1/1), ctest 2/2 (359 gtests: four new for the mapping, the
   allocator, the radars' allocate and the briefing), cppcheck clean, lint OK (44 flight sources); one gate run red on
   `test_utilities_e2e` (the plant missed one poll in a 90 ms frame, a game running), green alone; load 8784 us. Meter 36.5 / 37.5 = 97.3 %.
+
+### 2026-11-22 - unit 38 the user manual - by Alee's agent
+- *What*: the punch list's item 7. `B20SS/FMOFP_User_Manual/`'s seventeen chapters rewritten for the port, file
+  names kept: the title and contents; getting started (install, build, the gate, the first flight); the legal page
+  (the port's own notes added); the system overview (the bus, the partitions, the displays, the Python tools, what
+  is frozen); one chapter per radar (its modes, its commands from the radar window and the prompt, what the
+  frozen Python did and what the port keeps or departs from); the PFD; the MFD, EICAS, TSD and SMS; the themes and
+  the holographic displays; flight management, flight control and the plant's two ways of flying; the bus and its
+  tools; operating procedures (the demo's options, the prompt's commands, scenarios, the recorder, an exercise);
+  building, testing and troubleshooting; appendices (the terminal and port tables, timing, the shortcuts, the test
+  suites, the documents, a glossary). `FMOFP/docs/Threads.md` and `FMOFP/docs/Messaging/` (the deleted messaging
+  and threads) deleted. One fix of unit 35 found while writing: `do tgt-lock` sent the targeting radar's LOCK mode,
+  in which the radar takes no lock; it sends TARGET_TRACK now (`fmofp_cli/shortcuts.py`, its test).
+- *How*: each chapter written from the code and the ICD README, not from the old text; the demo's and the prompt's
+  options read from their `--help`, the shortcut table from `do`, the enum names checked in `fmofp_bus/icd`. The
+  exercise of chapter 12 and the commands of chapter 10 were run against a headless demo with `--no-events` (port
+  base 50000) through `py -m fmofp_cli -c ...`: COMBAT made the FMS ARMED and the stores computer's master arm
+  ARMED; SET_PHASE INGRESS turned the five radars en route; the three briefing commands counted 1/1/1; two chaff
+  released (58 left); ELEVATOR 10 pitched the aircraft to the 25 degree clamp in six seconds and 0 held it; ARM_STATION
+  2 made three stations armed; `mode night` reached the PFD (`mode = NIGHT`). That flight had 208 overruns in
+  3500 frames (worst 78 ms) with the prompt's client programs starting beside it on a busy machine: not a
+  measurement. Every link between chapters checked by script.
+- *Warnings / lessons*: section 6's line on shortcuts. The manual says what the port does today, with its known
+  departures; where a chapter names a quirk it points to the ICD README's sections 2 and 12, which stay the
+  reference. `FMOFP/docs/Displays/` is kept.
+- *Files*: `B20SS/FMOFP_User_Manual/*.md` (17), `B20SS/FMOFP/docs/Threads.md` and `Messaging/` (deleted),
+  `fmofp_cli/shortcuts.py`, `fmofp_bus/tests/test_cli_shortcuts.py`, this file.
+- *Tests and numbers*: `verify.sh icd py` OK (see the commit); no C++ or ICD changed. Meter 37.5 / 37.5 = 100 %.
 
 ---
 

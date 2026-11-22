@@ -57,7 +57,7 @@ class ShortcutTest(unittest.TestCase):
                          (wx.requested_state, wx.requested_mode, wx.range_km, wx.tilt, wx.cmd_seq))
         self.assertEqual(TerminalState.STANDBY, build("wx", "NONE").requested_state, "mode NONE stands the radar by")
         lock = build("tgt-lock", "3")
-        self.assertEqual((TargetingMode.LOCK, 3), (lock.requested_mode, lock.lock_track_id))
+        self.assertEqual((TargetingMode.TARGET_TRACK, 3), (lock.requested_mode, lock.lock_track_id))
         self.assertEqual(TrackFilter.HOSTILE, build("tgt", "TARGET_SEARCH", "HOSTILE").track_filter)
         sector = build("aewc-sector", "10", "80")
         self.assertEqual(("SECTOR_SCAN", 10.0, 80.0), (sector.requested_mode.name, sector.azimuth_start,
