@@ -190,7 +190,8 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: none claimed; units 37 and 38 open, Alee's to take in order. No `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: unit 37, the mission phase driving the radars and the mission briefing, `IN PROGRESS
+  (Alee, 2026-11-21)`; unit 38 open. No `wip/` branch. **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -302,7 +303,7 @@ a reason written in section 8. Status values: `open`, `IN PROGRESS (<name>, <dat
 | 34 | Display themes and the holographic PFD and MFD, fed from the bus | 1.5 | DONE 2026-11-21 |
 | 35 | The prompt: upstream's canned messages as named shortcuts, the test suites, one mode for every display | 0.5 | DONE 2026-11-21 |
 | 36 | Flight dynamics in the plant: an aircraft that answers its controls, the surfaces' loop closed | 1.5 | DONE 2026-11-21 (flown by the FCS's commands; the surfaces terminal's loop is a ticket: section 2.36) |
-| 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | open |
+| 37 | Mission phase driving the radars; the mission's objectives, rules of engagement and intelligence | 0.5 | IN PROGRESS (Alee, 2026-11-21) |
 | 38 | The user manual rewritten for the bus, the C++ and the demo | 1 | open |
 
 **Done: 36 / 37.5 = 96 %.** Open: units 37 and 38.
@@ -354,6 +355,16 @@ called either. Plan, to be scoped before the claim: the mission computer's phase
 allocation says, and the objectives, rules of engagement and intelligence as `MSN_CMD` commands and `MSN_STATUS`
 fields; both new behaviour with the Python's rules, recorded in the ICD README section 2.
 
+Scoped 2026-11-21, before the claim: there is little behind either. `radarControl.update_mission_phase` reads the
+radar package's own flight phases (PRE_FLIGHT, TAKEOFF, CLIMB, CRUISE, DESCENT, APPROACH, LANDING, POST_FLIGHT),
+not the mission computer's (PLANNING, INGRESS, OBJECTIVE, EGRESS, COMPLETE), and configures only three of them:
+TAKEOFF and APPROACH the airport set (weather SURVEILLANCE, TFR TERRAIN_FOLLOWING, targeting, SAR and AEWC
+STANDBY), CRUISE the en-route set (weather SURVEILLANCE, TFR TERRAIN_FOLLOWING, targeting SEARCH, SAR STRIPMAP,
+AEWC SEARCH); nothing called it. MissionControl's `set_objectives` and `set_roe` copy a list of strings and
+`update_intelligence` merges a dictionary; nothing reads any of them. Alee chose to build all of it (section 8):
+the radar computer follows the mission phase through a mapping onto those configurations (INGRESS, OBJECTIVE and
+EGRESS en route, COMPLETE the airport set, PLANNING none), applied when the configuration changes; the briefing as
+`MSN_BRIEF_CMD` (one entry a command, up to 8 of each) with the counts in `MSN_STATUS`. ICD v1.29.
 ### 2.38 The user manual, 1
 
 Added 2026-11-21 (Alee, section 8), the punch list's item 7. `B20SS/FMOFP_User_Manual/` (17 chapters) and
@@ -3092,3 +3103,7 @@ done before this file existed are condensed from the private session notes.
   to the plant, ICD v1.28), not by the flight surfaces terminal's positions, whose ported laws are reversed in pitch
   and roll (section 2.36); the surfaces terminal is not changed and the reversal is recorded as a finding. The random
   walk stays the plant's default; `--dynamics` (the demo's) flies the model.
+- 2026-11-21, Alee ("Build all of it"): unit 37 is built though upstream has little behind it (section 2.37): the
+  radars follow the mission phase through a mapping the agent defines onto upstream's three configurations, and the
+  objectives, rules of engagement and intelligence are stored by the mission computer from a new MSN_BRIEF_CMD and
+  counted in MSN_STATUS. Both are new behaviour, recorded in the ICD README section 2. ICD v1.29.
