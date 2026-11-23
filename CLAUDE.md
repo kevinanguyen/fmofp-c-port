@@ -190,7 +190,8 @@ person may continue it in their next session; when it is green it is rebased ont
 - **Upstream**: merged through `4c25f52` (2026-11-02), and **the line is cut since unit 29**: later
   `TubAleeLo/fmofp` commits touch files this branch deleted or cut, so they are no longer merged (section 4.4).
   Port baseline for the ported logic stays `0ab9236` (Alee's freeze, 2026-10-10).
-- **Open work / claims**: none; no `wip/` branch. **Waiting on the humans, outside the
+- **Open work / claims**: none; no `wip/` branch. **CI**: `linux-asan` was red on its Build step from unit 37
+  (`2fbc4b0`) to unit 38 (`314431a`), every other job green; repaired 2026-11-23 (section 7). **Waiting on the humans, outside the
   meter**: (1) the ticket format: `ofp/docs/TICKETS.md` is still marked DRAFT, with five questions for Alee and
   Kevin at its end (how interns submit work, hints, planted-fault tickets, the level scale, the SSTR tickets as
   a model); tickets live as issues on this fork (Alee, section 8). (2) **Kevin: issues are switched off on the
@@ -1243,6 +1244,11 @@ Python tests and displays
 - A shortcut that names a mode must be checked against the terminal's own rule for it, not only encoded:
   `do tgt-lock` sent the targeting radar's LOCK mode, which takes no lock (a lock is taken in TARGET_TRACK);
   the shortcut test checked the encoding and passed. Found while writing the manual (unit 38).
+- The `linux-asan` job's compile errors can be reproduced on Windows: MinGW GCC cannot link the sanitizers,
+  but it compiles with `-fsanitize=undefined`, and that is where the extra `-Wconversion` findings come from.
+  Take each command from `build/windows-ucrt64/compile_commands.json`, add the flag, write the object to `NUL`
+  (a scratch script did all 117 sources in a few minutes). CI's logs need a GitHub login; the Actions API's
+  job list (step names, no login) says which step failed.
 
 Working on this machine (Kevin's)
 - `.claude/CLAUDE.md` in Kevin's clone is a private pointer to this file; the root file is
@@ -2968,6 +2974,24 @@ done before this file existed are condensed from the private session notes.
 - *Files*: `B20SS/FMOFP_User_Manual/*.md` (17), `B20SS/FMOFP/docs/Threads.md` and `Messaging/` (deleted),
   `fmofp_cli/shortcuts.py`, `fmofp_bus/tests/test_cli_shortcuts.py`, this file.
 - *Tests and numbers*: `verify.sh icd py` OK (see the commit); no C++ or ICD changed. Meter 37.5 / 37.5 = 100 %.
+
+### 2026-11-23 - CI's sanitizer build repaired; the punch list checked - by Alee's agent
+- *What*: Alee asked whether anything was left on the punch list. Items 2 to 7 are units 33 to 38, all done; item 1
+  is Kevin's and untouched (`git ls-remote`: the seven `bug/SSTR-*` branches, `intern-canonical` and
+  `port/flight-sim` are on the fork; the public API says the default branch is `main` and issues are off). The check
+  found **CI red since unit 37**: runs of `2fbc4b0`, `7b1dc40` and `314431a` failed on `C++ OFP (linux-asan)`'s Build
+  step alone, every other job green. Cause: the briefing's text packing written in unit 37,
+  `static_cast<std::uint16_t>(ch << 8U)` inside a conditional, in `fmofp_mission_tool` and
+  `mission_allocation_test.cpp`: under `-fsanitize=undefined` GCC reports the `int` the shift and the `|` produce as
+  narrowed into 16 bits (`-Werror=conversion`); the debug and optimised builds do not. Repaired by doing the
+  arithmetic in `unsigned` and narrowing once. The flight code (`mission_computer.cpp`) was already written that way.
+- *How*: reproduced on this machine by compiling those files from the debug build's compile database with
+  `-fsanitize=undefined` added (section 6); after the repair all 117 sources compile so. No behaviour changed.
+- *Files*: `ofp/partitions/mission/tools/mission_tool.cpp`, `ofp/tests/mission_allocation_test.cpp`, this file.
+- *Tests and numbers*: `verify.sh`: icd, cpp (ctest 2/2, cppcheck clean) and load OK; the Python suite 384 of 388 in
+  253 s with League of Legends running, the four failures in `test_display_render` (the EICAS oil row) and
+  `test_engine_e2e` (a 58 ms frame), both green when run alone with `test_mission_briefing` (14 OK). Meter
+  unchanged, 37.5 / 37.5 = 100 %.
 
 ---
 

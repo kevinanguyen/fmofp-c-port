@@ -124,11 +124,13 @@ icd::MsnBriefCmd brief(icd::BriefingCommand command, std::uint8_t seq, const cha
     std::array<std::uint16_t, mission::kBriefingKeyWords> k{};
     for (std::size_t i = 0; i < std::strlen(text) && i < mission::kBriefingTextChars; ++i) {
         const auto ch = static_cast<std::uint16_t>(static_cast<unsigned char>(text[i]));
-        t[i / 2] = static_cast<std::uint16_t>(t[i / 2] | (i % 2 == 0 ? static_cast<std::uint16_t>(ch << 8U) : ch));
+        const unsigned part = (i % 2 == 0) ? (static_cast<unsigned>(ch) << 8U) : static_cast<unsigned>(ch);
+        t[i / 2] = static_cast<std::uint16_t>(static_cast<unsigned>(t[i / 2]) | part);
     }
     for (std::size_t i = 0; i < std::strlen(key) && i < mission::kBriefingKeyChars; ++i) {
         const auto ch = static_cast<std::uint16_t>(static_cast<unsigned char>(key[i]));
-        k[i / 2] = static_cast<std::uint16_t>(k[i / 2] | (i % 2 == 0 ? static_cast<std::uint16_t>(ch << 8U) : ch));
+        const unsigned part = (i % 2 == 0) ? (static_cast<unsigned>(ch) << 8U) : static_cast<unsigned>(ch);
+        k[i / 2] = static_cast<std::uint16_t>(static_cast<unsigned>(k[i / 2]) | part);
     }
     c.text_0 = t[0]; c.text_1 = t[1]; c.text_2 = t[2]; c.text_3 = t[3]; c.text_4 = t[4]; c.text_5 = t[5];
     c.text_6 = t[6]; c.text_7 = t[7]; c.text_8 = t[8]; c.text_9 = t[9]; c.text_10 = t[10]; c.text_11 = t[11];

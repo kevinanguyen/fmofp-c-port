@@ -84,7 +84,8 @@ std::array<std::uint16_t, N> pack(const std::string& text) {
     std::array<std::uint16_t, N> words{};
     for (std::size_t i = 0; i < text.size() && i < 2 * N; ++i) {
         const auto ch = static_cast<std::uint16_t>(static_cast<unsigned char>(text[i]));
-        words[i / 2] = static_cast<std::uint16_t>(words[i / 2] | (i % 2 == 0 ? static_cast<std::uint16_t>(ch << 8U) : ch));
+        const unsigned part = (i % 2 == 0) ? (static_cast<unsigned>(ch) << 8U) : static_cast<unsigned>(ch);
+        words[i / 2] = static_cast<std::uint16_t>(static_cast<unsigned>(words[i / 2]) | part);
     }
     return words;
 }
